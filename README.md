@@ -1,2 +1,2 @@
-# olas-lst
+# OLAS-LST
 Liquid Staking for OLAS
