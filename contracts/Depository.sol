@@ -136,9 +136,8 @@ contract Depository {
         emit SetGuardianServiceStatuses(guardianServices, statuses);
     }
 
-    /// @dev Increases multisig activity by the guardian service.
-    /// @param multisigs Multisig addresses.
-    /// @param activityChanges Corresponding activity changes
+    /// @dev Adds staking models.
+    /// @param stakingModels Staking models.
     function addStakingModels(StakingModel[] memory stakingModels) external {
         // Check for whitelisted guardian agent
         if (!mapGuardianAgents[msg.sender]) {
@@ -149,7 +148,7 @@ contract Depository {
 
         uint256 localNum = numStakingModels;
         for(uint256 i = 0; i < stakingModels.length; ++i) {
-            mapStakingModels[localNum] = stakingModels;
+            mapStakingModels[localNum] = stakingModels[i];
             ++localNum;
         }
 
@@ -192,7 +191,7 @@ contract Depository {
         stAmount = getStAmount(olasAmount);
 
         // Get OLAS from the sender
-        IToken(olas).transferFrom(msg.sender, olasAmount);
+        IToken(olas).transferFrom(msg.sender, address(this), olasAmount);
         // Approve OLAS for veOLAS
         IToken(olas).approve(ve, olasAmount);
         // Lock OLAS for veOLAS
@@ -205,7 +204,7 @@ contract Depository {
 
     // TODO: renew lock, withdraw, evict by agent if not renewed? Then need to lock from the proxy controlled by the agent as well
 
-    function getStAmount(uint256 olasAmount) public returns (uint256 stAmount) {
+    function getStAmount(uint256 olasAmount) public view returns (uint256 stAmount) {
         stAmount = olasAmount;
     }
 }
