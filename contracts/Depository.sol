@@ -65,18 +65,19 @@ struct StakingModel {
 
 /// @title Depository - Smart contract for the stOLAS Depository.
 contract Depository {
-    event ImplementationUpdated(address indexed implementation);
     event OwnerUpdated(address indexed owner);
     event SetGuardianServiceStatuses(address[] contributeServices, bool[] statuses);
     event AddStakingModels(address indexed sender, StakingModel[] stakingModels);
     event ChangeModelStatuses(uint256[] modelIds, bool[] statuses);
-    event Deposit(address indexed sender, uint256 indexed modelId, uint256 olasAmount, uint256 stAmount);
+    event Deposit(address indexed sender, uint256 indexed modelId, uint256 indexed depositCoutner, uint256 olasAmount,
+        uint256 stAmount);
 
     address public immutable olas;
     address public immutable ve;
     address public immutable st;
 
     uint256 public numStakingModels;
+    uint256 public depositCounter;
     address public owner;
     address public oracle;
 
@@ -187,10 +188,22 @@ contract Depository {
             revert WrongStakingModel(modelId);
         }
 
+        if (olasAmount > type(uint96).max) {
+            revert Overflow(olasAmount, uint256(type(uint96).max));
+        }
+
+        // Check for staking model remainder
+        if (olasAmount > stakingModel.remainder) {
+            revert Overflow(olasAmount, stakingModel.remainder);
+        }
+
+        // Update staking model remainder
+        stakingModel.remainder = stakingModel.remainder - uint96(olasAmount);
+
         // Get stOLAS amount from the provided OLAS amount
         stAmount = getStAmount(olasAmount);
 
-        // Get OLAS from the sender
+        // Get OLAS from sender
         IToken(olas).transferFrom(msg.sender, address(this), olasAmount);
         // Approve OLAS for veOLAS
         IToken(olas).approve(ve, olasAmount);
@@ -199,7 +212,10 @@ contract Depository {
         // Mint stOLAS
         IToken(st).mint(msg.sender, stAmount);
 
-        emit Deposit(msg.sender, modelId, olasAmount, stAmount);
+        uint256 localDepositCounter = depositCounter;
+        depositCounter = localDepositCounter + 1;
+
+        emit Deposit(msg.sender, modelId, localDepositCounter, olasAmount, stAmount);
     }
 
     // TODO: renew lock, withdraw, evict by agent if not renewed? Then need to lock from the proxy controlled by the agent as well
