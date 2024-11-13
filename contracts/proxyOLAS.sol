@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import {stOLAS, MinterOnly} from "./stOLAS.sol";
 
 /// @title stOLASL2 - Smart contract for the stOLAS token on L2.
-contract stOLASL2 is stOLAS {
+contract proxyOLAS is stOLAS {
 
     constructor() stOLAS() {}
 

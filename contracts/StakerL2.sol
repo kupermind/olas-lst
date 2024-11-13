@@ -1,9 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import {ERC721TokenReceiver} from "../lib/autonolas-registries/lib/solmate/src/tokens/ERC721.sol";
 import {IService} from "./interfaces/IService.sol";
 import {IStaking} from "./interfaces/IStaking.sol";
 import {IToken, INFToken} from "./interfaces/IToken.sol";
+
+// Multisig interface
+interface IMultisig {
+    /// @dev Returns array of owners.
+    /// @return Array of Safe owners.
+    function getOwners() external view returns (address[] memory);
+}
 
 /// @dev Only `owner` has a privilege, but the `sender` was provided.
 /// @param sender Sender address.
@@ -37,20 +45,17 @@ error ReentrancyGuard();
 /// @param stakingProxy Staking proxy address.
 error WrongStakingInstance(address stakingProxy);
 
-/// @dev Service is not found.
-/// @param serviceId Service Id.
-error ServiceNotFound(uint256 serviceId);
-
 /// @dev Request Id already processed.
 /// @param requestId Request Id.
 error AlreadyProcessed(uint256 requestId);
 
 /// @title StakerL2 - Smart contract for staking OLAS on L2.
-contract StakerL2 {
+contract StakerL2 is ERC721TokenReceiver {
     event OwnerUpdated(address indexed owner);
     event SetGuardianServiceStatuses(address[] guardianServices, bool[] statuses);
     event Stake(address indexed sender, address indexed account, uint256 indexed depositCounter, uint256 olasAmount);
     event CreateAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig);
+    event DeployAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig);
     event Unstake(address indexed sender, address indexed stakingProxy, uint256 indexed serviceId);
 
     // Number of agent instances
@@ -92,7 +97,8 @@ contract StakerL2 {
     mapping(address => uint256) public balanceOf;
     mapping(address => uint256) public mapStakingProxyBalances;
     mapping(uint256 => bool) public mapDepositCounters;
-    mapping(address => uint256) public mapLastStakedServiceIds;
+    mapping(address => uint256[]) public mapStakedServiceIds;
+    mapping(address => uint256) public mapLastStakedServiceIdxs;
 
     /// @dev StakerL2 constructor.
     /// @param _serviceManager Service manager address.
@@ -227,10 +233,10 @@ contract StakerL2 {
     }
 
     /// @dev Stakes the already deployed service.
+    /// @param stakingProxy Staking proxy address.
     /// @param serviceId Service Id.
     /// @param multisig Corresponding service multisig.
-    /// @param stakingProxy Staking proxy address.
-    function _stake(uint256 serviceId, address multisig, address stakingProxy) internal {
+    function _stake(address stakingProxy, uint256 serviceId, address multisig) internal {
         // Approve service NFT for the staking instance
         INFToken(serviceRegistry).approve(stakingProxy, serviceId);
 
@@ -246,21 +252,47 @@ contract StakerL2 {
         (uint256 serviceId, address multisig) = _createAndDeploy(proxyOlas, minStakingDeposit);
 
         // Stake the service
-        _stake(serviceId, multisig, stakingProxy);
+        _stake(stakingProxy, serviceId, multisig);
 
-        // TODO create a cyclic map of service Ids?
-        mapLastStakedServiceIds[stakingProxy] = serviceId;
+        // Record last service Id index
+        mapLastStakedServiceIdxs[stakingProxy] = mapStakedServiceIds[stakingProxy].length;
+        mapStakedServiceIds[stakingProxy].push(serviceId);
 
         emit CreateAndStake(stakingProxy, serviceId, multisig);
+    }
+
+    /// @dev Stakes the already deployed service.
+    /// @param stakingProxy Staking proxy address.
+    /// @param serviceId Service Id.
+    function _deployAndStake(address stakingProxy, uint256 serviceId) internal {
+        // Get the service multisig
+        (, address multisig, , , , , ) = IService(serviceRegistry).mapServices(serviceId);
+
+        // Activate registration (1 wei as a deposit wrapper)
+        IService(serviceManager).activateRegistration{value: 1}(serviceId);
+
+        address[] memory instances = IMultisig(multisig).getOwners();
+        // Get agent Ids
+        uint32[] memory agentIds = new uint32[](NUM_AGENT_INSTANCES);
+        agentIds[0] = uint32(agentId);
+
+        // Register msg.sender as an agent instance (numAgentInstances wei as a bond wrapper)
+        IService(serviceManager).registerAgents{value: NUM_AGENT_INSTANCES}(serviceId, instances, agentIds);
+
+        // Stake the service
+        _stake(stakingProxy, serviceId, multisig);
+
+        emit DeployAndStake(stakingProxy, serviceId, multisig);
     }
 
     /// @dev Finds the lasst staked service and unstakes it.
     /// @param stakingProxy Staking proxy address.
     function _unstake(address stakingProxy) internal {
-        uint256 serviceId = mapLastStakedServiceIds[stakingProxy];
-
-        if (serviceId == 0) {
-            revert ServiceNotFound(serviceId);
+        // Get the last staked Service Id index
+        uint256 lastIdx = mapLastStakedServiceIdxs[stakingProxy];
+        uint256 serviceId = mapStakedServiceIds[stakingProxy][lastIdx];
+        if (lastIdx > 0) {
+            mapLastStakedServiceIdxs[stakingProxy] = lastIdx - 1;
         }
 
         // Unstake the service
@@ -294,7 +326,7 @@ contract StakerL2 {
         }
 
         balanceOf[account] += olasAmount;
-        // Mint stOLASL2
+        // Mint proxyOLAS
         IToken(proxyOlas).mint(address(this), olasAmount);
 
         uint256 balance = mapStakingProxyBalances[stakingProxy];
@@ -306,9 +338,18 @@ contract StakerL2 {
             // Approve token for the serviceRegistryTokenUtility contract
             IToken(proxyOlas).approve(serviceRegistryTokenUtility, stakeDeposit);
 
-            // TODO Find if there's a service for this stake already
-            
-            _createAndStake(stakingProxy, minStakingDeposit);
+            // Get already existent service or create a new one
+            uint256 lastIdx = mapLastStakedServiceIdxs[stakingProxy] + 1;
+            uint256 serviceId;
+            if (lastIdx < mapStakedServiceIds[stakingProxy].length) {
+                serviceId = mapStakedServiceIds[stakingProxy][lastIdx];
+            }
+
+            if (serviceId == 0) {
+                _createAndStake(stakingProxy, minStakingDeposit);
+            } else {
+                _deployAndStake(stakingProxy, serviceId);
+            }
 
             balance -= stakeDeposit;
         }
@@ -352,7 +393,7 @@ contract StakerL2 {
         }
         mapStakingProxyBalances[stakingProxy] = balance;
 
-        // Burn stOLASL2
+        // Burn proxyOLAS
         IToken(proxyOlas).burn(olasAmount);
 
         _locked = 1;
@@ -363,6 +404,9 @@ contract StakerL2 {
         if(!IStaking(stakingFactory).verifyInstance(stakingProxy)) {
             revert WrongStakingInstance(stakingProxy);
         }
+
+        // TODO Check number of staked services
+        //
 
         // Get the token info from the staking contract
         // If this call fails, it means the staking contract does not have a token and is not compatible
@@ -387,6 +431,16 @@ contract StakerL2 {
     }
 
     function isAbleWithdraw(address stakingProxy, uint256 olasAmount) public view returns (bool) {
+        uint256 numServices = mapStakedServiceIds[stakingProxy].length;
+        if (numServices == 0) {
+            revert ZeroValue();
+        }
+
+        uint256 lastIdx = mapLastStakedServiceIdxs[stakingProxy];
+        if (lastIdx == 0) {
+            revert ZeroValue();
+        }
+
         return true;
     }
 }
