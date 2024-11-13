@@ -82,6 +82,8 @@ contract StakerL2 is ERC721TokenReceiver {
     address public immutable stakingFactory;
     // Safe multisig processing contract address
     address public immutable safeMultisig;
+    // Safe same address multisig processing contract address
+    address public immutable safeSameAddressMultisig;
     // Safe fallback handler
     address public immutable fallbackHandler;
 
@@ -106,6 +108,7 @@ contract StakerL2 is ERC721TokenReceiver {
     /// @param _proxyOlas OLAS proxy token address.
     /// @param _stakingFactory Staking factory address.
     /// @param _safeMultisig Safe multisig address.
+    /// @param _safeSameAddressMultisig Safe multisig processing contract address.
     /// @param _fallbackHandler Multisig fallback handler address.
     /// @param _agentId Contributor agent Id.
     /// @param _configHash Contributor service config hash.
@@ -115,13 +118,15 @@ contract StakerL2 is ERC721TokenReceiver {
         address _proxyOlas,
         address _stakingFactory,
         address _safeMultisig,
+        address _safeSameAddressMultisig,
         address _fallbackHandler,
         uint256 _agentId,
         bytes32 _configHash
     ) {
         // Check for zero addresses
         if (_serviceManager == address(0) || _olas == address(0) || _proxyOlas == address(0) ||
-            _stakingFactory == address(0) || _safeMultisig == address(0) || _fallbackHandler == address(0)) {
+            _stakingFactory == address(0) || _safeMultisig == address(0) || _safeSameAddressMultisig == address(0) ||
+            _fallbackHandler == address(0)) {
             revert ZeroAddress();
         }
 
@@ -235,13 +240,16 @@ contract StakerL2 is ERC721TokenReceiver {
     /// @dev Stakes the already deployed service.
     /// @param stakingProxy Staking proxy address.
     /// @param serviceId Service Id.
-    /// @param multisig Corresponding service multisig.
-    function _stake(address stakingProxy, uint256 serviceId, address multisig) internal {
+    function _stake(address stakingProxy, uint256 serviceId) internal {
         // Approve service NFT for the staking instance
         INFToken(serviceRegistry).approve(stakingProxy, serviceId);
 
         // Stake the service
         IStaking(stakingProxy).stake(serviceId);
+
+        // Record last service Id index
+        mapLastStakedServiceIdxs[stakingProxy] = mapStakedServiceIds[stakingProxy].length;
+        mapStakedServiceIds[stakingProxy].push(serviceId);
     }
     
     /// @dev Creates and deploys a service, and stakes it with a specified staking contract.
@@ -252,11 +260,7 @@ contract StakerL2 is ERC721TokenReceiver {
         (uint256 serviceId, address multisig) = _createAndDeploy(proxyOlas, minStakingDeposit);
 
         // Stake the service
-        _stake(stakingProxy, serviceId, multisig);
-
-        // Record last service Id index
-        mapLastStakedServiceIdxs[stakingProxy] = mapStakedServiceIds[stakingProxy].length;
-        mapStakedServiceIds[stakingProxy].push(serviceId);
+        _stake(stakingProxy, serviceId);
 
         emit CreateAndStake(stakingProxy, serviceId, multisig);
     }
@@ -279,8 +283,12 @@ contract StakerL2 is ERC721TokenReceiver {
         // Register msg.sender as an agent instance (numAgentInstances wei as a bond wrapper)
         IService(serviceManager).registerAgents{value: NUM_AGENT_INSTANCES}(serviceId, instances, agentIds);
 
+        // Re-deploy the service
+        bytes memory data = abi.encodePacked(multisig);
+        IService(serviceManager).deploy(serviceId, safeSameAddressMultisig, data);
+
         // Stake the service
-        _stake(stakingProxy, serviceId, multisig);
+        _stake(stakingProxy, serviceId);
 
         emit DeployAndStake(stakingProxy, serviceId, multisig);
     }
@@ -345,10 +353,11 @@ contract StakerL2 is ERC721TokenReceiver {
                 serviceId = mapStakedServiceIds[stakingProxy][lastIdx];
             }
 
-            if (serviceId == 0) {
-                _createAndStake(stakingProxy, minStakingDeposit);
-            } else {
+            // Deploy and stake already existent service or create a new one first
+            if (serviceId > 0) {
                 _deployAndStake(stakingProxy, serviceId);
+            } else {
+                _createAndStake(stakingProxy, minStakingDeposit);
             }
 
             balance -= stakeDeposit;
