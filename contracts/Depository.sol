@@ -61,10 +61,8 @@ error UnauthorizedAccount(address account);
 error WrongStakingModel(uint256 modelId);
 
 struct StakingTerm {
-    address stakingProxy;
-    uint96 userSupply;
     address lockProxy;
-    uint64 chainId;
+    uint96 userSupply;
 }
 
 struct StakingModel {
@@ -235,6 +233,7 @@ contract Depository {
         emit ChangeModelStatuses(modelIds, statuses);
     }
 
+    // TODO: array of modelId-s and olasAmount-s as on stake might not fit into one model
     function deposit(uint256 modelId, uint256 olasAmount) external returns (uint256 stAmount) {
         // Get staking model
         StakingModel storage stakingModel = mapStakingModels[modelId];
