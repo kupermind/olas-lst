@@ -1,6 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import {LockProxy} from "./LockProxy.sol";
+
+interface ILock {
+    function initialize(address depository) external;
+
+    /// @dev Deposits `amount` tokens for `msg.sender` and locks for `unlockTime`.
+    /// @notice Tokens are taken from `msg.sender`'s balance.
+    /// @param amount Amount to deposit.
+    /// @param unlockTime Time when tokens unlock, rounded down to a whole week.
+    function createLock(uint256 amount, uint256 unlockTime) external;
+}
+
 interface IToken {
     /// @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
     /// @param spender Account address that will be able to transfer tokens on behalf of the caller.
@@ -19,15 +31,6 @@ interface IToken {
     /// @param account Account address.
     /// @param amount Token amount.
     function mint(address account, uint256 amount) external;
-}
-
-interface IVotingEscrow {
-    /// @dev Deposits `amount` tokens for `account` and locks for `unlockTime`.
-    /// @notice Tokens are taken from `msg.sender`'s balance.
-    /// @param account Account address.
-    /// @param amount Amount to deposit.
-    /// @param unlockTime Time when tokens unlock, rounded down to a whole week.
-    function createLockFor(address account, uint256 amount, uint256 unlockTime) external;
 }
 
 /// @dev Only `owner` has a privilege, but the `sender` was provided.
@@ -54,11 +57,17 @@ error UnauthorizedAccount(address account);
 
 error WrongStakingModel(uint256 modelId);
 
+struct StakingTerm {
+    address stakingProxy;
+    uint96 userSupply;
+    address lockProxy;
+    uint64 chainId;
+}
+
 struct StakingModel {
-    address stakingContract;
+    address stakingProxy;
     uint96 supply;
     uint96 remainder;
-    uint64 vesting;
     uint64 chainId;
     bool active;
 }
@@ -72,23 +81,30 @@ contract Depository {
     event Deposit(address indexed sender, uint256 indexed modelId, uint256 indexed depositCoutner, uint256 olasAmount,
         uint256 stAmount);
 
+    uint256 public immutable vesting;
     address public immutable olas;
     address public immutable ve;
     address public immutable st;
+    address public immutable lockImplementation;
 
     uint256 public numStakingModels;
     uint256 public depositCounter;
     address public owner;
     address public oracle;
 
+    uint256 internal _nonce;
+
+    mapping(address => StakingTerm) public mapStakingTerms;
     mapping(uint256 => StakingModel) public mapStakingModels;
     mapping(address => bool) public mapGuardianAgents;
     
-    constructor(address _olas, address _ve, address _st, address _oracle) {
+    constructor(address _olas, address _ve, address _st, address _oracle, address _lockImplementation, uint256 _vesting) {
         olas = _olas;
         ve = _ve;
         st = _st;
         oracle = _oracle;
+        lockImplementation = _lockImplementation;
+        vesting = _vesting;
 
         owner = msg.sender;
     }
@@ -197,6 +213,29 @@ contract Depository {
             revert Overflow(olasAmount, stakingModel.remainder);
         }
 
+        StakingTerm storage stakingTerm = mapStakingTerms[msg.sender];
+        address lockProxy = stakingTerm.lockProxy;
+        // Create lock contract if needed
+        if (lockProxy != address(0)) {
+            uint256 localNonce = _nonce;
+            bytes32 randomNonce = bytes32(uint256(keccak256(abi.encodePacked(block.timestamp, msg.sender, localNonce))));
+            bytes memory deploymentData = abi.encodePacked(type(LockProxy).creationCode, uint256(uint160(lockImplementation)));
+            // solhint-disable-next-line no-inline-assembly
+            assembly {
+                lockProxy := create2(0x0, add(0x20, deploymentData), mload(deploymentData), randomNonce)
+            }
+
+            if (address(lockProxy) == address(0)) {
+                revert ZeroAddress();
+            }
+            _nonce = localNonce + 1;
+
+            // Initialize the lock proxy
+            ILock(lockProxy).initialize(address(this));
+        }
+
+        // TODO check for the vesting to correspond to staking contract
+
         // Update staking model remainder
         stakingModel.remainder = stakingModel.remainder - uint96(olasAmount);
 
@@ -205,10 +244,11 @@ contract Depository {
 
         // Get OLAS from sender
         IToken(olas).transferFrom(msg.sender, address(this), olasAmount);
-        // Approve OLAS for veOLAS
-        IToken(olas).approve(ve, olasAmount);
+        // Approve OLAS for lockProxy
+        IToken(olas).approve(lockProxy, olasAmount);
+        // TODO: choose corresponding action: create new lock, increase amount, increase lock time
         // Lock OLAS for veOLAS
-        IVotingEscrow(ve).createLockFor(msg.sender, olasAmount, stakingModel.vesting);
+        ILock(lockProxy).createLock(olasAmount, vesting);
         // Mint stOLAS
         IToken(st).mint(msg.sender, stAmount);
 

@@ -10,7 +10,7 @@ contract stOLASL2 is stOLAS {
 
     /// @dev Burns stOLASL2 tokens.
     /// @param amount stOLASL2 token amount to burn.
-    function burn(uint256 amount) external {
+    function burn(uint256 amount) external override {
         // Access control
         if (msg.sender != minter) {
             revert MinterOnly(msg.sender, minter);
