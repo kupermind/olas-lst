@@ -48,7 +48,7 @@ error WrongStakingModel(uint256 modelId);
 /// @title StakerL2 - Smart contract for staking OLAS on L2.
 contract StakerL2 {
     event OwnerUpdated(address indexed owner);
-    event SetGuardianServiceStatuses(address[] contributeServices, bool[] statuses);
+    event SetGuardianServiceStatuses(address[] guardianServices, bool[] statuses);
     event Stake(address indexed sender, address indexed account, uint256 indexed depositCoutner, uint256 olasL2Amount);
 
     address public immutable olasL2;

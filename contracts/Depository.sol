@@ -41,6 +41,9 @@ error OwnerOnly(address sender, address owner);
 /// @dev Zero address.
 error ZeroAddress();
 
+/// @dev The contract is already initialized.
+error AlreadyInitialized();
+
 /// @dev Wrong length of two arrays.
 /// @param numValues1 Number of values in a first array.
 /// @param numValues2 Number of values in a second array.
@@ -74,12 +77,16 @@ struct StakingModel {
 
 /// @title Depository - Smart contract for the stOLAS Depository.
 contract Depository {
+    event ImplementationUpdated(address indexed implementation);
     event OwnerUpdated(address indexed owner);
-    event SetGuardianServiceStatuses(address[] contributeServices, bool[] statuses);
+    event SetGuardianServiceStatuses(address[] guardianServices, bool[] statuses);
     event AddStakingModels(address indexed sender, StakingModel[] stakingModels);
     event ChangeModelStatuses(uint256[] modelIds, bool[] statuses);
     event Deposit(address indexed sender, uint256 indexed modelId, uint256 indexed depositCoutner, uint256 olasAmount,
         uint256 stAmount);
+
+    // Code position in storage is keccak256("DEPOSITORY_PROXY") = "0x40f951bb727bcaf251807e38aa34e1b3f20d890f9f3286454f4c473c60a21cdc"
+    bytes32 public constant DEPOSITORY_PROXY = 0x40f951bb727bcaf251807e38aa34e1b3f20d890f9f3286454f4c473c60a21cdc;
 
     uint256 public immutable vesting;
     address public immutable olas;
@@ -97,7 +104,8 @@ contract Depository {
     mapping(address => StakingTerm) public mapStakingTerms;
     mapping(uint256 => StakingModel) public mapStakingModels;
     mapping(address => bool) public mapGuardianAgents;
-    
+
+    // TODO change to initialize in prod
     constructor(address _olas, address _ve, address _st, address _oracle, address _lockImplementation, uint256 _vesting) {
         olas = _olas;
         ve = _ve;
@@ -107,6 +115,37 @@ contract Depository {
         vesting = _vesting;
 
         owner = msg.sender;
+    }
+
+    /// @dev Contributors initializer.
+    function initialize() external{
+        // Check for already initialized
+        if (owner != address(0)) {
+            revert AlreadyInitialized();
+        }
+
+        owner = msg.sender;
+    }
+
+    /// @dev Changes the contributors implementation contract address.
+    /// @param newImplementation New implementation contract address.
+    function changeImplementation(address newImplementation) external {
+        // Check for the ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
+        }
+
+        // Check for zero address
+        if (newImplementation == address(0)) {
+            revert ZeroAddress();
+        }
+
+        // Store the contributors implementation address
+        assembly {
+            sstore(DEPOSITORY_PROXY, newImplementation)
+        }
+
+        emit ImplementationUpdated(newImplementation);
     }
 
     /// @dev Changes contract owner address.
@@ -219,10 +258,10 @@ contract Depository {
         if (lockProxy != address(0)) {
             uint256 localNonce = _nonce;
             bytes32 randomNonce = bytes32(uint256(keccak256(abi.encodePacked(block.timestamp, msg.sender, localNonce))));
-            bytes memory deploymentData = abi.encodePacked(type(LockProxy).creationCode, uint256(uint160(lockImplementation)));
+            bytes memory payload = abi.encodePacked(type(LockProxy).creationCode, uint256(uint160(lockImplementation)));
             // solhint-disable-next-line no-inline-assembly
             assembly {
-                lockProxy := create2(0x0, add(0x20, deploymentData), mload(deploymentData), randomNonce)
+                lockProxy := create2(0x0, add(0x20, payload), mload(payload), randomNonce)
             }
 
             if (address(lockProxy) == address(0)) {
@@ -232,6 +271,8 @@ contract Depository {
 
             // Initialize the lock proxy
             ILock(lockProxy).initialize(address(this));
+
+            stakingTerm.lockProxy = lockProxy;
         }
 
         // TODO check for the vesting to correspond to staking contract
