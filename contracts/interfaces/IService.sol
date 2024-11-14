@@ -54,6 +54,18 @@ interface IService {
         bytes memory data
     ) external returns (address multisig);
 
+    /// @dev Terminates the service.
+    /// @param serviceId Service Id.
+    /// @return success True, if function executed successfully.
+    /// @return refund Refund for the service owner.
+    function terminate(uint256 serviceId) external returns (bool success, uint256 refund);
+
+    /// @dev Unbonds agent instances of the operator from the service.
+    /// @param serviceId Service Id.
+    /// @return success True, if function executed successfully.
+    /// @return refund The amount of refund returned to the operator.
+    function unbond(uint256 serviceId) external returns (bool success, uint256 refund);
+
     /// @dev Gets the serviceRegistry address.
     /// @return serviceRegistry address.
     function serviceRegistry() external returns (address);

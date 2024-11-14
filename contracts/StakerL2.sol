@@ -99,6 +99,7 @@ contract StakerL2 is ERC721TokenReceiver {
     mapping(address => uint256) public balanceOf;
     mapping(address => uint256) public mapStakingProxyBalances;
     mapping(uint256 => bool) public mapDepositCounters;
+    mapping(uint256 => bool) public mapWithdrawCounters;
     mapping(address => uint256[]) public mapStakedServiceIds;
     mapping(address => uint256) public mapLastStakedServiceIdxs;
 
@@ -295,7 +296,8 @@ contract StakerL2 is ERC721TokenReceiver {
 
     /// @dev Finds the lasst staked service and unstakes it.
     /// @param stakingProxy Staking proxy address.
-    function _unstake(address stakingProxy) internal {
+    /// @return unstakeAmount Unstake amount for service termination and unbond.
+    function _unstake(address stakingProxy) internal returns (uint256 unstakeAmount) {
         // Get the last staked Service Id index
         uint256 lastIdx = mapLastStakedServiceIdxs[stakingProxy];
         uint256 serviceId = mapStakedServiceIds[stakingProxy][lastIdx];
@@ -305,6 +307,11 @@ contract StakerL2 is ERC721TokenReceiver {
 
         // Unstake the service
         IStaking(stakingProxy).unstake(serviceId);
+
+        // Terminate and unbond
+        (, unstakeAmount) = IService(serviceManager).terminate(serviceId);
+        (, uint256 refund) = IService(serviceManager).unbond(serviceId);
+        unstakeAmount += refund;
 
         emit Unstake(msg.sender, stakingProxy, serviceId);
     }
@@ -336,6 +343,8 @@ contract StakerL2 is ERC721TokenReceiver {
         balanceOf[account] += olasAmount;
         // Mint proxyOLAS
         IToken(proxyOlas).mint(address(this), olasAmount);
+
+        // TODO How many stakes are needed?
 
         uint256 balance = mapStakingProxyBalances[stakingProxy];
         uint256 minStakingDeposit = IStaking(stakingProxy).minStakingDeposit();
@@ -382,11 +391,19 @@ contract StakerL2 is ERC721TokenReceiver {
             revert UnauthorizedAccount(msg.sender);
         }
 
+        // Check for withdraw counter
+        if (mapDepositCounters[withdrawCounter]) {
+            revert AlreadyProcessed(withdrawCounter);
+        }
+        mapDepositCounters[withdrawCounter] = true;
+
         uint256 balance = balanceOf[account];
         if (balance < olasAmount) {
             revert();
         }
         balanceOf[account] -= olasAmount;
+
+        // TODO How many unstakes are needed?
 
         balance = mapStakingProxyBalances[stakingProxy];
         if (balance > olasAmount) {
@@ -396,8 +413,7 @@ contract StakerL2 is ERC721TokenReceiver {
                 revert();
             }
 
-            _unstake(stakingProxy);
-            uint256 unstakeAmount = (1 + NUM_AGENT_INSTANCES) * IStaking(stakingProxy).minStakingDeposit();
+            uint256 unstakeAmount = _unstake(stakingProxy);
             balance = unstakeAmount - (olasAmount - balance);
         }
         mapStakingProxyBalances[stakingProxy] = balance;
@@ -426,7 +442,6 @@ contract StakerL2 is ERC721TokenReceiver {
         }
 
         // Get other service info for staking
-        uint256 minStakingDeposit = IStaking(stakingProxy).minStakingDeposit();
         uint256 numAgentInstances = IStaking(stakingProxy).numAgentInstances();
         uint256 threshold = IStaking(stakingProxy).threshold();
         // Check for number of agent instances that must be equal to one,
