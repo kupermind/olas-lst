@@ -104,9 +104,9 @@ contract StakerL2 is ERC721TokenReceiver {
     mapping(address => uint256) public mapLastStakedServiceIdxs;
 
     /// @dev StakerL2 constructor.
-    /// @param _serviceManager Service manager address.
     /// @param _olas OLAS token address.
     /// @param _proxyOlas OLAS proxy token address.
+    /// @param _serviceManager Service manager address.
     /// @param _stakingFactory Staking factory address.
     /// @param _safeMultisig Safe multisig address.
     /// @param _safeSameAddressMultisig Safe multisig processing contract address.
@@ -114,9 +114,9 @@ contract StakerL2 is ERC721TokenReceiver {
     /// @param _agentId Contributor agent Id.
     /// @param _configHash Contributor service config hash.
     constructor(
-        address _serviceManager,
         address _olas,
         address _proxyOlas,
+        address _serviceManager,
         address _stakingFactory,
         address _safeMultisig,
         address _safeSameAddressMultisig,
@@ -433,14 +433,6 @@ contract StakerL2 is ERC721TokenReceiver {
 
         // TODO Check number of staked services
         //
-
-        // Get the token info from the staking contract
-        // If this call fails, it means the staking contract does not have a token and is not compatible
-        address token = IStaking(stakingProxy).stakingToken();
-        // Check the token address
-        if (token != proxyOlas) {
-            revert WrongStakingInstance(stakingProxy);
-        }
 
         // Get other service info for staking
         uint256 numAgentInstances = IStaking(stakingProxy).numAgentInstances();

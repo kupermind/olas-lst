@@ -23,6 +23,10 @@ interface IStaking {
     /// @return Service staking token address.
     function stakingToken() external view returns (address);
 
+    /// @dev Gets service proxy staking token.
+    /// @return Service proxy staking token address.
+    function stakingProxyToken() external view returns (address);
+
     /// @dev Gets service registry address.
     /// @return Service registry address.
     function serviceRegistry() external view returns(address);
@@ -287,7 +291,25 @@ contract StakingVerifier {
             // The returned size must be 32 to fit one address
             if (returnData.length == 32) {
                 token = abi.decode(returnData, (address));
-                if (token != olas && token != proxyOlas) {
+                if (token != olas) {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+
+        // Check proxy staking token
+        // This is an optional check since there could be staking contracts with native tokens
+        tokenData = abi.encodeCall(IStaking.stakingProxyToken, ());
+        (success, returnData) = instance.staticcall(tokenData);
+
+        // Check the returnData is the call was successful
+        if (success) {
+            // The returned size must be 32 to fit one address
+            if (returnData.length == 32) {
+                token = abi.decode(returnData, (address));
+                if (token != proxyOlas) {
                     return false;
                 }
             } else {

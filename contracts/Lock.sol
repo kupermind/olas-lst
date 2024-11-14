@@ -26,27 +26,40 @@ interface IVEOLAS {
 /// @dev Zero address.
 error ZeroAddress();
 
+/// @dev Only `depository` has a privilege, but the `sender` was provided.
+/// @param sender Sender address.
+/// @param depository Required sender address as a depository.
+error DepositoryOnly(address sender, address depository);
+
 /// @title Lock - Smart contract for veOLAS related lock and voting functions
-contract wveOLAS {
+contract Lock {
     // veOLAS address
     address public immutable ve;
     // OLAS address
     address public immutable olas;
+    // Depository address
+    address public immutable depository;
 
     /// @dev Lock constructor.
     /// @param _olas OLAS address.
     /// @param _ve veOLAS address.
-    constructor(address _olas, address _ve) {
+    /// @param _depository Depository address.
+    constructor(address _olas, address _ve, address _depository) {
         // Check for the zero address
-        if (_olas == address(0) || _ve == address(0)) {
+        if (_olas == address(0) || _ve == address(0) || _depository == address(0)) {
             revert ZeroAddress();
         }
 
         ve = _ve;
         olas = _olas;
+        depository = _depository;
     }
 
     function createLock(uint256 amount, uint256 unlockTime) external {
+        if (msg.sender != depository) {
+            revert DepositoryOnly(msg.sender, depository);
+        }
+
         // Get OLAS from depository
         IToken(olas).transferFrom(msg.sender, address(this), amount);
         // Approve OLAS for veOLAS

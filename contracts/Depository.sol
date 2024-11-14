@@ -4,8 +4,6 @@ pragma solidity ^0.8.28;
 import {LockProxy} from "./LockProxy.sol";
 
 interface ILock {
-    function initialize(address depository) external;
-
     /// @dev Deposits `amount` tokens for `msg.sender` and locks for `unlockTime`.
     /// @notice Tokens are taken from `msg.sender`'s balance.
     /// @param amount Amount to deposit.
@@ -67,6 +65,7 @@ struct StakingTerm {
 
 struct StakingModel {
     address stakingProxy;
+    // TODO supply is renewable supposedly every epoch
     uint96 supply;
     uint96 remainder;
     uint64 chainId;
@@ -77,6 +76,7 @@ struct StakingModel {
 contract Depository {
     event ImplementationUpdated(address indexed implementation);
     event OwnerUpdated(address indexed owner);
+    event LockImplementationUpdated(address indexed lockImplementation);
     event SetGuardianServiceStatuses(address[] guardianServices, bool[] statuses);
     event AddStakingModels(address indexed sender, StakingModel[] stakingModels);
     event ChangeModelStatuses(uint256[] modelIds, bool[] statuses);
@@ -90,11 +90,11 @@ contract Depository {
     address public immutable olas;
     address public immutable ve;
     address public immutable st;
-    address public immutable lockImplementation;
 
     uint256 public numStakingModels;
     uint256 public depositCounter;
     address public owner;
+    address public lockImplementation;
     address public oracle;
 
     uint256 internal _nonce;
@@ -104,12 +104,11 @@ contract Depository {
     mapping(address => bool) public mapGuardianAgents;
 
     // TODO change to initialize in prod
-    constructor(address _olas, address _ve, address _st, address _oracle, address _lockImplementation, uint256 _vesting) {
+    constructor(address _olas, address _ve, address _st, address _oracle, uint256 _vesting) {
         olas = _olas;
         ve = _ve;
         st = _st;
         oracle = _oracle;
-        lockImplementation = _lockImplementation;
         vesting = _vesting;
 
         owner = msg.sender;
@@ -128,7 +127,7 @@ contract Depository {
     /// @dev Changes the contributors implementation contract address.
     /// @param newImplementation New implementation contract address.
     function changeImplementation(address newImplementation) external {
-        // Check for the ownership
+        // Check for ownership
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);
         }
@@ -149,7 +148,7 @@ contract Depository {
     /// @dev Changes contract owner address.
     /// @param newOwner Address of a new owner.
     function changeOwner(address newOwner) external {
-        // Check for the ownership
+        // Check for ownership
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);
         }
@@ -161,6 +160,23 @@ contract Depository {
 
         owner = newOwner;
         emit OwnerUpdated(newOwner);
+    }
+
+    /// @dev Changes lock implementation address.
+    /// @param newLockImplementation Address of a new lock implementation.
+    function changeLockImplementation(address newLockImplementation) external {
+        // Check for ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
+        }
+
+        // Check for the zero address
+        if (newLockImplementation == address(0)) {
+            revert ZeroAddress();
+        }
+
+        lockImplementation = newLockImplementation;
+        emit LockImplementationUpdated(newLockImplementation);
     }
 
     /// @dev Sets guardian service multisig statues.
@@ -201,7 +217,7 @@ contract Depository {
         // TODO Check inputs or trust agent?
 
         uint256 localNum = numStakingModels;
-        for(uint256 i = 0; i < stakingModels.length; ++i) {
+        for (uint256 i = 0; i < stakingModels.length; ++i) {
             mapStakingModels[localNum] = stakingModels[i];
             ++localNum;
         }
@@ -254,7 +270,7 @@ contract Depository {
         StakingTerm storage stakingTerm = mapStakingTerms[msg.sender];
         address lockProxy = stakingTerm.lockProxy;
         // Create lock contract if needed
-        if (lockProxy != address(0)) {
+        if (lockProxy == address(0)) {
             uint256 localNonce = _nonce;
             bytes32 randomNonce = bytes32(uint256(keccak256(abi.encodePacked(block.timestamp, msg.sender, localNonce))));
             bytes memory payload = abi.encodePacked(type(LockProxy).creationCode, uint256(uint160(lockImplementation)));
@@ -268,8 +284,8 @@ contract Depository {
             }
             _nonce = localNonce + 1;
 
-            // Initialize the lock proxy
-            ILock(lockProxy).initialize(address(this));
+            // Initialize the lock proxy, if needed
+            //ILock(lockProxy).initialize();
 
             stakingTerm.lockProxy = lockProxy;
         }
