@@ -214,6 +214,7 @@ contract StakerL2 is ERC721TokenReceiver {
 
         // Set agent instances as [msg.sender]
         address[] memory instances = new address[](NUM_AGENT_INSTANCES);
+        // TODO create proxy contract
         instances[0] = msg.sender;
 
         // Create a service owned by this contract
