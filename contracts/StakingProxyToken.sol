@@ -36,33 +36,33 @@ error ValueLowerThan(uint256 provided, uint256 expected);
 contract StakingProxyToken is StakingBase {
     // ServiceRegistryTokenUtility address
     address public serviceRegistryTokenUtility;
-    // Rewards token address for staking the proxy token
+    // Security proxy token address for staking the proxy token
     address public stakingToken;
-    // Security proxy token address for staking corresponding to the service deposit token
-    address public stakingProxyToken;
+    // Rewards token address for staking the proxy token
+    address public rewardToken;
 
     /// @dev StakingToken initialization.
     /// @param _stakingParams Service staking parameters.
     /// @param _serviceRegistryTokenUtility ServiceRegistryTokenUtility contract address.
     /// @param _stakingToken Address of a staking rewards token.
-    /// @param _stakingProxyToken Address of a service staking proxy token.
+    /// @param _rewardToken Address of a service staking proxy token.
     function initialize(
         StakingParams memory _stakingParams,
         address _serviceRegistryTokenUtility,
         address _stakingToken,
-        address _stakingProxyToken
+        address _rewardToken
     ) external
     {
         _initialize(_stakingParams);
 
         // Initial checks
-        if (_serviceRegistryTokenUtility == address(0) || _stakingToken == address(0) || _stakingProxyToken == address(0)) {
+        if (_serviceRegistryTokenUtility == address(0) || _stakingToken == address(0) || _rewardToken == address(0)) {
             revert ZeroTokenAddress();
         }
 
         serviceRegistryTokenUtility = _serviceRegistryTokenUtility;
         stakingToken = _stakingToken;
-        stakingProxyToken = _stakingProxyToken;
+        rewardToken = _rewardToken;
     }
 
     /// @dev Checks proxy token staking deposit.
@@ -76,8 +76,8 @@ contract StakingProxyToken is StakingBase {
             IServiceTokenUtility(serviceRegistryTokenUtility).mapServiceIdTokenDeposit(serviceId);
 
         // The staking token must match the contract token
-        if (stakingProxyToken != token) {
-            revert WrongStakingToken(stakingProxyToken, token);
+        if (stakingToken != token) {
+            revert WrongStakingToken(stakingToken, token);
         }
 
         uint256 minDeposit = minStakingDeposit;
@@ -104,7 +104,7 @@ contract StakingProxyToken is StakingBase {
         // Update the contract balance
         balance -= amount;
 
-        SafeTransferLib.safeTransfer(stakingToken, to, amount);
+        SafeTransferLib.safeTransfer(rewardToken, to, amount);
 
         emit Withdraw(to, amount);
     }
@@ -121,7 +121,7 @@ contract StakingProxyToken is StakingBase {
         availableRewards = newAvailableRewards;
 
         // Add to the overall balance
-        SafeTransferLib.safeTransferFrom(stakingToken, msg.sender, address(this), amount);
+        SafeTransferLib.safeTransferFrom(rewardToken, msg.sender, address(this), amount);
 
         emit Deposit(msg.sender, amount, newBalance, newAvailableRewards);
     }

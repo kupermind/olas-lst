@@ -182,7 +182,7 @@ describe("Liquid Staking", function () {
         const StakingProxyToken = await ethers.getContractFactory("StakingProxyToken");
         stakingTokenImplementation = await StakingProxyToken.deploy();
         const initPayload = stakingTokenImplementation.interface.encodeFunctionData("initialize",
-            [serviceParams, serviceRegistryTokenUtility.address, olas.address, proxyOlas.address]);
+            [serviceParams, serviceRegistryTokenUtility.address, proxyOlas.address, olas.address]);
         const tx = await stakingFactory.createStakingInstance(stakingTokenImplementation.address, initPayload);
         const res = await tx.wait();
         // Get staking contract instance address from the event
@@ -220,31 +220,54 @@ describe("Liquid Staking", function () {
             // Take a snapshot of the current state of the blockchain
             const snapshot = await helpers.takeSnapshot();
 
+            console.log("L1");
+
             // Get OLAS amount to stake
             const olasAmount = minStakingDeposit.mul(3);
 
             // Approve OLAS for depository
+            console.log("Approve OLAS for depository:", olasAmount.toString());
             await olas.approve(depository.address, olasAmount);
 
             // Stake OLAS on L1
+            console.log("Deposit OLAS for stOLAS");
             await depository.deposit(modelId, olasAmount);
+            console.log("stOLAS balance now:", (await st.balanceOf(deployer.address)).toString());
 
             const depositId = 1;
+            console.log("\nL2");
+            console.log("OLAS rewards available on L2 staking contract:", (await stakingProxyToken.availableRewards()).toString());
+            console.log("Picking up event on L2 by an agent");
 
             // Create and stake the service on L2
+            console.log("Minting proxyOLAS and staking it by the agent");
             await stakerL2.connect(agent).stake(deployer.address, depositId, olasAmount, stakingProxyToken.address, {value: 2});
 
+            // Check the reward
+            let serviceInfo = await stakingProxyToken.mapServiceInfo(serviceId);
+            console.log("Service multisig address:", serviceInfo.multisig);
+            console.log("Reward before checkpoint", serviceInfo.reward.toString());
+
             // Increase the time for the livenessPeriod
+            console.log("Wait for liveness period to pass");
             await helpers.time.increase(livenessPeriod + 10);
 
             // Call the checkpoint
+            console.log("Calling checkpoint by the agent");
             await stakingProxyToken.connect(agent).checkpoint();
 
             // Check the reward
-            const serviceInfo = await stakingProxyToken.mapServiceInfo(serviceId);
-            console.log(serviceInfo.reward.toString());
+            serviceInfo = await stakingProxyToken.mapServiceInfo(serviceId);
+            console.log("Reward after checkpoint", serviceInfo.reward.toString());
 
-            // const lockProxy = await ethers.getContractAt("Lock", lockProxy.address);
+            console.log("\nL1");
+            const stakingTerm = await depository.mapStakingTerms(deployer.address);
+            const veBalance = await ve.getVotes(stakingTerm.lockProxy);
+
+            //const lockProxy = await ethers.getContractAt("Lock", lockProxyAddress);
+            //console.log(await lockProxy.depository());
+
+            console.log("veOLAS balance:", veBalance.toString());
 
             // Restore a previous state of blockchain
             snapshot.restore();
