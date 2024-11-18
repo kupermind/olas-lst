@@ -8,6 +8,12 @@ interface IToken {
     /// @return True if the function execution is successful.
     function approve(address spender, uint256 amount) external returns (bool);
 
+    /// @dev Transfers the token amount.
+    /// @param to Address to transfer to.
+    /// @param amount The amount to transfer.
+    /// @return True if the function execution is successful.
+    function transfer(address to, uint256 amount) external returns (bool);
+
     /// @dev Transfers the token amount that was previously approved up until the maximum allowance.
     /// @param from Account address to transfer from.
     /// @param to Account address to transfer to.
@@ -21,6 +27,9 @@ interface IVEOLAS {
     /// @param amount Amount to deposit.
     /// @param unlockTime Time when tokens unlock, rounded down to a whole week.
     function createLock(uint256 amount, uint256 unlockTime) external;
+
+    /// @dev Withdraws all tokens for `msg.sender`. Only possible if the lock has expired.
+    function withdraw() external;
 }
 
 /// @dev Zero address.
@@ -67,5 +76,13 @@ contract Lock {
 
         // Create lock
         IVEOLAS(ve).createLock(amount, unlockTime);
+    }
+
+    function unlock(address account, uint256 amount) external {
+        // Withdraw veOLAS
+        IVEOLAS(ve).withdraw();
+
+        // Transfer OLAS
+        IToken(olas).transfer(account, amount);
     }
 }

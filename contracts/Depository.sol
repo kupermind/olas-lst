@@ -9,6 +9,8 @@ interface ILock {
     /// @param amount Amount to deposit.
     /// @param unlockTime Time when tokens unlock, rounded down to a whole week.
     function createLock(uint256 amount, uint256 unlockTime) external;
+
+    function unlock(address account, uint256 userSupply) external;
 }
 
 interface IToken {
@@ -17,6 +19,12 @@ interface IToken {
     /// @param amount Token amount.
     /// @return True if the function execution is successful.
     function approve(address spender, uint256 amount) external returns (bool);
+
+    /// @dev Transfers the token amount.
+    /// @param to Address to transfer to.
+    /// @param amount The amount to transfer.
+    /// @return True if the function execution is successful.
+    function transfer(address to, uint256 amount) external returns (bool);
 
     /// @dev Transfers the token amount that was previously approved up until the maximum allowance.
     /// @param from Account address to transfer from.
@@ -29,6 +37,10 @@ interface IToken {
     /// @param account Account address.
     /// @param amount Token amount.
     function mint(address account, uint256 amount) external;
+
+    /// @dev Burns tokens.
+    /// @param amount Token amount.
+    function burn(uint256 amount) external;
 }
 
 /// @dev Only `owner` has a privilege, but the `sender` was provided.
@@ -38,6 +50,9 @@ error OwnerOnly(address sender, address owner);
 
 /// @dev Zero address.
 error ZeroAddress();
+
+/// @dev Zero value.
+error ZeroValue();
 
 /// @dev The contract is already initialized.
 error AlreadyInitialized();
@@ -292,6 +307,9 @@ contract Depository {
 
         // TODO check for the vesting to correspond to staking contract
 
+        // TODO This might be not needed
+        stakingTerm.userSupply = uint96(olasAmount);
+
         // Update staking model remainder
         stakingModel.remainder = stakingModel.remainder - uint96(olasAmount);
 
@@ -316,7 +334,35 @@ contract Depository {
 
     // TODO: renew lock, withdraw, evict by agent if not renewed? Then need to lock from the proxy controlled by the agent as well
 
+    // Unlock veOLAS
+    function unlock() external {
+        uint256 userSupply = mapStakingTerms[msg.sender].userSupply;
+        if (userSupply == 0) {
+            revert ZeroValue();
+        }
+
+        ILock(mapStakingTerms[msg.sender].lockProxy).unlock(msg.sender, userSupply);
+        mapStakingTerms[msg.sender].userSupply = 0;
+    }
+
+    function withdraw(uint256 stAmount) external {
+        IToken(st).transferFrom(msg.sender, address(this), stAmount);
+
+        // Change for OLAS
+        uint256 olasAmount = getOLASAmount(stAmount);
+
+        // Burn stOLAS
+        IToken(st).burn(stAmount);
+
+        // Transfer OLAS
+        IToken(olas).transfer(msg.sender, olasAmount);
+    }
+
     function getStAmount(uint256 olasAmount) public view returns (uint256 stAmount) {
         stAmount = olasAmount;
+    }
+
+    function getOLASAmount(uint256 stAmount) public view returns (uint256 olasAmount) {
+        olasAmount = stAmount;
     }
 }
