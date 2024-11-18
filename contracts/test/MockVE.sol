@@ -2,6 +2,12 @@
 pragma solidity ^0.8.28;
 
 interface IToken {
+    /// @dev Transfers the token amount.
+    /// @param to Address to transfer to.
+    /// @param amount The amount to transfer.
+    /// @return True if the function execution is successful.
+    function transfer(address to, uint256 amount) external returns (bool);
+    
     /// @dev Transfers the token amount that was previously approved up until the maximum allowance.
     /// @param from Account address to transfer from.
     /// @param to Account address to transfer to.
@@ -27,6 +33,12 @@ contract MockVE {
     function createLock(uint256 amount, uint256) external {
         IToken(olas).transferFrom(msg.sender, address(this), amount);
         accountWeightedBalances[msg.sender] = amount;
+    }
+
+    /// @dev Simulates a lock for the specified account.
+    function withdraw() external {
+        uint256 amount = accountWeightedBalances[msg.sender];
+        IToken(olas).transfer(msg.sender, amount);
     }
 
     /// @dev Gets the account balance at a specific block number.
