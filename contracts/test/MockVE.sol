@@ -7,7 +7,7 @@ interface IToken {
     /// @param amount The amount to transfer.
     /// @return True if the function execution is successful.
     function transfer(address to, uint256 amount) external returns (bool);
-    
+
     /// @dev Transfers the token amount that was previously approved up until the maximum allowance.
     /// @param from Account address to transfer from.
     /// @param to Account address to transfer to.
@@ -38,6 +38,7 @@ contract MockVE {
     /// @dev Simulates a lock for the specified account.
     function withdraw() external {
         uint256 amount = accountWeightedBalances[msg.sender];
+        accountWeightedBalances[msg.sender] = 0;
         IToken(olas).transfer(msg.sender, amount);
     }
 

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {LockProxy} from "./LockProxy.sol";
+import "hardhat/console.sol";
 
 interface ILock {
     /// @dev Deposits `amount` tokens for `msg.sender` and locks for `unlockTime`.
@@ -335,7 +336,7 @@ contract Depository {
     // TODO: renew lock, withdraw, evict by agent if not renewed? Then need to lock from the proxy controlled by the agent as well
 
     // Unlock veOLAS
-    function unlock() external {
+    function unlock() public {
         uint256 userSupply = mapStakingTerms[msg.sender].userSupply;
         if (userSupply == 0) {
             revert ZeroValue();
@@ -345,8 +346,16 @@ contract Depository {
         mapStakingTerms[msg.sender].userSupply = 0;
     }
 
+    function requestToWithdraw(uint256 stAmount) external {
+        // TODO Math
+        //IToken(st).transferFrom(msg.sender, address(this), stAmount);
+    }
+
     function withdraw(uint256 stAmount) external {
         IToken(st).transferFrom(msg.sender, address(this), stAmount);
+
+        // TODO For testing purposes now before the stOLAS math is fixed
+        unlock();
 
         // Change for OLAS
         uint256 olasAmount = getOLASAmount(stAmount);
@@ -362,7 +371,8 @@ contract Depository {
         stAmount = olasAmount;
     }
 
+    // TODO: Fix math
     function getOLASAmount(uint256 stAmount) public view returns (uint256 olasAmount) {
-        olasAmount = stAmount;
+        olasAmount = (stAmount * 1.00000001 ether) / 1 ether;
     }
 }

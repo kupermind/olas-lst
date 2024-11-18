@@ -30,6 +30,11 @@ interface IToken {
     /// @dev Burns tokens.
     /// @param amount Token amount.
     function burn(uint256 amount) external;
+
+    /// @dev Gets the amount of tokens owned by a specified account.
+    /// @param account Account address.
+    /// @return Amount of tokens owned.
+    function balanceOf(address account) external view returns (uint256);
 }
 
 // ERC721 token interface

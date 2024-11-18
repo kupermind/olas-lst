@@ -82,7 +82,11 @@ contract Lock {
         // Withdraw veOLAS
         IVEOLAS(ve).withdraw();
 
+        // TODO For testing purposes now
         // Transfer OLAS
-        IToken(olas).transfer(account, amount);
+        IToken(olas).transfer(depository, amount);
+
+//        // Transfer OLAS
+//        IToken(olas).transfer(account, amount);
     }
 }

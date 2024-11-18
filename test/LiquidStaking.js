@@ -2,6 +2,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-network-helpers");
+const safeContracts = require("@gnosis.pm/safe-contracts");
 
 describe("Liquid Staking", function () {
     let serviceRegistry;
@@ -226,21 +227,23 @@ describe("Liquid Staking", function () {
             const olasAmount = minStakingDeposit.mul(3);
 
             // Approve OLAS for depository
-            console.log("Approve OLAS for depository:", olasAmount.toString());
+            console.log("User approves OLAS for depository:", olasAmount.toString());
             await olas.approve(depository.address, olasAmount);
 
             // Stake OLAS on L1
-            console.log("Deposit OLAS for stOLAS");
+            console.log("User deposits OLAS for stOLAS");
             await depository.deposit(modelId, olasAmount);
-            console.log("stOLAS balance now:", (await st.balanceOf(deployer.address)).toString());
+            let stBalance = await st.balanceOf(deployer.address);
+            console.log("User stOLAS balance now:", stBalance.toString());
 
-            const depositId = 1;
             console.log("\nL2");
+
             console.log("OLAS rewards available on L2 staking contract:", (await stakingProxyToken.availableRewards()).toString());
             console.log("Picking up event on L2 by an agent");
 
             // Create and stake the service on L2
             console.log("Minting proxyOLAS and staking it by the agent");
+            const depositId = 1;
             await stakerL2.connect(agent).stake(deployer.address, depositId, olasAmount, stakingProxyToken.address, {value: 2});
 
             // Check the reward
@@ -250,7 +253,7 @@ describe("Liquid Staking", function () {
 
             // Increase the time for the livenessPeriod
             console.log("Wait for liveness period to pass");
-            await helpers.time.increase(livenessPeriod + 10);
+            await helpers.time.increase(maxInactivity);
 
             // Call the checkpoint
             console.log("Calling checkpoint by the agent");
@@ -261,13 +264,62 @@ describe("Liquid Staking", function () {
             console.log("Reward after checkpoint", serviceInfo.reward.toString());
 
             console.log("\nL1");
+
             const stakingTerm = await depository.mapStakingTerms(deployer.address);
-            const veBalance = await ve.getVotes(stakingTerm.lockProxy);
+            let veBalance = await ve.getVotes(stakingTerm.lockProxy);
 
             //const lockProxy = await ethers.getContractAt("Lock", lockProxyAddress);
             //console.log(await lockProxy.depository());
 
-            console.log("veOLAS balance:", veBalance.toString());
+            console.log("User current veOLAS balance:", veBalance.toString());
+
+            console.log("User approves stOLAS for depository:", stBalance.toString());
+            await st.approve(depository.address, stBalance);
+
+            console.log("User requests stOLAS to get OLAS");
+            await depository.requestToWithdraw(stBalance);
+            const olasIncrease = await depository.getOLASAmount(stBalance);
+
+            console.log("\nL2");
+
+            console.log("Picking up event on L2 by the agent");
+            const withdrawId = 1;
+            console.log("Withdraw from StakerL2 contract by the agent");
+            await stakerL2.connect(agent).withdraw(deployer.address, withdrawId, stBalance, olasIncrease,
+                stakingProxyToken.address);
+
+            const multisigBalance = await olas.balanceOf(serviceInfo.multisig);
+            console.log("Multisig balance", multisigBalance.toString());
+
+            // Approve for corresponding multisig
+            const multisig = await ethers.getContractAt("GnosisSafe", serviceInfo.multisig);
+            let nonce = await multisig.nonce();
+            let txHashData = await safeContracts.buildContractCall(olas, "approve",
+                [stakerL2.address, serviceInfo.reward], nonce, 0, 0);
+            let signMessageData = await safeContracts.safeSignMessage(agent, multisig, txHashData, 0);
+            await safeContracts.executeTx(multisig, txHashData, [signMessageData], 0);
+
+            // Bridge
+            console.log("Bridge transfer of OLAS from L2 to L1");
+            await stakerL2.connect(agent).bridgeTransfer(multisig.address, depository.address);
+
+            console.log("\nL1");
+
+            console.log("For testing purposes only: stOLAS for OLAS is possible after veOLAS unlock");
+            //await depository.unlock();
+
+            const olasBalance = await olas.balanceOf(depository.address);
+            console.log("OLAS balance in Depository on L1 before the unlock:", olasBalance.toString());
+
+            console.log("veOLAS unlock");
+            console.log("User gives back stOLAS to get OLAS");
+            await depository.withdraw(stBalance);
+
+            console.log("Increased User OLAS balance:", olasIncrease.toString());
+
+            // Check updated veOLAS
+            veBalance = await ve.getVotes(stakingTerm.lockProxy);
+            console.log("User veOLAS balance now:", veBalance.toString());
 
             // Restore a previous state of blockchain
             snapshot.restore();

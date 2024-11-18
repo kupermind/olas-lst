@@ -5,6 +5,7 @@ import {ERC721TokenReceiver} from "../lib/autonolas-registries/lib/solmate/src/t
 import {IService} from "./interfaces/IService.sol";
 import {IStaking} from "./interfaces/IStaking.sol";
 import {IToken, INFToken} from "./interfaces/IToken.sol";
+import "hardhat/console.sol";
 
 // Multisig interface
 interface IMultisig {
@@ -307,12 +308,12 @@ contract StakerL2 is ERC721TokenReceiver {
         }
 
         // Unstake the service
-        IStaking(stakingProxy).unstake(serviceId);
+        uint256 reward = IStaking(stakingProxy).unstake(serviceId);
 
         // Terminate and unbond
         (, unstakeAmount) = IService(serviceManager).terminate(serviceId);
         (, uint256 refund) = IService(serviceManager).unbond(serviceId);
-        unstakeAmount += refund;
+        unstakeAmount += reward + refund;
 
         emit Unstake(msg.sender, stakingProxy, serviceId);
     }
@@ -341,7 +342,7 @@ contract StakerL2 is ERC721TokenReceiver {
             revert();
         }
 
-        balanceOf[account] += olasAmount;
+//        balanceOf[account] += olasAmount;
         // Mint proxyOLAS
         IToken(proxyOlas).mint(address(this), olasAmount);
 
@@ -380,7 +381,13 @@ contract StakerL2 is ERC721TokenReceiver {
     }
 
     // TODO arrays
-    function withdraw(address account, uint256 withdrawCounter, uint256 olasAmount, address stakingProxy) external {
+    function withdraw(
+        address account,
+        uint256 withdrawCounter,
+        uint256 stAmount,
+        uint256 olasAmount,
+        address stakingProxy
+    ) external {
         // Reentrancy guard
         if (_locked > 1) {
             revert ReentrancyGuard();
@@ -393,20 +400,20 @@ contract StakerL2 is ERC721TokenReceiver {
         }
 
         // Check for withdraw counter
-        if (mapDepositCounters[withdrawCounter]) {
+        if (mapWithdrawCounters[withdrawCounter]) {
             revert AlreadyProcessed(withdrawCounter);
         }
-        mapDepositCounters[withdrawCounter] = true;
+        mapWithdrawCounters[withdrawCounter] = true;
 
-        uint256 balance = balanceOf[account];
-        if (balance < olasAmount) {
-            revert();
-        }
-        balanceOf[account] -= olasAmount;
+//        uint256 balance = balanceOf[account];
+//        if (balance < olasAmount) {
+//            revert();
+//        }
+//        balanceOf[account] -= olasAmount;
 
         // TODO How many unstakes are needed?
 
-        balance = mapStakingProxyBalances[stakingProxy];
+        uint256 balance = mapStakingProxyBalances[stakingProxy];
         if (balance > olasAmount) {
             balance -= olasAmount;
         } else {
@@ -415,14 +422,32 @@ contract StakerL2 is ERC721TokenReceiver {
             }
 
             uint256 unstakeAmount = _unstake(stakingProxy);
-            balance = unstakeAmount - (olasAmount - balance);
+            balance = balance + unstakeAmount - olasAmount;
         }
         mapStakingProxyBalances[stakingProxy] = balance;
 
         // Burn proxyOLAS
-        IToken(proxyOlas).burn(olasAmount);
+        IToken(proxyOlas).burn(stAmount);
 
         _locked = 1;
+    }
+
+    function bridgeTransfer(address multisig, address depository) external {
+        // Check for whitelisted guardian agent
+        if (!mapGuardianAgents[msg.sender]) {
+            revert UnauthorizedAccount(msg.sender);
+        }
+
+        // Get the multisig balance
+        uint256 balance = IToken(olas).balanceOf(multisig);
+
+        // TODO Mock bridge transfer for now
+        IToken(olas).transferFrom(multisig, address(this), balance);
+        IToken(olas).transfer(depository, balance);
+    }
+
+    receive() external payable {
+
     }
 
     function isAbleStake(address stakingProxy, uint256 olasAmount) public view returns (bool) {
@@ -450,11 +475,6 @@ contract StakerL2 is ERC721TokenReceiver {
     function isAbleWithdraw(address stakingProxy, uint256 olasAmount) public view returns (bool) {
         uint256 numServices = mapStakedServiceIds[stakingProxy].length;
         if (numServices == 0) {
-            revert ZeroValue();
-        }
-
-        uint256 lastIdx = mapLastStakedServiceIdxs[stakingProxy];
-        if (lastIdx == 0) {
             revert ZeroValue();
         }
 
