@@ -4,14 +4,11 @@ pragma solidity ^0.8.28;
 import {LockProxy} from "./LockProxy.sol";
 import "hardhat/console.sol";
 
-interface ILock {
-    /// @dev Deposits `amount` tokens for `msg.sender` and locks for `unlockTime`.
+interface ITreasury {
+    /// @dev Stakes OLAS to treasury for vault and veOLAS lock.
     /// @notice Tokens are taken from `msg.sender`'s balance.
-    /// @param amount Amount to deposit.
-    /// @param unlockTime Time when tokens unlock, rounded down to a whole week.
-    function createLock(uint256 amount, uint256 unlockTime) external;
-
-    function unlock(address account, uint256 userSupply) external;
+    /// @param olasAmount OLAS amount.
+    function stakeFunds(address account, uint256 olasAmount) external;
 }
 
 interface IToken {
@@ -74,11 +71,6 @@ error UnauthorizedAccount(address account);
 
 error WrongStakingModel(uint256 modelId);
 
-struct StakingTerm {
-    address lockProxy;
-    uint96 userSupply;
-}
-
 struct StakingModel {
     address stakingProxy;
     // TODO supply is renewable supposedly every epoch
@@ -92,7 +84,7 @@ struct StakingModel {
 contract Depository {
     event ImplementationUpdated(address indexed implementation);
     event OwnerUpdated(address indexed owner);
-    event LockImplementationUpdated(address indexed lockImplementation);
+    event LockFactorUpdated(uint256 lockFactor);
     event SetGuardianServiceStatuses(address[] guardianServices, bool[] statuses);
     event AddStakingModels(address indexed sender, StakingModel[] stakingModels);
     event ChangeModelStatuses(uint256[] modelIds, bool[] statuses);
@@ -102,30 +94,27 @@ contract Depository {
     // Code position in storage is keccak256("DEPOSITORY_PROXY") = "0x40f951bb727bcaf251807e38aa34e1b3f20d890f9f3286454f4c473c60a21cdc"
     bytes32 public constant DEPOSITORY_PROXY = 0x40f951bb727bcaf251807e38aa34e1b3f20d890f9f3286454f4c473c60a21cdc;
 
-    uint256 public immutable vesting;
     address public immutable olas;
-    address public immutable ve;
     address public immutable st;
+    address public immutable treasury;
 
     uint256 public numStakingModels;
     uint256 public depositCounter;
+    uint256 public withdrawCounter;
     address public owner;
-    address public lockImplementation;
     address public oracle;
 
     uint256 internal _nonce;
 
-    mapping(address => StakingTerm) public mapStakingTerms;
     mapping(uint256 => StakingModel) public mapStakingModels;
     mapping(address => bool) public mapGuardianAgents;
 
     // TODO change to initialize in prod
-    constructor(address _olas, address _ve, address _st, address _oracle, uint256 _vesting) {
+    constructor(address _olas, address _st, address _treasury, address _oracle) {
         olas = _olas;
-        ve = _ve;
         st = _st;
+        treasury = _treasury;
         oracle = _oracle;
-        vesting = _vesting;
 
         owner = msg.sender;
     }
@@ -176,23 +165,6 @@ contract Depository {
 
         owner = newOwner;
         emit OwnerUpdated(newOwner);
-    }
-
-    /// @dev Changes lock implementation address.
-    /// @param newLockImplementation Address of a new lock implementation.
-    function changeLockImplementation(address newLockImplementation) external {
-        // Check for ownership
-        if (msg.sender != owner) {
-            revert OwnerOnly(msg.sender, owner);
-        }
-
-        // Check for the zero address
-        if (newLockImplementation == address(0)) {
-            revert ZeroAddress();
-        }
-
-        lockImplementation = newLockImplementation;
-        emit LockImplementationUpdated(newLockImplementation);
     }
 
     /// @dev Sets guardian service multisig statues.
@@ -283,30 +255,7 @@ contract Depository {
             revert Overflow(olasAmount, stakingModel.remainder);
         }
 
-        StakingTerm storage stakingTerm = mapStakingTerms[msg.sender];
-        address lockProxy = stakingTerm.lockProxy;
-        // Create lock contract if needed
-        if (lockProxy == address(0)) {
-            uint256 localNonce = _nonce;
-            bytes32 randomNonce = bytes32(uint256(keccak256(abi.encodePacked(block.timestamp, msg.sender, localNonce))));
-            bytes memory payload = abi.encodePacked(type(LockProxy).creationCode, uint256(uint160(lockImplementation)));
-            // solhint-disable-next-line no-inline-assembly
-            assembly {
-                lockProxy := create2(0x0, add(0x20, payload), mload(payload), randomNonce)
-            }
-
-            if (address(lockProxy) == address(0)) {
-                revert ZeroAddress();
-            }
-            _nonce = localNonce + 1;
-
-            // Initialize the lock proxy, if needed
-            //ILock(lockProxy).initialize();
-
-            stakingTerm.lockProxy = lockProxy;
-        }
-
-        // TODO check for the vesting to correspond to staking contract
+        ITreasury(treasury).addFunds(msg.sender, olasAmount);
 
         // TODO This might be not needed
         stakingTerm.userSupply = uint96(olasAmount);

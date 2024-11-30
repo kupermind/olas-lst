@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {stOLAS, MinterOnly} from "./stOLAS.sol";
+import {stOLAS, MinterOnly} from "./l1/stOLAS.sol";
 
 /// @title stOLASL2 - Smart contract for the stOLAS token on L2.
 contract proxyOLAS is stOLAS {
