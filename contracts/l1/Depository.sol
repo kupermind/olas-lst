@@ -4,6 +4,15 @@ pragma solidity ^0.8.28;
 import {LockProxy} from "./LockProxy.sol";
 import "hardhat/console.sol";
 
+interface IDepositProcessor {
+    /// @dev Sends a single message to the L2 side via a corresponding bridge.
+    /// @param target Staking target addresses.
+    /// @param stakingShare Corresponding staking amount.
+    /// @param bridgePayload Bridge payload necessary (if required) for a specific bridge relayer.
+    /// @param transferAmount Actual OLAS amount to be transferred.
+    function sendMessage(address target, uint256 stakingShare, bytes memory bridgePayload, uint256 transferAmount) external payable;
+}
+
 interface ITreasury {
     /// @dev Stakes OLAS to treasury for vault and veOLAS lock.
     /// @notice Tokens are taken from `msg.sender`'s balance.
@@ -84,12 +93,11 @@ struct StakingModel {
 contract Depository {
     event ImplementationUpdated(address indexed implementation);
     event OwnerUpdated(address indexed owner);
-    event LockFactorUpdated(uint256 lockFactor);
+    event SetDepositProcessorChainIds(address[] depositProcessors, uint256[] chainIds);
     event SetGuardianServiceStatuses(address[] guardianServices, bool[] statuses);
     event AddStakingModels(address indexed sender, StakingModel[] stakingModels);
     event ChangeModelStatuses(uint256[] modelIds, bool[] statuses);
-    event Deposit(address indexed sender, uint256 indexed modelId, uint256 indexed depositCoutner, uint256 olasAmount,
-        uint256 stAmount);
+    event Deposit(address indexed sender, uint256 indexed modelId, uint256 olasAmount, uint256 stAmount);
 
     // Code position in storage is keccak256("DEPOSITORY_PROXY") = "0x40f951bb727bcaf251807e38aa34e1b3f20d890f9f3286454f4c473c60a21cdc"
     bytes32 public constant DEPOSITORY_PROXY = 0x40f951bb727bcaf251807e38aa34e1b3f20d890f9f3286454f4c473c60a21cdc;
@@ -108,6 +116,8 @@ contract Depository {
 
     mapping(uint256 => StakingModel) public mapStakingModels;
     mapping(address => bool) public mapGuardianAgents;
+    // Mapping for L2 chain Id => dedicated deposit processors
+    mapping(uint256 => address) public mapChainIdDepositProcessors;
 
     // TODO change to initialize in prod
     constructor(address _olas, address _st, address _treasury, address _oracle) {
@@ -129,7 +139,7 @@ contract Depository {
         owner = msg.sender;
     }
 
-    /// @dev Changes the contributors implementation contract address.
+    /// @dev Changes depository implementation contract address.
     /// @param newImplementation New implementation contract address.
     function changeImplementation(address newImplementation) external {
         // Check for ownership
@@ -142,7 +152,7 @@ contract Depository {
             revert ZeroAddress();
         }
 
-        // Store the contributors implementation address
+        // Store depository implementation address
         assembly {
             sstore(DEPOSITORY_PROXY, newImplementation)
         }
@@ -158,7 +168,7 @@ contract Depository {
             revert OwnerOnly(msg.sender, owner);
         }
 
-        // Check for the zero address
+        // Check for zero address
         if (newOwner == address(0)) {
             revert ZeroAddress();
         }
@@ -171,7 +181,7 @@ contract Depository {
     /// @param guardianServices Guardian service multisig addresses.
     /// @param statuses Corresponding whitelisting statues.
     function setGuardianServiceStatuses(address[] memory guardianServices, bool[] memory statuses) external {
-        // Check for the ownership
+        // Check for ownership
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);
         }
@@ -194,12 +204,42 @@ contract Depository {
         emit SetGuardianServiceStatuses(guardianServices, statuses);
     }
 
+    /// @dev Sets deposit processor contracts addresses and L2 chain Ids.
+    /// @notice It is the contract owner responsibility to set correct L1 deposit processor contracts
+    ///         and corresponding supported L2 chain Ids.
+    /// @param depositProcessors Set of deposit processor contract addresses on L1.
+    /// @param chainIds Set of corresponding L2 chain Ids.
+    function setDepositProcessorChainIds(address[] memory depositProcessors, uint256[] memory chainIds) external {
+        // Check for the ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
+        }
+
+        // Check for array length correctness
+        if (depositProcessors.length == 0 || depositProcessors.length != chainIds.length) {
+            revert WrongArrayLength(depositProcessors.length, chainIds.length);
+        }
+
+        // Link L1 and L2 bridge mediators, set L2 chain Ids
+        for (uint256 i = 0; i < chainIds.length; ++i) {
+            // Check supported chain Ids on L2
+            if (chainIds[i] == 0) {
+                revert ZeroValue();
+            }
+
+            // Note: depositProcessors[i] might be zero if there is a need to stop processing a specific L2 chain Id
+            mapChainIdDepositProcessors[chainIds[i]] = depositProcessors[i];
+        }
+
+        emit SetDepositProcessorChainIds(depositProcessors, chainIds);
+    }
+
     /// @dev Adds staking models.
     /// @param stakingModels Staking models.
     function addStakingModels(StakingModel[] memory stakingModels) external {
-        // Check for whitelisted guardian agent
-        if (!mapGuardianAgents[msg.sender]) {
-            revert UnauthorizedAccount(msg.sender);
+        // Check for ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
         }
 
         // TODO Check inputs or trust agent?
@@ -216,9 +256,9 @@ contract Depository {
     }
 
     function changeModelStatuses(uint256[] memory modelIds, bool[] memory statuses) external {
-        // Check for whitelisted guardian agent
-        if (!mapGuardianAgents[msg.sender]) {
-            revert UnauthorizedAccount(msg.sender);
+        // Check for ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
         }
 
         // Check for array lengths
@@ -238,7 +278,11 @@ contract Depository {
     }
 
     // TODO: array of modelId-s and olasAmount-s as on stake might not fit into one model
-    function deposit(uint256 modelId, uint256 olasAmount) external returns (uint256 stAmount) {
+    function deposit(
+        uint256 modelId,
+        uint256 olasAmount,
+        bytes memory bridgePayload
+    ) external payable returns (uint256 stAmount) {
         // Get staking model
         StakingModel storage stakingModel = mapStakingModels[modelId];
         // Check for model existence and activity
@@ -255,8 +299,6 @@ contract Depository {
             revert Overflow(olasAmount, stakingModel.remainder);
         }
 
-        ITreasury(treasury).addFunds(msg.sender, olasAmount);
-
         // TODO This might be not needed
         stakingTerm.userSupply = uint96(olasAmount);
 
@@ -268,18 +310,15 @@ contract Depository {
 
         // Get OLAS from sender
         IToken(olas).transferFrom(msg.sender, address(this), olasAmount);
-        // Approve OLAS for lockProxy
-        IToken(olas).approve(lockProxy, olasAmount);
-        // TODO: choose corresponding action: create new lock, increase amount, increase lock time
-        // Lock OLAS for veOLAS
-        ILock(lockProxy).createLock(olasAmount, vesting);
+
         // Mint stOLAS
         IToken(st).mint(msg.sender, stAmount);
 
-        uint256 localDepositCounter = depositCounter;
-        depositCounter = localDepositCounter + 1;
+        // Transfer OLAS via the bridge
+        address depositProcessor = mapChainIdDepositProcessors[stakingModel.chainId];
+        IDepositProcessor(depositProcessor).sendMessage(stakingModel.stakingProxy, olasAmount, bridgePayload, olasAmount);
 
-        emit Deposit(msg.sender, modelId, localDepositCounter, olasAmount, stAmount);
+        emit Deposit(msg.sender, modelId, olasAmount, stAmount);
     }
 
     // TODO: renew lock, withdraw, evict by agent if not renewed? Then need to lock from the proxy controlled by the agent as well

@@ -52,6 +52,7 @@ error AlreadyInitialized();
 contract Treasury {
     event ImplementationUpdated(address indexed implementation);
     event OwnerUpdated(address indexed owner);
+    event LockFactorUpdated(uint256 lockFactor);
     event Vault(address indexed account, uint256 vaultAmount, uint256 lockAmount);
 
     // Code position in storage is keccak256("TREASURY_PROXY") = "0x9b3195704d7d8da1c9110d90b2bf37e7d1d93753debd922cc1f20df74288b870"

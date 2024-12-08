@@ -73,8 +73,6 @@ contract StakerL2 is ERC721TokenReceiver {
     address public immutable serviceManager;
     // OLAS token address
     address public immutable olas;
-    // OLAS proxy token address
-    address public immutable proxyOlas;
     // Service registry address
     address public immutable serviceRegistry;
     // Service registry token utility address
@@ -106,7 +104,6 @@ contract StakerL2 is ERC721TokenReceiver {
 
     /// @dev StakerL2 constructor.
     /// @param _olas OLAS token address.
-    /// @param _proxyOlas OLAS proxy token address.
     /// @param _serviceManager Service manager address.
     /// @param _stakingFactory Staking factory address.
     /// @param _safeMultisig Safe multisig address.
@@ -116,7 +113,6 @@ contract StakerL2 is ERC721TokenReceiver {
     /// @param _configHash Contributor service config hash.
     constructor(
         address _olas,
-        address _proxyOlas,
         address _serviceManager,
         address _stakingFactory,
         address _safeMultisig,
@@ -126,9 +122,8 @@ contract StakerL2 is ERC721TokenReceiver {
         bytes32 _configHash
     ) {
         // Check for zero addresses
-        if (_serviceManager == address(0) || _olas == address(0) || _proxyOlas == address(0) ||
-            _stakingFactory == address(0) || _safeMultisig == address(0) || _safeSameAddressMultisig == address(0) ||
-            _fallbackHandler == address(0)) {
+        if (_serviceManager == address(0) || _olas == address(0) || _stakingFactory == address(0) ||
+            _safeMultisig == address(0) || _safeSameAddressMultisig == address(0) || _fallbackHandler == address(0)) {
             revert ZeroAddress();
         }
 
@@ -142,7 +137,6 @@ contract StakerL2 is ERC721TokenReceiver {
 
         serviceManager = _serviceManager;
         olas = _olas;
-        proxyOlas = _proxyOlas;
         stakingFactory = _stakingFactory;
         safeMultisig = _safeMultisig;
         fallbackHandler = _fallbackHandler;
@@ -260,7 +254,7 @@ contract StakerL2 is ERC721TokenReceiver {
     /// @param stakingProxy Corresponding staking instance address.
     function _createAndStake(address stakingProxy, uint256 minStakingDeposit) internal {
         // Create and deploy service
-        (uint256 serviceId, address multisig) = _createAndDeploy(proxyOlas, minStakingDeposit);
+        (uint256 serviceId, address multisig) = _createAndDeploy(olas, minStakingDeposit);
 
         // Stake the service
         _stake(stakingProxy, serviceId);
@@ -319,32 +313,17 @@ contract StakerL2 is ERC721TokenReceiver {
     }
     
     // TODO: arrays
-    function stake(address account, uint256 depositCounter, uint256 olasAmount, address stakingProxy) external payable {
+    function stake(address stakingProxy, uint256 olasAmount) external {
         // Reentrancy guard
         if (_locked > 1) {
             revert ReentrancyGuard();
         }
         _locked = 2;
 
-        // Check for whitelisted guardian agent
-        if (!mapGuardianAgents[msg.sender]) {
-            revert UnauthorizedAccount(msg.sender);
-        }
-
-        // Check for deposit counter
-        if (mapDepositCounters[depositCounter]) {
-            revert AlreadyProcessed(depositCounter);
-        }
-        mapDepositCounters[depositCounter] = true;
-
         // TODO: check that stakingProxy is able to host another service
         if (!isAbleStake(stakingProxy, olasAmount)) {
             revert();
         }
-
-//        balanceOf[account] += olasAmount;
-        // Mint proxyOLAS
-        IToken(proxyOlas).mint(address(this), olasAmount);
 
         // TODO How many stakes are needed?
 
@@ -355,7 +334,7 @@ contract StakerL2 is ERC721TokenReceiver {
         balance += olasAmount;
         if (balance >= stakeDeposit) {
             // Approve token for the serviceRegistryTokenUtility contract
-            IToken(proxyOlas).approve(serviceRegistryTokenUtility, stakeDeposit);
+            IToken(olas).approve(serviceRegistryTokenUtility, stakeDeposit);
 
             // Get already existent service or create a new one
             uint256 lastIdx = mapLastStakedServiceIdxs[stakingProxy] + 1;
@@ -375,7 +354,7 @@ contract StakerL2 is ERC721TokenReceiver {
         }
         mapStakingProxyBalances[stakingProxy] = balance;
 
-        emit Stake(msg.sender, account, depositCounter, olasAmount);
+        emit Stake(msg.sender, olasAmount);
 
         _locked = 1;
     }
@@ -384,7 +363,6 @@ contract StakerL2 is ERC721TokenReceiver {
     function withdraw(
         address account,
         uint256 withdrawCounter,
-        uint256 stAmount,
         uint256 olasAmount,
         address stakingProxy
     ) external {
@@ -426,8 +404,8 @@ contract StakerL2 is ERC721TokenReceiver {
         }
         mapStakingProxyBalances[stakingProxy] = balance;
 
-        // Burn proxyOLAS
-        IToken(proxyOlas).burn(stAmount);
+        // Send OLAS back to L1
+        IToken(olas).sendBack(olasAmount);
 
         _locked = 1;
     }
@@ -444,10 +422,6 @@ contract StakerL2 is ERC721TokenReceiver {
         // TODO Mock bridge transfer for now
         IToken(olas).transferFrom(multisig, address(this), balance);
         IToken(olas).transfer(depository, balance);
-    }
-
-    receive() external payable {
-
     }
 
     function isAbleStake(address stakingProxy, uint256 olasAmount) public view returns (bool) {
