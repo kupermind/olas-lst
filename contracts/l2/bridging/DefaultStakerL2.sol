@@ -1,21 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IBridgeErrors} from "../interfaces/IBridgeErrors.sol";
+import {IBridgeErrors} from "../../interfaces/IBridgeErrors.sol";
 
-// Staking interface
-interface IStaking {
-    /// @dev Deposits OLAS tokens to the staking contract.
-    /// @param amount OLAS amount.
-    function deposit(uint256 amount) external;
-}
-
-// Staking factory interface
-interface IStakingFactory {
-    /// @dev Verifies staking proxy instance and gets emissions amount.
-    /// @param instance Staking proxy instance.
-    /// @return amount Emissions amount.
-    function verifyInstanceAndGetEmissionsAmount(address instance) external view returns (uint256 amount);
+// Staker interface
+interface IStaker {
+    function stake(address stakingProxy, uint256 olasAmount) external;
 }
 
 // Necessary ERC20 token interface
@@ -161,7 +151,7 @@ abstract contract DefaultStakerL2 is IBridgeErrors {
             address target = targets[i];
             uint256 amount = amounts[i];
 
-            IStaker(staker).stake(target, amount, );
+            IStaker(staker).stake(target, amount);
 
             uint256 olasBalance = IToken(olas).balanceOf(address(this));
             // Check the OLAS balance and the contract being unpaused

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IBridgeErrors} from "../interfaces/IBridgeErrors.sol";
+import {IBridgeErrors} from "../../interfaces/IBridgeErrors.sol";
 
 interface IDispenser {
     function syncWithheldAmount(uint256 chainId, uint256 amount, bytes32 batchHash) external;

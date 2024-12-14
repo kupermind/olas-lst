@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ERC721TokenReceiver} from "../lib/autonolas-registries/lib/solmate/src/tokens/ERC721.sol";
-import {IService} from "./interfaces/IService.sol";
-import {IStaking} from "./interfaces/IStaking.sol";
-import {IToken, INFToken} from "./interfaces/IToken.sol";
+import {ERC721TokenReceiver} from "../../lib/autonolas-registries/lib/solmate/src/tokens/ERC721.sol";
+import {IService} from "../interfaces/IService.sol";
+import {IStaking} from "../interfaces/IStaking.sol";
+import {IToken, INFToken} from "../interfaces/IToken.sol";
 import "hardhat/console.sol";
 
 // Multisig interface

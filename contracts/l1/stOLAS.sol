@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ERC20} from  "../lib/autonolas-registries/lib/solmate/src/tokens/ERC20.sol";
+import {ERC20} from  "../../lib/autonolas-registries/lib/solmate/src/tokens/ERC20.sol";
 
 /// @dev Only `minter` has a privilege, but the `sender` was provided.
 /// @param sender Sender address.
