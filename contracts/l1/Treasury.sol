@@ -165,6 +165,17 @@ contract Treasury {
         emit LockFactorUpdated(newLockFactor);
     }
 
+    function calculateAndMint(uint256 olasAmount) external {
+        // Get stOLAS amount from the provided OLAS amount
+        stAmount = getStAmount(olasAmount);
+
+        // Get OLAS from sender
+        IToken(olas).transferFrom(msg.sender, address(this), olasAmount);
+
+        // Mint stOLAS
+        ITreasury(st).mint(msg.sender, stAmount);
+    }
+
     /// @dev Deposits OLAS to treasury for vault and veOLAS lock.
     /// @notice Tokens are taken from `msg.sender`'s balance.
     /// @param olasAmount OLAS amount.
@@ -202,5 +213,14 @@ contract Treasury {
 
     function cancelWithdrawRequest(uint256 requestId) external {
         // TODO kick request out of the map
+    }
+
+    function getStAmount(uint256 olasAmount) public view returns (uint256 stAmount) {
+        stAmount = olasAmount;
+    }
+
+    // TODO: Fix math
+    function getOLASAmount(uint256 stAmount) public view returns (uint256 olasAmount) {
+        olasAmount = (stAmount * 1.00000001 ether) / 1 ether;
     }
 }

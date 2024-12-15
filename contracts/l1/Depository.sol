@@ -305,14 +305,8 @@ contract Depository {
         // Update staking model remainder
         stakingModel.remainder = stakingModel.remainder - uint96(olasAmount);
 
-        // Get stOLAS amount from the provided OLAS amount
-        stAmount = getStAmount(olasAmount);
-
-        // Get OLAS from sender
-        IToken(olas).transferFrom(msg.sender, address(this), olasAmount);
-
-        // Mint stOLAS
-        IToken(st).mint(msg.sender, stAmount);
+        // Calculates stAmount and mints stOLAS
+        ITreasury(treasury).calculateAndMint(olasAmount);
 
         // Transfer OLAS via the bridge
         address depositProcessor = mapChainIdDepositProcessors[stakingModel.chainId];
@@ -353,14 +347,5 @@ contract Depository {
 
         // Transfer OLAS
         IToken(olas).transfer(msg.sender, olasAmount);
-    }
-
-    function getStAmount(uint256 olasAmount) public view returns (uint256 stAmount) {
-        stAmount = olasAmount;
-    }
-
-    // TODO: Fix math
-    function getOLASAmount(uint256 stAmount) public view returns (uint256 olasAmount) {
-        olasAmount = (stAmount * 1.00000001 ether) / 1 ether;
     }
 }
