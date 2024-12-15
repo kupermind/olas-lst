@@ -61,6 +61,8 @@ abstract contract DefaultStakerL2 is IBridgeErrors {
     address public immutable stakingFactory;
     // L2 Relayer address that receives the message across the bridge from the source L1 network
     address public immutable l2MessageRelayer;
+    // L2 Token relayer address that sends tokens to the L1 source network
+    address public immutable l2TokenRelayer;
     // Deposit processor address on L1 that is authorized to propagate the transaction execution across the bridge
     address public immutable l1DepositProcessor;
     // Deposit processor chain Id
@@ -82,19 +84,21 @@ abstract contract DefaultStakerL2 is IBridgeErrors {
     /// @dev DefaultStakerL2 constructor.
     /// @param _olas OLAS token address on L2.
     /// @param _stakingFactory Service staking proxy factory address.
+    /// @param _l2TokenRelayer L2 token relayer bridging contract address.
     /// @param _l2MessageRelayer L2 message relayer bridging contract address.
     /// @param _l1DepositProcessor L1 deposit processor address.
     /// @param _l1SourceChainId L1 source chain Id.
     constructor(
         address _olas,
         address _stakingFactory,
+        address _l2TokenRelayer,
         address _l2MessageRelayer,
         address _l1DepositProcessor,
         uint256 _l1SourceChainId
     ) {
         // Check for zero addresses
-        if (_olas == address(0) || _stakingFactory == address(0) || _l2MessageRelayer == address(0)
-            || _l1DepositProcessor == address(0)) {
+        if (_olas == address(0) || _stakingFactory == address(0) || _l2TokenRelayer == address(0) ||
+            _l2MessageRelayer == address(0) || _l1DepositProcessor == address(0)) {
             revert ZeroAddress();
         }
 
@@ -111,6 +115,7 @@ abstract contract DefaultStakerL2 is IBridgeErrors {
         // Immutable parameters assignment
         olas = _olas;
         stakingFactory = _stakingFactory;
+        l2TokenRelayer = _l2TokenRelayer;
         l2MessageRelayer = _l2MessageRelayer;
         l1DepositProcessor = _l1DepositProcessor;
         l1SourceChainId = _l1SourceChainId;
@@ -458,6 +463,8 @@ abstract contract DefaultStakerL2 is IBridgeErrors {
 
         // _locked is now set to 2 for good
     }
+
+    function relayToL1(uint256 olasAmount) external virtual payable;
 
     /// @dev Gets the maximum number of token decimals able to be transferred across the bridge.
     /// @return Number of supported decimals.

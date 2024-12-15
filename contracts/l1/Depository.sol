@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {LockProxy} from "./LockProxy.sol";
+import {ActivityModuleProxy} from "../l2/LockProxy.sol";
 import "hardhat/console.sol";
 
 interface IDepositProcessor {

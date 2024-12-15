@@ -14,6 +14,10 @@ interface IMultisig {
     function getOwners() external view returns (address[] memory);
 }
 
+interface ITokenRelayer {
+    function relayToL1(uint256 olasAmount) external payable;
+}
+
 /// @dev Only `owner` has a privilege, but the `sender` was provided.
 /// @param sender Sender address.
 /// @param owner Required sender address as an owner.
@@ -53,6 +57,7 @@ error AlreadyProcessed(uint256 requestId);
 /// @title StakerL2 - Smart contract for staking OLAS on L2.
 contract StakerL2 is ERC721TokenReceiver {
     event OwnerUpdated(address indexed owner);
+    event TokenRelayerUpdated(address indexed tokenRelayer);
     event SetGuardianServiceStatuses(address[] guardianServices, bool[] statuses);
     event Stake(address indexed sender, address indexed account, uint256 indexed depositCounter, uint256 olasAmount);
     event CreateAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig);
@@ -87,6 +92,7 @@ contract StakerL2 is ERC721TokenReceiver {
     address public immutable fallbackHandler;
 
     address public owner;
+    address public tokenRelayer;
 
     // Nonce
     uint256 internal _nonce;
@@ -119,11 +125,13 @@ contract StakerL2 is ERC721TokenReceiver {
         address _safeSameAddressMultisig,
         address _fallbackHandler,
         uint256 _agentId,
-        bytes32 _configHash
+        bytes32 _configHash,
+        address _tokenRelayer
     ) {
         // Check for zero addresses
         if (_serviceManager == address(0) || _olas == address(0) || _stakingFactory == address(0) ||
-            _safeMultisig == address(0) || _safeSameAddressMultisig == address(0) || _fallbackHandler == address(0)) {
+            _safeMultisig == address(0) || _safeSameAddressMultisig == address(0) || _fallbackHandler == address(0) ||
+            _tokenRelayer == address(0)) {
             revert ZeroAddress();
         }
 
@@ -140,6 +148,7 @@ contract StakerL2 is ERC721TokenReceiver {
         stakingFactory = _stakingFactory;
         safeMultisig = _safeMultisig;
         fallbackHandler = _fallbackHandler;
+        tokenRelayer = _tokenRelayer;
         serviceRegistry = IService(serviceManager).serviceRegistry();
         serviceRegistryTokenUtility = IService(serviceManager).serviceRegistryTokenUtility();
 
@@ -161,6 +170,23 @@ contract StakerL2 is ERC721TokenReceiver {
 
         owner = newOwner;
         emit OwnerUpdated(newOwner);
+    }
+
+    /// @dev Changes token relayer address.
+    /// @param newTokenRelayer Address of a new owner.
+    function changeTokenRelayer(address newTokenRelayer) external {
+        // Check for the ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
+        }
+
+        // Check for the zero address
+        if (newTokenRelayer == address(0)) {
+            revert ZeroAddress();
+        }
+
+        tokenRelayer = newTokenRelayer;
+        emit TokenRelayerUpdated(newTokenRelayer);
     }
 
     /// @dev Sets guardian service multisig statues.
@@ -405,7 +431,8 @@ contract StakerL2 is ERC721TokenReceiver {
         mapStakingProxyBalances[stakingProxy] = balance;
 
         // Send OLAS back to L1
-        IToken(olas).sendBack(olasAmount);
+        IToken(olas).approve(tokenRelayer, olasAmount);
+        ITokenRelayer(tokenRelayer).relayToL1{value: msg.value}(olasAmount);
 
         _locked = 1;
     }

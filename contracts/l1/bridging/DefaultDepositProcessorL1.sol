@@ -13,6 +13,18 @@ interface IToken {
     /// @param amount Token amount.
     /// @return True if the function execution is successful.
     function approve(address spender, uint256 amount) external returns (bool);
+
+    /// @dev Gets the amount of tokens owned by a specified account.
+    /// @param account Account address.
+    /// @return Amount of tokens owned.
+    function balanceOf(address account) external view returns (uint256);
+}
+
+interface ITreasury {
+    /// @dev Deposits OLAS to treasury for vault and veOLAS lock.
+    /// @notice Tokens are taken from `msg.sender`'s balance.
+    /// @param olasAmount OLAS amount.
+    function depositAndLock(uint256 olasAmount) external;
 }
 
 /// @title DefaultDepositProcessorL1 - Smart contract for sending tokens and data via arbitrary bridge from L1 to L2 and processing data received from L2.
@@ -105,6 +117,7 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
         bytes32 batchHash
     ) internal virtual returns (uint256 sequence, uint256 leftovers);
 
+    // TODO Probably obsolete
     /// @dev Receives a message on L1 sent from L2 staker side to sync withheld OLAS amount on L2.
     /// @param l1Relayer L1 source relayer.
     /// @param l2Dispenser L2 staker that originated the message.
@@ -235,6 +248,13 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
             revert AlreadyDelivered(batchHash);
         }
         processedHashes[batchHash] = true;
+    }
+
+    // TODO What to do with tokens sent to this contract directly? Seems safe to just account for the overall balance
+    function finalizeStakingReward() external {
+        uint256 balance = IToken(olas).balanceOf(address(this));
+        IToken(olas).approve(treasury, balance);
+        ITreasury(treasury).depositAndLock(balance);
     }
 
     /// @dev Sets L2 staker address and zero-s the owner.

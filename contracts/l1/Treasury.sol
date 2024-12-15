@@ -2,10 +2,28 @@
 pragma solidity ^0.8.28;
 
 interface IVEOLAS {
+    struct LockedBalance {
+        // Token amount. It will never practically be bigger. Initial OLAS cap is 1 bn tokens, or 1e27.
+        // After 10 years, the inflation rate is 2% per year. It would take 1340+ years to reach 2^128 - 1
+        uint128 amount;
+        // Unlock time. It will never practically be bigger
+        uint64 endTime;
+    }
+
     /// @dev Deposits `amount` tokens for `msg.sender` and locks for `unlockTime`.
     /// @param amount Amount to deposit.
     /// @param unlockTime Time when tokens unlock, rounded down to a whole week.
     function createLock(uint256 amount, uint256 unlockTime) external;
+
+    /// @dev Deposits `amount` additional tokens for `msg.sender` without modifying the unlock time.
+    /// @param amount Amount of tokens to deposit and add to the lock.
+    function increaseAmount(uint256 amount) external;
+
+    /// @dev Extends the unlock time.
+    /// @param unlockTime New tokens unlock time.
+    function increaseUnlockTime(uint256 unlockTime) external;
+
+    function mapLockedBalances(address account) external returns (LockedBalance memory);
 }
 
 interface IToken {
@@ -53,7 +71,7 @@ contract Treasury {
     event ImplementationUpdated(address indexed implementation);
     event OwnerUpdated(address indexed owner);
     event LockFactorUpdated(uint256 lockFactor);
-    event Vault(address indexed account, uint256 vaultAmount, uint256 lockAmount);
+    event Vault(address indexed account, uint256 olasAmount, uint256 lockAmount, uint256 vaultBalance);
 
     // Code position in storage is keccak256("TREASURY_PROXY") = "0x9b3195704d7d8da1c9110d90b2bf37e7d1d93753debd922cc1f20df74288b870"
     bytes32 public constant TREASURY_PROXY = 0x9b3195704d7d8da1c9110d90b2bf37e7d1d93753debd922cc1f20df74288b870;
@@ -64,7 +82,8 @@ contract Treasury {
     address public immutable olas;
     address public immutable ve;
 
-    uint256 public olasBalance;
+    // Vault balance
+    uint256 public vaultBalance;
     // Lock factor in 10_000 value
     uint256 public lockFactor;
     address public depository;
@@ -144,28 +163,33 @@ contract Treasury {
         emit LockFactorUpdated(newLockFactor);
     }
 
-    /// @dev Stakes OLAS to treasury for vault and veOLAS lock.
+    /// @dev Deposits OLAS to treasury for vault and veOLAS lock.
     /// @notice Tokens are taken from `msg.sender`'s balance.
     /// @param olasAmount OLAS amount.
-    function stakeFunds(address account, uint256 olasAmount) external {
-        if (msg.sender != depository) {
-            revert ManagerOnly(msg.sender, depository);
-        }
-
-        IToken(olas).transferFrom(account, address(this), amount);
+    function depositAndLock(uint256 olasAmount) external {
+        IToken(olas).transferFrom(msg.sender, address(this), olasAmount);
 
         // Get treasury veOLAS lock amount
-        uint256 lockAmount = (olasAmount * lockFactor) / 10000;
+        uint256 lockAmount = (olasAmount * lockFactor) / 10_000;
         uint256 vaultAmount = olasAmount - lockAmount;
-        olasBalance += vaultAmount;
+
+        vaultAmount += vaultBalance;
+        vaultBalance = vaultAmount;
 
         // Approve OLAS for veOLAS
         IToken(olas).approve(ve, lockAmount);
 
-        // TODO calculate amount and lock: increase amount and increase lock
-        IVEOLAS(ve).createLock(lockAmount, MAX_LOCK_TIME);
+        LockedBalance memory lockedBalance = IVEOLAS(ve).mapLockedBalances(address(this));
+        // Lock if never was locked or unlocked
+        if (lockedBalance.amount == 0) {
+            IVEOLAS(ve).createLock(lockAmount, MAX_LOCK_TIME);
+        } else {
+            // Increase amount and unlock time to a maximum
+            IVEOLAS(ve).increaseAmount(lockAmount);
+            IVEOLAS(ve).increaseUnlockTime(MAX_LOCK_TIME);
+        }
 
-        emit Vault(account, vaultAmount, lockAmount);
+        emit Vault(msg.sender, olasAmount, lockAmount, vaultAmount);
     }
 
     function unstakeFunds(uint256 olasAmount) external {
