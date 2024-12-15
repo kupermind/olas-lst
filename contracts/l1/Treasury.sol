@@ -81,6 +81,7 @@ contract Treasury {
 
     address public immutable olas;
     address public immutable ve;
+    address public immutable st;
 
     // Vault balance
     uint256 public vaultBalance;
@@ -90,9 +91,10 @@ contract Treasury {
     address public owner;
 
     // TODO change to initialize in prod
-    constructor(address _olas, address _ve, uint256 _lockFactor) {
+    constructor(address _olas, address _ve, address _st, uint256 _lockFactor) {
         olas = _olas;
         ve = _ve;
+        st = _st;
         _lockFactor;
 
         owner = msg.sender;
@@ -192,11 +194,13 @@ contract Treasury {
         emit Vault(msg.sender, olasAmount, lockAmount, vaultAmount);
     }
 
-    function unstakeFunds(uint256 olasAmount) external {
-        if (msg.sender != depository) {
-            revert ManagerOnly(msg.sender, depository);
-        }
+    function requestToWithdraw(uint256 stAmount) external returns (uint256 requestId, uint256 olasAmount) {
+        IToken(st).transferFrom(msg.sender, address(this), stAmount);
 
-        IToken(olas).transfer(depository, olasAmount);
+        // TODO cyclic map requests
+    }
+
+    function cancelWithdrawRequest(uint256 requestId) external {
+        // TODO kick request out of the map
     }
 }
