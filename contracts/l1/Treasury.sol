@@ -357,11 +357,13 @@ contract Treasury {
             emit WithdrawRequestExecuted(requestIds[i]);
         }
 
+        // TODO any checks or now overflow is possible?
+
         // Transfer total amount
         // The transfer overflow check is not needed since balances are in sync
         IToken(olas).transfer(msg.sender, totalAmount);
 
-        // Adjust vault balances
+        // Adjust vault balances directly to avoid calling updateReserves()
         vaultBalance -= totalAmount;
         totalReserves -= totalAmount;
     }
