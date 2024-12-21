@@ -126,6 +126,8 @@ contract Treasury {
     uint256 public numWithdrawRequests;
     // Depository address
     address public depository;
+    // Governor address
+    address public governor;
     // Contract owner
     address public owner;
 
@@ -423,6 +425,16 @@ contract Treasury {
         // The transfer overflow check is not needed since balances are in sync
         // This fails here
         IToken(olas).transfer(msg.sender, totalAmount);
+    }
+
+    // TODO Separate proxy for locked funds and voting functions with beacon?
+    function castVote(uint256 proposalId, uint8 vote) external {
+        // Check for ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
+        }
+
+        IGovernor(governor).castVote(proposalId, vote);
     }
 
     function getStAmount(uint256 olasAmount) external view returns (uint256 stAmount) {
