@@ -14,10 +14,11 @@ interface IDepositProcessor {
 }
 
 interface ITreasury {
-    /// @dev Stakes OLAS to treasury for vault and veOLAS lock.
-    /// @notice Tokens are taken from `msg.sender`'s balance.
+    /// @dev Processes OLAS amount supplied and mints corresponding amount of stOLAS.
+    /// @param account Account address.
     /// @param olasAmount OLAS amount.
-    function stakeFunds(address account, uint256 olasAmount) external;
+    /// @return Amount of stOLAS
+    function processAndMintStToken(address account, uint256 olasAmount) external returns (uint256);
 }
 
 interface IToken {
@@ -299,17 +300,22 @@ contract Depository {
             revert Overflow(olasAmount, stakingModel.remainder);
         }
 
-        // TODO This might be not needed
-        stakingTerm.userSupply = uint96(olasAmount);
-
         // Update staking model remainder
         stakingModel.remainder = stakingModel.remainder - uint96(olasAmount);
 
+        // Get OLAS from sender
+        IToken(olas).transferFrom(msg.sender, address(this), olasAmount);
+
         // Calculates stAmount and mints stOLAS
-        ITreasury(treasury).calculateAndMint(olasAmount);
+        stAmount = ITreasury(treasury).processAndMintStToken(msg.sender, olasAmount);
 
         // Transfer OLAS via the bridge
         address depositProcessor = mapChainIdDepositProcessors[stakingModel.chainId];
+
+        // Approve OLAS for depositProcessor
+        IToken(olas).approve(depositProcessor, olasAmount);
+
+        // Transfer OLAS to its corresponding Staker on L2
         IDepositProcessor(depositProcessor).sendMessage(stakingModel.stakingProxy, olasAmount, bridgePayload, olasAmount);
 
         emit Deposit(msg.sender, modelId, olasAmount, stAmount);

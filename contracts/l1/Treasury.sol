@@ -70,11 +70,14 @@ error AlreadyInitialized();
 contract Treasury {
     event ImplementationUpdated(address indexed implementation);
     event OwnerUpdated(address indexed owner);
+    event TotalReservesUpdated(uint256 stakedBalance, uint256 totalReserves);
     event LockFactorUpdated(uint256 lockFactor);
     event Vault(address indexed account, uint256 olasAmount, uint256 lockAmount, uint256 vaultBalance);
 
     // Code position in storage is keccak256("TREASURY_PROXY") = "0x9b3195704d7d8da1c9110d90b2bf37e7d1d93753debd922cc1f20df74288b870"
     bytes32 public constant TREASURY_PROXY = 0x9b3195704d7d8da1c9110d90b2bf37e7d1d93753debd922cc1f20df74288b870;
+    // Max lock factor
+    uint256 public constant MAX_LOCK_FACTOR = 10_000;
     // Maximum veOLAS lock time (4 years)
     uint256 public constant MAX_LOCK_TIME = 4 * 365 * 1 days;
 
@@ -83,8 +86,12 @@ contract Treasury {
     address public immutable ve;
     address public immutable st;
 
+    // Staked balance
+    uint256 public stakedBalance;
     // Vault balance
     uint256 public vaultBalance;
+    // Total OLAS reserves that include staked and vault balance
+    uint256 public totalReserves;
     // Lock factor in 10_000 value
     uint256 public lockFactor;
     address public depository;
@@ -165,15 +172,80 @@ contract Treasury {
         emit LockFactorUpdated(newLockFactor);
     }
 
-    function calculateAndMint(uint256 olasAmount) external {
-        // Get stOLAS amount from the provided OLAS amount
-        stAmount = getStAmount(olasAmount);
+    function firstLock(uint256 olasAmount) external {
+        // Check for ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
+        }
 
-        // Get OLAS from sender
         IToken(olas).transferFrom(msg.sender, address(this), olasAmount);
+        IVEOLAS(ve).createLock(olasAmount, MAX_LOCK_TIME);
+    }
+
+    function processAndMintStToken(address account, uint256 olasAmount) external returns (uint256 stAmount) {
+        // Check for depository access
+        if (msg.sender != depository) {
+            revert DepositoryOnly(msg.sender, depository);
+        }
+
+        // Get staked OLAS balance
+        uint256 localStakedBalance = stakedBalance;
+
+        // Adjust staked balance
+        localStakedBalance += olasAmount;
+        stakedBalance = localStakedBalance;
+
+        uint256 localTotalReserves = _updateReserves(localStakedBalance);
+
+        // Get stOLAS amount from the provided OLAS amount
+        stAmount = (olasAmount * localTotalReserves) / localStakedBalance;
 
         // Mint stOLAS
-        ITreasury(st).mint(msg.sender, stAmount);
+        IToken(st).mint(account, stAmount);
+    }
+
+    function _updateReserves(uint256 localStakedBalance) internal returns (uint256) {
+        if (localStakedBalance == 0) {
+            localStakedBalance = stakedBalance;
+        }
+
+        // Get current vault balance
+        uint256 curVaultBalance = IToken(olas).balanceOf(address(this));
+        // Get previous vault balance
+        uint256 prevVaultBalance = vaultBalance;
+
+        // Lock required amounts if balances changed positively
+        if (curVaultBalance > prevVaultBalance) {
+            uint256 lockRemainder = _lock(curVaultBalance - prevVaultBalance);
+            curVaultBalance = prevVaultBalance + lockRemainder;
+        }
+        vaultBalance = curVaultBalance;
+
+        uint256 localTotalReserves = localStakedBalance + curVaultBalance;
+        totalReserves = localTotalReserves;
+
+        emit TotalReservesUpdated(localStakedBalance, localTotalReserves);
+
+        return localTotalReserves;
+    }
+
+    function updateReserves() public returns (uint256) {
+        return _updateReserves(0);
+    }
+
+    function _lock(uint256 olasAmount) internal returns (uint256 remainder) {
+        // Get treasury veOLAS lock amount
+        uint256 lockAmount = (olasAmount * lockFactor) / MAX_LOCK_FACTOR;
+        remainder = olasAmount - lockAmount;
+
+        // Approve OLAS for veOLAS
+        IToken(olas).approve(ve, lockAmount);
+
+        // Increase amount and unlock time to a maximum
+        IVEOLAS(ve).increaseAmount(lockAmount);
+        IVEOLAS(ve).increaseUnlockTime(MAX_LOCK_TIME);
+
+        emit Vault(msg.sender, olasAmount, lockAmount, remainder);
     }
 
     /// @dev Deposits OLAS to treasury for vault and veOLAS lock.
@@ -182,27 +254,18 @@ contract Treasury {
     function depositAndLock(uint256 olasAmount) external {
         IToken(olas).transferFrom(msg.sender, address(this), olasAmount);
 
-        // Get treasury veOLAS lock amount
-        uint256 lockAmount = (olasAmount * lockFactor) / 10_000;
-        uint256 vaultAmount = olasAmount - lockAmount;
+        _updateReserves(0);
+    }
 
-        vaultAmount += vaultBalance;
-        vaultBalance = vaultAmount;
-
-        // Approve OLAS for veOLAS
-        IToken(olas).approve(ve, lockAmount);
-
-        LockedBalance memory lockedBalance = IVEOLAS(ve).mapLockedBalances(address(this));
-        // Lock if never was locked or unlocked
-        if (lockedBalance.amount == 0) {
-            IVEOLAS(ve).createLock(lockAmount, MAX_LOCK_TIME);
-        } else {
-            // Increase amount and unlock time to a maximum
-            IVEOLAS(ve).increaseAmount(lockAmount);
-            IVEOLAS(ve).increaseUnlockTime(MAX_LOCK_TIME);
+    /// TBD
+    function unlock() external {
+        // Check for ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
         }
 
-        emit Vault(msg.sender, olasAmount, lockAmount, vaultAmount);
+        // TODO Never withdraw the full amount, i.e. neve close the treasury lock
+        LockedBalance memory lockedBalance = IVEOLAS(ve).mapLockedBalances(address(this));
     }
 
     function requestToWithdraw(uint256 stAmount) external returns (uint256 requestId, uint256 olasAmount) {
@@ -215,12 +278,13 @@ contract Treasury {
         // TODO kick request out of the map
     }
 
-    function getStAmount(uint256 olasAmount) public view returns (uint256 stAmount) {
-        stAmount = olasAmount;
+    function getStAmount(uint256 olasAmount) external view returns (uint256 stAmount) {
+        // TODO MulDiv?
+        stAmount = (olasAmount * totalReserves) / stakedBalance;
     }
-
-    // TODO: Fix math
+    
     function getOLASAmount(uint256 stAmount) public view returns (uint256 olasAmount) {
-        olasAmount = (stAmount * 1.00000001 ether) / 1 ether;
+        // TODO MulDiv? Rounding down to zero?
+        olasAmount = (stAmount * stakedBalance) / totalReserves;
     }
 }
