@@ -27,6 +27,11 @@ interface IVEOLAS {
 }
 
 interface IToken {
+    /// @dev Gets the amount of tokens owned by a specified account.
+    /// @param account Account address.
+    /// @return Amount of tokens owned.
+    function balanceOf(address account) external view returns (uint256);
+
     /// @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
     /// @param spender Account address that will be able to transfer tokens on behalf of the caller.
     /// @param amount Token amount.
@@ -45,6 +50,11 @@ interface IToken {
     /// @param amount Amount to transfer to.
     /// @return True if the function execution is successful.
     function transferFrom(address from, address to, uint256 amount) external returns (bool);
+
+    /// @dev Mints stOLAS tokens.
+    /// @param account Account address.
+    /// @param amount stOLAS token amount.
+    function mint(address account, uint256 amount) external;
 }
 
 /// @dev Only `owner` has a privilege, but the `sender` was provided.
@@ -52,10 +62,10 @@ interface IToken {
 /// @param owner Required sender address as an owner.
 error OwnerOnly(address sender, address owner);
 
-/// @dev Only `manager` has a privilege, but the `sender` was provided.
+/// @dev Only `depository` has a privilege, but the `sender` was provided.
 /// @param sender Sender address.
-/// @param manager Required sender address as an owner.
-error ManagerOnly(address sender, address manager);
+/// @param depository Required depository address.
+error DepositoryOnly(address sender, address depository);
 
 /// @dev Zero address.
 error ZeroAddress();
@@ -66,13 +76,24 @@ error ZeroValue();
 /// @dev The contract is already initialized.
 error AlreadyInitialized();
 
+struct WithdrawRequest {
+    address requester;
+    uint96 stAmount;
+    uint96 olasAmount;
+    uint32 withdrawTime;
+}
+
 /// @title Treasury - Smart contract for the treasury.
 contract Treasury {
     event ImplementationUpdated(address indexed implementation);
     event OwnerUpdated(address indexed owner);
     event TotalReservesUpdated(uint256 stakedBalance, uint256 totalReserves);
     event LockFactorUpdated(uint256 lockFactor);
-    event Vault(address indexed account, uint256 olasAmount, uint256 lockAmount, uint256 vaultBalance);
+    event Locked(address indexed account, uint256 olasAmount, uint256 lockAmount, uint256 vaultBalance);
+    event WithdrawRequestInitiated(address indexed requester, uint256 indexed requestId, uint256 stAmount,
+        uint256 olasAmount, uint256 withdrawTime);
+    event WithdrawRequestCanceled(uint256 indexed requestId);
+    event WithdrawRequestExecuted(uint256 indexed requestId);
 
     // Code position in storage is keccak256("TREASURY_PROXY") = "0x9b3195704d7d8da1c9110d90b2bf37e7d1d93753debd922cc1f20df74288b870"
     bytes32 public constant TREASURY_PROXY = 0x9b3195704d7d8da1c9110d90b2bf37e7d1d93753debd922cc1f20df74288b870;
@@ -94,8 +115,16 @@ contract Treasury {
     uint256 public totalReserves;
     // Lock factor in 10_000 value
     uint256 public lockFactor;
+    // Withdraw time delay
+    uint256 public withdrawDelay;
+    // Number of withdraw requests
+    uint256 public numWithdrawRequests;
+    // Depository address
     address public depository;
+    // Contract owner
     address public owner;
+
+    mapping(uint256 => WithdrawRequest) public mapWithdrawRequests;
 
     // TODO change to initialize in prod
     constructor(address _olas, address _ve, address _st, uint256 _lockFactor) {
@@ -189,28 +218,29 @@ contract Treasury {
         }
 
         // Get staked OLAS balance
-        uint256 localStakedBalance = stakedBalance;
+        uint256 curStakedBalance = stakedBalance;
 
         // Adjust staked balance
-        localStakedBalance += olasAmount;
-        stakedBalance = localStakedBalance;
+        curStakedBalance += olasAmount;
+        stakedBalance = curStakedBalance;
 
-        uint256 localTotalReserves = _updateReserves(localStakedBalance);
+        (, uint256 curTotalReserves) = _updateReserves(curStakedBalance);
 
         // Get stOLAS amount from the provided OLAS amount
-        stAmount = (olasAmount * localTotalReserves) / localStakedBalance;
+        stAmount = (olasAmount * curTotalReserves) / curStakedBalance;
 
         // Mint stOLAS
         IToken(st).mint(account, stAmount);
     }
 
-    function _updateReserves(uint256 localStakedBalance) internal returns (uint256) {
-        if (localStakedBalance == 0) {
-            localStakedBalance = stakedBalance;
+    function _updateReserves(uint256 curStakedBalance)
+        internal returns (uint256 curVaultBalance, uint256 curTotalReserves) {
+        if (curStakedBalance == 0) {
+            curStakedBalance = stakedBalance;
         }
 
         // Get current vault balance
-        uint256 curVaultBalance = IToken(olas).balanceOf(address(this));
+        curVaultBalance = IToken(olas).balanceOf(address(this));
         // Get previous vault balance
         uint256 prevVaultBalance = vaultBalance;
 
@@ -221,12 +251,10 @@ contract Treasury {
         }
         vaultBalance = curVaultBalance;
 
-        uint256 localTotalReserves = localStakedBalance + curVaultBalance;
-        totalReserves = localTotalReserves;
+        curTotalReserves = curStakedBalance + curVaultBalance;
+        totalReserves = curTotalReserves;
 
-        emit TotalReservesUpdated(localStakedBalance, localTotalReserves);
-
-        return localTotalReserves;
+        emit TotalReservesUpdated(curStakedBalance, curVaultBalance, curTotalReserves);
     }
 
     function updateReserves() public returns (uint256) {
@@ -245,7 +273,7 @@ contract Treasury {
         IVEOLAS(ve).increaseAmount(lockAmount);
         IVEOLAS(ve).increaseUnlockTime(MAX_LOCK_TIME);
 
-        emit Vault(msg.sender, olasAmount, lockAmount, remainder);
+        emit Locked(msg.sender, olasAmount, lockAmount, remainder);
     }
 
     /// @dev Deposits OLAS to treasury for vault and veOLAS lock.
@@ -269,21 +297,81 @@ contract Treasury {
     }
 
     function requestToWithdraw(uint256 stAmount) external returns (uint256 requestId, uint256 olasAmount) {
+        // Update reserves
+        _updateReserves(0);
+
+        // Get stOLAS
         IToken(st).transferFrom(msg.sender, address(this), stAmount);
 
-        // TODO cyclic map requests
+        requestId = numWithdrawRequests;
+        numWithdrawRequests = requestId + 1;
+
+        WithdrawRequest storage withdrawRequest = mapWithdrawRequests[requestId];
+        withdrawRequest.requester = msg.sender;
+        withdrawRequest.stAmount = stAmount;
+
+        olasAmount = getOlasAmount(stAmount);
+        // TODO any checks or now overflow is possible?
+        withdrawRequest.olasAmount = olasAmount;
+
+        uint256 withdrawTime = block.timestamp + withdrawDelay;
+        withdrawRequest.withdrawTime = withdrawTime;
+
+        emit WithdrawRequestInitiated(msg.sender, requestId, stAmount, olasAmount, withdrawTime);
     }
 
-    function cancelWithdrawRequest(uint256 requestId) external {
-        // TODO kick request out of the map
+    function cancelWithdrawRequests(uint256[] memory requestIds) external {
+        // Traverse all withdraw requests
+        for (uint256 i = 0; i < requestIds[i]; ++i) {
+            // Get withdraw request
+            WithdrawRequest storage withdrawRequest = mapWithdrawRequests[requestIds[i]];
+            // Check for request owner
+            if (msg.sender != withdrawRequest.requester) {
+                revert OwnerOnly(msg.sender, withdrawRequest.requester);
+            }
+
+            delete mapWithdrawRequests[requestIds[i]];
+
+            emit WithdrawRequestCanceled(requestIds[i]);
+        }
+    }
+
+    function finalizeWithdrawRequests(uint256[] memory requestIds) external {
+        // Update reserves
+        _updateReserves(0);
+
+        uint256 totalAmount;
+        // Traverse all withdraw requests
+        for (uint256 i = 0; i < requestIds[i]; ++i) {
+            // Get withdraw request
+            WithdrawRequest storage withdrawRequest = mapWithdrawRequests[requestIds[i]];
+
+            // Check for earliest possible withdraw time
+            if (withdrawRequest.withdrawTime > block.timestamp) {
+                revert();
+            }
+
+            uint256 amount = withdrawRequest.olasAmount;
+            totalAmount += amount;
+
+            emit WithdrawRequestExecuted(requestIds[i]);
+        }
+
+        // Transfer total amount
+        // The transfer overflow check is not needed since balances are in sync
+        IToken(olas).transfer(msg.sender, totalAmount);
+
+        // Adjust vault balances
+        vaultBalance -= totalAmount;
+        totalReserves -= totalAmount;
     }
 
     function getStAmount(uint256 olasAmount) external view returns (uint256 stAmount) {
         // TODO MulDiv?
         stAmount = (olasAmount * totalReserves) / stakedBalance;
     }
-    
-    function getOLASAmount(uint256 stAmount) public view returns (uint256 olasAmount) {
+
+    function getOlasAmount(uint256 stAmount) public view returns (uint256 olasAmount) {
         // TODO MulDiv? Rounding down to zero?
         olasAmount = (stAmount * stakedBalance) / totalReserves;
     }
