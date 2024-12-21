@@ -390,12 +390,14 @@ contract StakerL2 is ERC721TokenReceiver {
 
     }
 
-    // TODO triggered when (curWithdrawAmountRequested - curVaultBalance) is positive, but need to do checks first
+    // TODO triggered when (curWithdrawAmountRequested - curVaultBalance) is positive, messaged by treasury
     // TODO arrays
+    /// @dev Withdraws specified amounts from specified staking contracts.
+    /// @notice The majority of discovered chains does not need any value to process token bridge transfer.
     function withdraw(
         address stakingProxy,
         uint256 olasAmount
-    ) external payable {
+    ) external payable virtual {
         // Reentrancy guard
         if (_locked > 1) {
             revert ReentrancyGuard();
@@ -403,7 +405,7 @@ contract StakerL2 is ERC721TokenReceiver {
         _locked = 2;
 
         // Check for whitelisted guardian agent
-        if (!mapGuardianAgents[msg.sender]) {
+        if (msg.sender != treasury) {
             revert UnauthorizedAccount(msg.sender);
         }
 
@@ -421,9 +423,6 @@ contract StakerL2 is ERC721TokenReceiver {
             balance = balance + unstakeAmount - olasAmount;
         }
         mapStakingProxyBalances[stakingProxy] = balance;
-
-        // TODO Send also message back since it's locked balance that needs to be negatively updated
-        // TODO guardians could pick this up and pushed into the pending state?
 
         // Send OLAS to collector to initiate L1 transfer for all the balances at this time
         IToken(olas).transfer(collector, olasAmount);

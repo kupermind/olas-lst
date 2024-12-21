@@ -51,7 +51,7 @@ contract stOLAS is ERC20 {
 
     /// @dev Burns stOLAS tokens.
     /// @param amount stOLAS token amount to burn.
-    function burn(uint256 amount) external virtual {
+    function burn(uint256 amount) external {
         _burn(msg.sender, amount);
     }
 }

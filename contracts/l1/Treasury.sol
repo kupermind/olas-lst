@@ -51,10 +51,14 @@ interface IToken {
     /// @return True if the function execution is successful.
     function transferFrom(address from, address to, uint256 amount) external returns (bool);
 
-    /// @dev Mints stOLAS tokens.
+    /// @dev Mints tokens.
     /// @param account Account address.
-    /// @param amount stOLAS token amount.
+    /// @param amount token amount.
     function mint(address account, uint256 amount) external;
+
+    /// @dev Burns tokens.
+    /// @param amount token amount to burn.
+    function burn(uint256 amount) external;
 }
 
 /// @dev Only `owner` has a privilege, but the `sender` was provided.
@@ -101,7 +105,6 @@ contract Treasury {
     uint256 public constant MAX_LOCK_FACTOR = 10_000;
     // Maximum veOLAS lock time (4 years)
     uint256 public constant MAX_LOCK_TIME = 4 * 365 * 1 days;
-
 
     address public immutable olas;
     address public immutable ve;
@@ -298,7 +301,31 @@ contract Treasury {
         LockedBalance memory lockedBalance = IVEOLAS(ve).mapLockedBalances(address(this));
     }
 
-    function requestToWithdraw(uint256 stAmount) external returns (uint256 requestId, uint256 olasAmount) {
+    /// @dev Calculate and unstake from specified models.
+    /// @notice Less relevant models must be placed in the back of array, such that they are not touched
+    ///         if there is enough amount to be unstaked from other models.
+    /// @param amount Total amount to unstake.
+    /// @param backupModelIds Model Ids to unstake from, in order of appearance.
+    function _unstake(uint256 unstakeAmount, uint256[] memory backupModelIds) internal {
+        uint256 curStakedBalance = stakedBalance;
+        if (curStakedBalance < unstakeAmount) {
+            revert Overflow(curStakedBalance, unstakeAmount);
+        }
+
+        // Update staked balance
+        curStakedBalance -= unstakeAmount;
+        stakedBalance = curStakedBalance;
+
+        // Collect staking contracts and amounts to send unstake message to L2-s
+        (address[] memory stakingProxies, uint256[] memory chainIds, uint256[] memory amounts) =
+            IDepository(depository).processUnstake(unstakeAmount, backupModelIds);
+        // TODO Send message to L2 to request withdrawDiff
+    }
+
+    function requestToWithdraw(
+        uint256 stAmount,
+        uint256[] memory backupModelIds
+    ) external returns (uint256 requestId, uint256 olasAmount) {
         // Update reserves
         _updateReserves(0);
 
@@ -312,6 +339,7 @@ contract Treasury {
         withdrawRequest.requester = msg.sender;
         withdrawRequest.stAmount = stAmount;
 
+        // Calculate OLAS amount
         olasAmount = getOlasAmount(stAmount);
         withdrawRequest.olasAmount = olasAmount;
 
@@ -326,17 +354,14 @@ contract Treasury {
         if (curWithdrawAmountRequested > curVaultBalance) {
             uint256 withdrawDiff = curWithdrawAmountRequested - curVaultBalance;
 
-            stakedBalance -= withdrawDiff;
-            // TODO Send message to L2 to request withdrawDiff
-            // TODO which chains to request?
-            // TODO what if the funds are already in process?
-            // TODO service to post info about incoming transfers?
+            _unstake(withdrawDiff, backupModelIds);
         }
 
         emit WithdrawRequestInitiated(msg.sender, requestId, stAmount, olasAmount, withdrawTime);
     }
 
     function cancelWithdrawRequests(uint256[] memory requestIds) external {
+        uint256 totalAmount;
         // Traverse all withdraw requests
         for (uint256 i = 0; i < requestIds[i]; ++i) {
             // Get withdraw request
@@ -346,9 +371,17 @@ contract Treasury {
                 revert OwnerOnly(msg.sender, withdrawRequest.requester);
             }
 
+            totalAmount += withdrawRequest.stAmount;
+
+            // TODO deactivate instead to leave all the info?
             delete mapWithdrawRequests[requestIds[i]];
 
             emit WithdrawRequestCanceled(requestIds[i]);
+        }
+
+        // Transfer stOLAS back to msg.sender
+        if (totalAmount > 0) {
+            IToken(st).transfer(msg.sender, totalAmount);
         }
     }
 
@@ -357,6 +390,7 @@ contract Treasury {
         _updateReserves(0);
 
         uint256 totalAmount;
+        uint256 stAmountToBurn;
         // Traverse all withdraw requests
         for (uint256 i = 0; i < requestIds[i]; ++i) {
             // Get withdraw request
@@ -367,22 +401,28 @@ contract Treasury {
                 revert();
             }
 
-            uint256 amount = withdrawRequest.olasAmount;
-            totalAmount += amount;
+            totalAmount += withdrawRequest.olasAmount;
+            stAmountToBurn += withdrawRequest.stAmount;
+
+            // TODO just decativate a request?
+            delete mapWithdrawRequests[requestIds[i]];
 
             emit WithdrawRequestExecuted(requestIds[i]);
         }
 
         // TODO any checks or now overflow is possible?
 
+        // Adjust vault balances directly to avoid calling updateReserves()
+        vaultBalance -= totalAmount;
+        totalReserves -= totalAmount;
+
+        // Burn stOLAS tokens
+        IToken(st).burn(stAmountToBurn);
+
         // Transfer total amount
         // The transfer overflow check is not needed since balances are in sync
         // This fails here
         IToken(olas).transfer(msg.sender, totalAmount);
-
-        // Adjust vault balances directly to avoid calling updateReserves()
-        vaultBalance -= totalAmount;
-        totalReserves -= totalAmount;
     }
 
     function getStAmount(uint256 olasAmount) external view returns (uint256 stAmount) {

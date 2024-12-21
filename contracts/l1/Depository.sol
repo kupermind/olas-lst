@@ -354,4 +354,29 @@ contract Depository {
         // Transfer OLAS
         IToken(olas).transfer(msg.sender, olasAmount);
     }
+
+    function processUnstake(
+        uint256 unstakeAmount,
+        uint256[] memory backupModelIds
+    ) external returns (address[] memory stakingProxies, uint256[] memory chainIds, uint256[] memory amounts) {
+        // Allocate arrays
+
+        // Collect staking contracts and amounts
+        for (uint256 i = 0; i < backupModelIds.length; ++i) {
+            StakingModel memory stakingModel = mapStakingModels[backupModelIds[i]];
+            uint256 maxUnstakeAmount = stakingModel.supply - stakingModel.remainder;
+
+            stakingProxies[i] = stakingModel.stakingProxy;
+            chainIds[i] = stakingModel.chainId;
+            if (unstakeAmount > maxUnstakeAmount) {
+                amounts[i] = maxUnstakeAmount;
+                unstakeAmount -= maxUnstakeAmount;
+                mapStakingModels[backupModelIds[i]].remainder = stakingModel.supply;
+            } else {
+                amounts[i] = unstakeAmount;
+                mapStakingModels[backupModelIds[i]].remainder += stakingModel.remainder + unstakeAmount;
+                break;
+            }
+        }
+    }
 }
