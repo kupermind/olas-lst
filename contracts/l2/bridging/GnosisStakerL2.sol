@@ -24,7 +24,7 @@ interface IBridge {
     function messageSender() external view returns (address);
 }
 
-/// @title GnosisTargetDispenserL2 - Smart contract for processing tokens and data received on Gnosis L2, and data sent back to L1.
+/// @title GnosisTargetDispenserL2 - Smart contract for processing tokens and data received on Gnosis L2, and token sent back to L1.
 contract GnosisStakerL2 is DefaultStakerL2 {
     // Bridge payload length
     uint256 public constant BRIDGE_PAYLOAD_LENGTH = 32;
@@ -97,6 +97,8 @@ contract GnosisStakerL2 is DefaultStakerL2 {
             revert();
         }
 
-        IBridge(l2TokenRelayer).relayTokens(olas, l1DepositProcessor, l2TokenRelayer);
+        IToken(olas).transferFrom(msg.sender, address(this), olasAmount);
+        IToken(olas).approve(l2TokenRelayer, olasAmount);
+        IBridge(l2TokenRelayer).relayTokens(olas, l1DepositProcessor, olasAmount);
     }
 }

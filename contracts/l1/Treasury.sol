@@ -115,6 +115,8 @@ contract Treasury {
     uint256 public totalReserves;
     // Lock factor in 10_000 value
     uint256 public lockFactor;
+    // Total withdraw amount requested
+    uint256 public withdrawAmountRequested;
     // Withdraw time delay
     uint256 public withdrawDelay;
     // Number of withdraw requests
@@ -311,11 +313,25 @@ contract Treasury {
         withdrawRequest.stAmount = stAmount;
 
         olasAmount = getOlasAmount(stAmount);
-        // TODO any checks or now overflow is possible?
         withdrawRequest.olasAmount = olasAmount;
 
         uint256 withdrawTime = block.timestamp + withdrawDelay;
         withdrawRequest.withdrawTime = withdrawTime;
+
+        uint256 curWithdrawAmountRequested = withdrawAmountRequested + olasAmount;
+        withdrawAmountRequested = curWithdrawAmountRequested;
+        uint256 curVaultBalance = vaultBalance;
+
+        // If withdraw amount is bigger than the current one, need to unstake
+        if (curWithdrawAmountRequested > curVaultBalance) {
+            uint256 withdrawDiff = curWithdrawAmountRequested - curVaultBalance;
+
+            stakedBalance -= withdrawDiff;
+            // TODO Send message to L2 to request withdrawDiff
+            // TODO which chains to request?
+            // TODO what if the funds are already in process?
+            // TODO service to post info about incoming transfers?
+        }
 
         emit WithdrawRequestInitiated(msg.sender, requestId, stAmount, olasAmount, withdrawTime);
     }
@@ -361,6 +377,7 @@ contract Treasury {
 
         // Transfer total amount
         // The transfer overflow check is not needed since balances are in sync
+        // This fails here
         IToken(olas).transfer(msg.sender, totalAmount);
 
         // Adjust vault balances directly to avoid calling updateReserves()

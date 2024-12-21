@@ -57,7 +57,7 @@ error AlreadyProcessed(uint256 requestId);
 /// @title StakerL2 - Smart contract for staking OLAS on L2.
 contract StakerL2 is ERC721TokenReceiver {
     event OwnerUpdated(address indexed owner);
-    event TokenRelayerUpdated(address indexed tokenRelayer);
+    event TokenRelayerUpdated(address indexed l2StakingProcessor);
     event SetGuardianServiceStatuses(address[] guardianServices, bool[] statuses);
     event Stake(address indexed sender, address indexed account, uint256 indexed depositCounter, uint256 olasAmount);
     event CreateAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig);
@@ -91,8 +91,8 @@ contract StakerL2 is ERC721TokenReceiver {
     // Safe fallback handler
     address public immutable fallbackHandler;
 
+    address public l2StakingProcessor;
     address public owner;
-    address public tokenRelayer;
 
     // Nonce
     uint256 internal _nonce;
@@ -103,8 +103,6 @@ contract StakerL2 is ERC721TokenReceiver {
     mapping(uint256 => bool) public mapDeposits;
     mapping(address => uint256) public balanceOf;
     mapping(address => uint256) public mapStakingProxyBalances;
-    mapping(uint256 => bool) public mapDepositCounters;
-    mapping(uint256 => bool) public mapWithdrawCounters;
     mapping(address => uint256[]) public mapStakedServiceIds;
     mapping(address => uint256) public mapLastStakedServiceIdxs;
 
@@ -126,12 +124,12 @@ contract StakerL2 is ERC721TokenReceiver {
         address _fallbackHandler,
         uint256 _agentId,
         bytes32 _configHash,
-        address _tokenRelayer
+        address _l2StakingProcessor
     ) {
         // Check for zero addresses
         if (_serviceManager == address(0) || _olas == address(0) || _stakingFactory == address(0) ||
             _safeMultisig == address(0) || _safeSameAddressMultisig == address(0) || _fallbackHandler == address(0) ||
-            _tokenRelayer == address(0)) {
+            _l2StakingProcessor == address(0)) {
             revert ZeroAddress();
         }
 
@@ -148,7 +146,7 @@ contract StakerL2 is ERC721TokenReceiver {
         stakingFactory = _stakingFactory;
         safeMultisig = _safeMultisig;
         fallbackHandler = _fallbackHandler;
-        tokenRelayer = _tokenRelayer;
+        l2StakingProcessor = _l2StakingProcessor;
         serviceRegistry = IService(serviceManager).serviceRegistry();
         serviceRegistryTokenUtility = IService(serviceManager).serviceRegistryTokenUtility();
 
@@ -185,7 +183,7 @@ contract StakerL2 is ERC721TokenReceiver {
             revert ZeroAddress();
         }
 
-        tokenRelayer = newTokenRelayer;
+        l2StakingProcessor = newTokenRelayer;
         emit TokenRelayerUpdated(newTokenRelayer);
     }
 
@@ -354,10 +352,12 @@ contract StakerL2 is ERC721TokenReceiver {
         // TODO How many stakes are needed?
 
         uint256 balance = mapStakingProxyBalances[stakingProxy];
+        uint256 lastBalance = balance;
         uint256 minStakingDeposit = IStaking(stakingProxy).minStakingDeposit();
         uint256 stakeDeposit = minStakingDeposit * (1 + NUM_AGENT_INSTANCES);
 
         balance += olasAmount;
+        // Check if the balance is enough to create another stake
         if (balance >= stakeDeposit) {
             // Approve token for the serviceRegistryTokenUtility contract
             IToken(olas).approve(serviceRegistryTokenUtility, stakeDeposit);
@@ -385,13 +385,17 @@ contract StakerL2 is ERC721TokenReceiver {
         _locked = 1;
     }
 
+    // TODO Re-stake if services are evicted by any reason
+    function reStake(address stakingProxy, uint256[] memory serviceIds) external {
+
+    }
+
+    // TODO triggered when (curWithdrawAmountRequested - curVaultBalance) is positive, but need to do checks first
     // TODO arrays
     function withdraw(
-        address account,
-        uint256 withdrawCounter,
-        uint256 olasAmount,
-        address stakingProxy
-    ) external {
+        address stakingProxy,
+        uint256 olasAmount
+    ) external payable {
         // Reentrancy guard
         if (_locked > 1) {
             revert ReentrancyGuard();
@@ -403,19 +407,7 @@ contract StakerL2 is ERC721TokenReceiver {
             revert UnauthorizedAccount(msg.sender);
         }
 
-        // Check for withdraw counter
-        if (mapWithdrawCounters[withdrawCounter]) {
-            revert AlreadyProcessed(withdrawCounter);
-        }
-        mapWithdrawCounters[withdrawCounter] = true;
-
-//        uint256 balance = balanceOf[account];
-//        if (balance < olasAmount) {
-//            revert();
-//        }
-//        balanceOf[account] -= olasAmount;
-
-        // TODO How many unstakes are needed?
+        //withdrawCounter++
 
         uint256 balance = mapStakingProxyBalances[stakingProxy];
         if (balance > olasAmount) {
@@ -430,25 +422,14 @@ contract StakerL2 is ERC721TokenReceiver {
         }
         mapStakingProxyBalances[stakingProxy] = balance;
 
-        // Send OLAS back to L1
-        IToken(olas).approve(tokenRelayer, olasAmount);
-        ITokenRelayer(tokenRelayer).relayToL1{value: msg.value}(olasAmount);
+        // TODO Send also message back since it's locked balance that needs to be negatively updated
+        // TODO guardians could pick this up and pushed into the pending state?
+
+        // Send OLAS to collector to initiate L1 transfer for all the balances at this time
+        IToken(olas).transfer(collector, olasAmount);
+        ICollector(collector).relayTokens{value: msg.value}(0);
 
         _locked = 1;
-    }
-
-    function bridgeTransfer(address multisig, address depository) external {
-        // Check for whitelisted guardian agent
-        if (!mapGuardianAgents[msg.sender]) {
-            revert UnauthorizedAccount(msg.sender);
-        }
-
-        // Get the multisig balance
-        uint256 balance = IToken(olas).balanceOf(multisig);
-
-        // TODO Mock bridge transfer for now
-        IToken(olas).transferFrom(multisig, address(this), balance);
-        IToken(olas).transfer(depository, balance);
     }
 
     function isAbleStake(address stakingProxy, uint256 olasAmount) public view returns (bool) {
