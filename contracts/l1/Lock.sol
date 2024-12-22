@@ -80,8 +80,8 @@ contract Lock {
     // Treasury address
     address public immutable treasury;
 
-    // Governor address
-    address public governor;
+    // OLAS olasGovernor address
+    address public olasGovernor;
     // Owner address
     address public owner;
 
@@ -101,14 +101,14 @@ contract Lock {
     }
 
     /// @dev Lock initializer.
-    function initialize(address _governor) external{
+    function initialize(address _olasGovernor) external{
         // Check for already initialized
         if (owner != address(0)) {
             revert AlreadyInitialized();
         }
 
         owner = msg.sender;
-        governor = _governor;
+        olasGovernor = _olasGovernor;
     }
 
     function createFirstLock(uint256 olasAmount) external {
@@ -166,7 +166,7 @@ contract Lock {
             revert OwnerOnly(msg.sender, owner);
         }
 
-        IGovernor(governor).proposeBatch(targets);
+        IGovernor(olasGovernor).proposeBatch(targets);
     }
 
     function castVote(uint256 proposalId, uint8 vote) external {
@@ -175,6 +175,6 @@ contract Lock {
             revert OwnerOnly(msg.sender, owner);
         }
 
-        IGovernor(governor).castVote(proposalId, vote);
+        IGovernor(olasGovernor).castVote(proposalId, vote);
     }
 }

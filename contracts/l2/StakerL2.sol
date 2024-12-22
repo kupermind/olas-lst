@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {ERC721TokenReceiver} from "../../lib/autonolas-registries/lib/solmate/src/tokens/ERC721.sol";
+import {ActivityModuleProxy} from "./ActivityModuleProxy.sol";
 import {IService} from "../interfaces/IService.sol";
 import {IStaking} from "../interfaces/IStaking.sol";
 import {IToken, INFToken} from "../interfaces/IToken.sol";
@@ -95,8 +96,12 @@ contract StakerL2 is ERC721TokenReceiver {
     address public immutable safeModuleInitializer;
     // Safe fallback handler
     address public immutable fallbackHandler;
+    // Activity module beacon
+    address public immutable beacon;
 
+    // L2 staking processor address
     address public l2StakingProcessor;
+    // Owner address
     address public owner;
 
     // Nonce
@@ -118,6 +123,7 @@ contract StakerL2 is ERC721TokenReceiver {
     /// @param _stakingFactory Staking factory address.
     /// @param _safeMultisig Safe multisig address.
     /// @param _safeSameAddressMultisig Safe multisig processing contract address.
+    /// @param _beacon Activity module beacon.
     /// @param _safeModuleInitializer Safe module initializer address.
     /// @param _fallbackHandler Multisig fallback handler address.
     /// @param _agentId Contributor agent Id.
@@ -128,6 +134,7 @@ contract StakerL2 is ERC721TokenReceiver {
         address _stakingFactory,
         address _safeMultisig,
         address _safeSameAddressMultisig,
+        address _beacon,
         address _safeModuleInitializer,
         address _fallbackHandler,
         uint256 _agentId,
@@ -136,7 +143,7 @@ contract StakerL2 is ERC721TokenReceiver {
     ) {
         // Check for zero addresses
         if (_serviceManager == address(0) || _olas == address(0) || _stakingFactory == address(0) ||
-            _safeMultisig == address(0) || _safeSameAddressMultisig == address(0) ||
+            _safeMultisig == address(0) || _safeSameAddressMultisig == address(0) || _beacon ==address(0) ||
             _safeModuleInitializer ==address(0) || _fallbackHandler == address(0) || _l2StakingProcessor == address(0)) {
             revert ZeroAddress();
         }
@@ -153,6 +160,8 @@ contract StakerL2 is ERC721TokenReceiver {
         olas = _olas;
         stakingFactory = _stakingFactory;
         safeMultisig = _safeMultisig;
+        safeSameAddressMultisig = _safeSameAddressMultisig;
+        beacon = _beacon;
         safeModuleInitializer = _safeModuleInitializer;
         fallbackHandler = _fallbackHandler;
         l2StakingProcessor = _l2StakingProcessor;
@@ -243,7 +252,7 @@ contract StakerL2 is ERC721TokenReceiver {
         // Set agent instances as [msg.sender]
         address[] memory instances = new address[](NUM_AGENT_INSTANCES);
         // TODO create proxy contract
-        instances[0] = msg.sender; // new ActivityModuleProxy
+        instances[0] = new ActivityModuleProxy(olas, beacon);//msg.sender; // new ActivityModuleProxy
 
         // Create a service owned by this contract
         serviceId = IService(serviceManager).create(address(this), token, configHash, agentIds,
