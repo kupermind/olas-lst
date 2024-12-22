@@ -160,6 +160,15 @@ contract Lock {
         IToken(olas).transfer(treasury, amount);
     }
 
+    function proposeBatch(address[] memory targets) external {
+        // Check for ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
+        }
+
+        IGovernor(governor).proposeBatch(targets);
+    }
+
     function castVote(uint256 proposalId, uint8 vote) external {
         // Check for ownership
         if (msg.sender != owner) {

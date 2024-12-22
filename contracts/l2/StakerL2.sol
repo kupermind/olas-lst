@@ -64,10 +64,13 @@ contract StakerL2 is ERC721TokenReceiver {
     event DeployAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig);
     event Unstake(address indexed sender, address indexed stakingProxy, uint256 indexed serviceId);
 
+    // Safe module payload
+    bytes public constant SAFE_MODULE_PAYLOAD = 0xfe51f64300000000000000000000000029fcb43b46531bca003ddc8fcb67ffe91900c762;
     // Number of agent instances
     uint256 public constant NUM_AGENT_INSTANCES = 1;
     // Threshold
     uint256 public constant THRESHOLD = 1;
+
     // Contributor agent Id
     uint256 public immutable agentId;
     // Contributor service config hash
@@ -88,6 +91,8 @@ contract StakerL2 is ERC721TokenReceiver {
     address public immutable safeMultisig;
     // Safe same address multisig processing contract address
     address public immutable safeSameAddressMultisig;
+    /// Safe module initializer address
+    address public immutable safeModuleInitializer;
     // Safe fallback handler
     address public immutable fallbackHandler;
 
@@ -104,6 +109,7 @@ contract StakerL2 is ERC721TokenReceiver {
     mapping(address => uint256) public balanceOf;
     mapping(address => uint256) public mapStakingProxyBalances;
     mapping(address => uint256[]) public mapStakedServiceIds;
+    mapping(uint256 => address) public mapServiceIdActivityModules;
     mapping(address => uint256) public mapLastStakedServiceIdxs;
 
     /// @dev StakerL2 constructor.
@@ -112,6 +118,7 @@ contract StakerL2 is ERC721TokenReceiver {
     /// @param _stakingFactory Staking factory address.
     /// @param _safeMultisig Safe multisig address.
     /// @param _safeSameAddressMultisig Safe multisig processing contract address.
+    /// @param _safeModuleInitializer Safe module initializer address.
     /// @param _fallbackHandler Multisig fallback handler address.
     /// @param _agentId Contributor agent Id.
     /// @param _configHash Contributor service config hash.
@@ -121,6 +128,7 @@ contract StakerL2 is ERC721TokenReceiver {
         address _stakingFactory,
         address _safeMultisig,
         address _safeSameAddressMultisig,
+        address _safeModuleInitializer,
         address _fallbackHandler,
         uint256 _agentId,
         bytes32 _configHash,
@@ -128,8 +136,8 @@ contract StakerL2 is ERC721TokenReceiver {
     ) {
         // Check for zero addresses
         if (_serviceManager == address(0) || _olas == address(0) || _stakingFactory == address(0) ||
-            _safeMultisig == address(0) || _safeSameAddressMultisig == address(0) || _fallbackHandler == address(0) ||
-            _l2StakingProcessor == address(0)) {
+            _safeMultisig == address(0) || _safeSameAddressMultisig == address(0) ||
+            _safeModuleInitializer ==address(0) || _fallbackHandler == address(0) || _l2StakingProcessor == address(0)) {
             revert ZeroAddress();
         }
 
@@ -145,6 +153,7 @@ contract StakerL2 is ERC721TokenReceiver {
         olas = _olas;
         stakingFactory = _stakingFactory;
         safeMultisig = _safeMultisig;
+        safeModuleInitializer = _safeModuleInitializer;
         fallbackHandler = _fallbackHandler;
         l2StakingProcessor = _l2StakingProcessor;
         serviceRegistry = IService(serviceManager).serviceRegistry();
@@ -234,11 +243,14 @@ contract StakerL2 is ERC721TokenReceiver {
         // Set agent instances as [msg.sender]
         address[] memory instances = new address[](NUM_AGENT_INSTANCES);
         // TODO create proxy contract
-        instances[0] = msg.sender;
+        instances[0] = msg.sender; // new ActivityModuleProxy
 
         // Create a service owned by this contract
         serviceId = IService(serviceManager).create(address(this), token, configHash, agentIds,
             agentParams, uint32(THRESHOLD));
+
+        // Record activity module
+        mapServiceIdActivityModules[serviceId] = instances[0];
 
         // Activate registration (1 wei as a deposit wrapper)
         IService(serviceManager).activateRegistration{value: 1}(serviceId);
@@ -249,8 +261,8 @@ contract StakerL2 is ERC721TokenReceiver {
         // Prepare Safe multisig data
         uint256 localNonce = _nonce;
         uint256 randomNonce = uint256(keccak256(abi.encodePacked(block.timestamp, msg.sender, localNonce)));
-        bytes memory data = abi.encodePacked(address(0), fallbackHandler, address(0), address(0), uint256(0),
-            randomNonce, "0x");
+        bytes memory data = abi.encodePacked(safeModuleInitializer, fallbackHandler, address(0), address(0), uint256(0),
+            randomNonce, SAFE_MODULE_PAYLOAD);
         // Deploy the service
         multisig = IService(serviceManager).deploy(serviceId, safeMultisig, data);
 
@@ -279,6 +291,8 @@ contract StakerL2 is ERC721TokenReceiver {
     function _createAndStake(address stakingProxy, uint256 minStakingDeposit) internal {
         // Create and deploy service
         (uint256 serviceId, address multisig) = _createAndDeploy(olas, minStakingDeposit);
+
+        // TODO Initialize ActivityModuleProxy
 
         // Stake the service
         _stake(stakingProxy, serviceId);
