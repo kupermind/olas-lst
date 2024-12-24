@@ -1,40 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-interface IToken {
-    /// @dev Gets the amount of tokens owned by a specified account.
-    /// @param account Account address.
-    /// @return Amount of tokens owned.
-    function balanceOf(address account) external view returns (uint256);
-
-    /// @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
-    /// @param spender Account address that will be able to transfer tokens on behalf of the caller.
-    /// @param amount Token amount.
-    /// @return True if the function execution is successful.
-    function approve(address spender, uint256 amount) external returns (bool);
-
-    /// @dev Transfers the token amount.
-    /// @param to Address to transfer to.
-    /// @param amount The amount to transfer.
-    /// @return True if the function execution is successful.
-    function transfer(address to, uint256 amount) external returns (bool);
-
-    /// @dev Transfers the token amount that was previously approved up until the maximum allowance.
-    /// @param from Account address to transfer from.
-    /// @param to Account address to transfer to.
-    /// @param amount Amount to transfer to.
-    /// @return True if the function execution is successful.
-    function transferFrom(address from, address to, uint256 amount) external returns (bool);
-
-    /// @dev Mints tokens.
-    /// @param account Account address.
-    /// @param amount token amount.
-    function mint(address account, uint256 amount) external;
-
-    /// @dev Burns tokens.
-    /// @param amount token amount to burn.
-    function burn(uint256 amount) external;
-}
+import {ERC1155, ERC1155TokenReceiver} from "../../lib/autonolas-registries/lib/solmate/src/tokens/ERC1155.sol";
+import {IToken} from "../interfaces/IToken.sol";
 
 /// @dev Only `owner` has a privilege, but the `sender` was provided.
 /// @param sender Sender address.
@@ -62,8 +30,8 @@ struct WithdrawRequest {
     uint32 withdrawTime;
 }
 
-/// @title Treasury - Smart contract for the treasury.
-contract Treasury {
+/// @title Treasury - Smart contract for treasury
+contract Treasury is ERC1155, ERC1155TokenReceiver {
     event ImplementationUpdated(address indexed implementation);
     event OwnerUpdated(address indexed owner);
     event TotalReservesUpdated(uint256 stakedBalance, uint256 totalReserves);
@@ -71,7 +39,6 @@ contract Treasury {
     event Locked(address indexed account, uint256 olasAmount, uint256 lockAmount, uint256 vaultBalance);
     event WithdrawRequestInitiated(address indexed requester, uint256 indexed requestId, uint256 stAmount,
         uint256 olasAmount, uint256 withdrawTime);
-    event WithdrawRequestCanceled(uint256 indexed requestId);
     event WithdrawRequestExecuted(uint256 indexed requestId);
 
     // Code position in storage is keccak256("TREASURY_PROXY") = "0x9b3195704d7d8da1c9110d90b2bf37e7d1d93753debd922cc1f20df74288b870"
@@ -283,19 +250,16 @@ contract Treasury {
         // Get stOLAS
         IToken(st).transferFrom(msg.sender, address(this), stAmount);
 
+        // Caclulate withdraw time
+        uint256 withdrawTime = block.timestamp + withdrawDelay;
+
         requestId = numWithdrawRequests;
         numWithdrawRequests = requestId + 1;
 
-        WithdrawRequest storage withdrawRequest = mapWithdrawRequests[requestId];
-        withdrawRequest.requester = msg.sender;
-        withdrawRequest.stAmount = stAmount;
-
         // Calculate OLAS amount
         olasAmount = getOlasAmount(stAmount);
-        withdrawRequest.olasAmount = olasAmount;
-
-        uint256 withdrawTime = block.timestamp + withdrawDelay;
-        withdrawRequest.withdrawTime = withdrawTime;
+        // Mint request tokens
+        _mint(msg.sender, requestId, olasAmount, "");
 
         uint256 curWithdrawAmountRequested = withdrawAmountRequested + olasAmount;
         withdrawAmountRequested = curWithdrawAmountRequested;
@@ -308,67 +272,40 @@ contract Treasury {
             _unstake(withdrawDiff, backupModelIds);
         }
 
+        // Burn stOLAS tokens
+        IToken(st).burn(stAmount);
+
         emit WithdrawRequestInitiated(msg.sender, requestId, stAmount, olasAmount, withdrawTime);
     }
 
-    function cancelWithdrawRequests(uint256[] memory requestIds) external {
-        uint256 totalAmount;
-        // Traverse all withdraw requests
-        for (uint256 i = 0; i < requestIds[i]; ++i) {
-            // Get withdraw request
-            WithdrawRequest storage withdrawRequest = mapWithdrawRequests[requestIds[i]];
-            // Check for request owner
-            if (msg.sender != withdrawRequest.requester) {
-                revert OwnerOnly(msg.sender, withdrawRequest.requester);
-            }
-
-            totalAmount += withdrawRequest.stAmount;
-
-            // TODO deactivate instead to leave all the info?
-            delete mapWithdrawRequests[requestIds[i]];
-
-            emit WithdrawRequestCanceled(requestIds[i]);
-        }
-
-        // Transfer stOLAS back to msg.sender
-        if (totalAmount > 0) {
-            IToken(st).transfer(msg.sender, totalAmount);
-        }
-    }
-
-    function finalizeWithdrawRequests(uint256[] memory requestIds) external {
+    function finalizeWithdrawRequests(uint256[] memory requestIds, uint256[] memory amount) external {
         // Update reserves
         _updateReserves(0);
 
+        safeBatchTransferFrom(msg.sender, address(this), requestIds, amount, "");
+
         uint256 totalAmount;
-        uint256 stAmountToBurn;
         // Traverse all withdraw requests
         for (uint256 i = 0; i < requestIds[i]; ++i) {
-            // Get withdraw request
-            WithdrawRequest storage withdrawRequest = mapWithdrawRequests[requestIds[i]];
-
             // Check for earliest possible withdraw time
-            if (withdrawRequest.withdrawTime > block.timestamp) {
+            uint256 withdrawTime;
+            if (withdrawTime > block.timestamp) {
                 revert();
             }
 
-            totalAmount += withdrawRequest.olasAmount;
-            stAmountToBurn += withdrawRequest.stAmount;
+            totalAmount += amounts[i];
 
-            // TODO just decativate a request?
-            delete mapWithdrawRequests[requestIds[i]];
-
-            emit WithdrawRequestExecuted(requestIds[i]);
+            emit WithdrawRequestExecuted(requestIds[i], amounts[i]);
         }
+
+        // Burn withdraw tokens
+        _batchBurn(address(this), requestIds[i], amounts[i]);
 
         // TODO any checks or now overflow is possible?
 
         // Adjust vault balances directly to avoid calling updateReserves()
         vaultBalance -= totalAmount;
         totalReserves -= totalAmount;
-
-        // Burn stOLAS tokens
-        IToken(st).burn(stAmountToBurn);
 
         // Transfer total amount
         // The transfer overflow check is not needed since balances are in sync

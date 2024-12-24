@@ -251,13 +251,18 @@ contract StakerL2 is ERC721TokenReceiver {
 
         // Set agent instances as [msg.sender]
         address[] memory instances = new address[](NUM_AGENT_INSTANCES);
-        // TODO create proxy contract
-        instances[0] = new ActivityModuleProxy(olas, beacon);//msg.sender; // new ActivityModuleProxy
+
+        // Create activity module proxy
+        ActivityModuleProxy activityModuleProxy = new ActivityModuleProxy(olas, beacon);
+        // Assign address as agent instance
+        instances[0] = address(activityModuleProxy);//msg.sender; // new ActivityModuleProxy
 
         // Create a service owned by this contract
         serviceId = IService(serviceManager).create(address(this), token, configHash, agentIds,
             agentParams, uint32(THRESHOLD));
 
+        // Initialize activity module
+        IActivityModule(instances[0]).initialize();
         // Record activity module
         mapServiceIdActivityModules[serviceId] = instances[0];
 
@@ -337,7 +342,7 @@ contract StakerL2 is ERC721TokenReceiver {
         emit DeployAndStake(stakingProxy, serviceId, multisig);
     }
 
-    /// @dev Finds the lasst staked service and unstakes it.
+    /// @dev Finds the last staked Id service and unstakes it.
     /// @param stakingProxy Staking proxy address.
     /// @return unstakeAmount Unstake amount for service termination and unbond.
     function _unstake(address stakingProxy) internal returns (uint256 unstakeAmount) {
