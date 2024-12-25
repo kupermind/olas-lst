@@ -55,12 +55,12 @@ error WrongStakingInstance(address stakingProxy);
 /// @param requestId Request Id.
 error AlreadyProcessed(uint256 requestId);
 
-/// @title StakerL2 - Smart contract for staking OLAS on L2.
-contract StakerL2 is ERC721TokenReceiver {
+/// @title StakingManager - Smart contract for OLAS staking management
+contract StakingManager is ERC721TokenReceiver {
     event OwnerUpdated(address indexed owner);
     event TokenRelayerUpdated(address indexed l2StakingProcessor);
     event SetGuardianServiceStatuses(address[] guardianServices, bool[] statuses);
-    event Stake(address indexed sender, address indexed account, uint256 indexed depositCounter, uint256 olasAmount);
+    event StakingBalanceUpdated(address indexed stakingProxy, uint256 balance);
     event CreateAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig);
     event DeployAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig);
     event Unstake(address indexed sender, address indexed stakingProxy, uint256 indexed serviceId);
@@ -96,6 +96,8 @@ contract StakerL2 is ERC721TokenReceiver {
     address public immutable safeModuleInitializer;
     // Safe fallback handler
     address public immutable fallbackHandler;
+    // OLAS collector address
+    address public immutable collector;
     // Activity module beacon
     address public immutable beacon;
 
@@ -126,6 +128,7 @@ contract StakerL2 is ERC721TokenReceiver {
     /// @param _beacon Activity module beacon.
     /// @param _safeModuleInitializer Safe module initializer address.
     /// @param _fallbackHandler Multisig fallback handler address.
+    /// @param _collector OLAS collector address.
     /// @param _agentId Contributor agent Id.
     /// @param _configHash Contributor service config hash.
     constructor(
@@ -137,14 +140,14 @@ contract StakerL2 is ERC721TokenReceiver {
         address _beacon,
         address _safeModuleInitializer,
         address _fallbackHandler,
+        address _collector,
         uint256 _agentId,
-        bytes32 _configHash,
-        address _l2StakingProcessor
+        bytes32 _configHash
     ) {
         // Check for zero addresses
         if (_serviceManager == address(0) || _olas == address(0) || _stakingFactory == address(0) ||
             _safeMultisig == address(0) || _safeSameAddressMultisig == address(0) || _beacon ==address(0) ||
-            _safeModuleInitializer ==address(0) || _fallbackHandler == address(0) || _l2StakingProcessor == address(0)) {
+            _safeModuleInitializer ==address(0) || _fallbackHandler == address(0) || _collector == address(0)) {
             revert ZeroAddress();
         }
 
@@ -164,11 +167,22 @@ contract StakerL2 is ERC721TokenReceiver {
         beacon = _beacon;
         safeModuleInitializer = _safeModuleInitializer;
         fallbackHandler = _fallbackHandler;
-        l2StakingProcessor = _l2StakingProcessor;
+        collector = _collector;
         serviceRegistry = IService(serviceManager).serviceRegistry();
         serviceRegistryTokenUtility = IService(serviceManager).serviceRegistryTokenUtility();
 
         owner = msg.sender;
+    }
+
+    function initialize(address _l2StakingProcessor) external {
+        if (owner != address(0)) {
+            revert AlreadyInitialized();
+        }
+
+        if (_l2StakingProcessor == address(0)) {
+            revert ZeroAddress();
+        }
+        l2StakingProcessor = _l2StakingProcessor;
     }
 
     /// @dev Changes contract owner address.
@@ -365,50 +379,59 @@ contract StakerL2 is ERC721TokenReceiver {
     }
     
     // TODO: arrays
-    function stake(address stakingProxy, uint256 olasAmount) external {
+    function stake(address[] memory stakingProxies, uint256[] memory amounts, uint256 totalAmount) external virtual {
         // Reentrancy guard
         if (_locked > 1) {
             revert ReentrancyGuard();
         }
         _locked = 2;
 
-        // TODO: check that stakingProxy is able to host another service
-        if (!isAbleStake(stakingProxy, olasAmount)) {
-            revert();
+        // Check for StakingProcessor access
+        if (msg.sender != l2StakingProcessor) {
+            revert UnauthorizedAccount(msg.sender);
         }
 
-        // TODO How many stakes are needed?
+        IToken(olas).transferFrom(l2StakingProcessor, address(this), totalAmount);
 
-        uint256 balance = mapStakingProxyBalances[stakingProxy];
-        uint256 lastBalance = balance;
-        uint256 minStakingDeposit = IStaking(stakingProxy).minStakingDeposit();
-        uint256 stakeDeposit = minStakingDeposit * (1 + NUM_AGENT_INSTANCES);
-
-        balance += olasAmount;
-        // Check if the balance is enough to create another stake
-        if (balance >= stakeDeposit) {
-            // Approve token for the serviceRegistryTokenUtility contract
-            IToken(olas).approve(serviceRegistryTokenUtility, stakeDeposit);
-
-            // Get already existent service or create a new one
-            uint256 lastIdx = mapLastStakedServiceIdxs[stakingProxy] + 1;
-            uint256 serviceId;
-            if (lastIdx < mapStakedServiceIds[stakingProxy].length) {
-                serviceId = mapStakedServiceIds[stakingProxy][lastIdx];
+        for (uint256 i = 0; i < stakingProxies.length; ++i) {
+            // TODO: check that stakingProxy is able to host another service
+            if (!isAbleStake(stakingProxies[i], amounts[i])) {
+                revert();
             }
 
-            // Deploy and stake already existent service or create a new one first
-            if (serviceId > 0) {
-                _deployAndStake(stakingProxy, serviceId);
-            } else {
-                _createAndStake(stakingProxy, minStakingDeposit);
-            }
+            // TODO How many stakes are needed?
 
-            balance -= stakeDeposit;
+            uint256 balance = mapStakingProxyBalances[stakingProxies[i]];
+            uint256 lastBalance = balance;
+            uint256 minStakingDeposit = IStaking(stakingProxies[i]).minStakingDeposit();
+            uint256 stakeDeposit = minStakingDeposit * (1 + NUM_AGENT_INSTANCES);
+
+            balance += amounts[i];
+            // Check if the balance is enough to create another stake
+            if (balance >= stakeDeposit) {
+                // Approve token for the serviceRegistryTokenUtility contract
+                IToken(olas).approve(serviceRegistryTokenUtility, stakeDeposit);
+
+                // Get already existent service or create a new one
+                uint256 lastIdx = mapLastStakedServiceIdxs[stakingProxies[i]] + 1;
+                uint256 serviceId;
+                if (lastIdx < mapStakedServiceIds[stakingProxies[i]].length) {
+                    serviceId = mapStakedServiceIds[stakingProxies[i]][lastIdx];
+                }
+
+                // Deploy and stake already existent service or create a new one first
+                if (serviceId > 0) {
+                    _deployAndStake(stakingProxies[i], serviceId);
+                } else {
+                    _createAndStake(stakingProxies[i], minStakingDeposit);
+                }
+
+                balance -= stakeDeposit;
+            }
+            mapStakingProxyBalances[stakingProxies[i]] = balance;
+
+            emit StakingBalanceUpdated(stakingProxies[i], balance);
         }
-        mapStakingProxyBalances[stakingProxy] = balance;
-
-        emit Stake(msg.sender, olasAmount);
 
         _locked = 1;
     }
@@ -418,19 +441,11 @@ contract StakerL2 is ERC721TokenReceiver {
 
     }
 
-    // TODO Unstake definitely terminated staking contracts - deactivated on L1 and / or ran out of funds
-    function unstake(address stakingProxy, uint256[] memory serviceIds) external {
-
-    }
-
-    // TODO triggered when (curWithdrawAmountRequested - curVaultBalance) is positive, messaged by treasury
-    // TODO arrays
-    /// @dev Withdraws specified amounts from specified staking contracts.
-    /// @notice The majority of discovered chains does not need any value to process token bridge transfer.
-    function withdraw(
-        address stakingProxy,
-        uint256 olasAmount
-    ) external payable virtual {
+    /// @dev Unstakes, if needed, and withdraws specified amounts from specified staking contracts.
+    /// @notice Unstakes services if needed to satisfy withdraw requests.
+    ///         Call this to unstake definitely terminated staking contracts - deactivated on L1 and / or ran out of funds.
+    ///         The majority of discovered chains does not need any value to process token bridge transfer.
+    function unstake(address[] memory stakingProxies, uint256[] amounts) external virtual {
         // Reentrancy guard
         if (_locked > 1) {
             revert ReentrancyGuard();
@@ -438,28 +453,33 @@ contract StakerL2 is ERC721TokenReceiver {
         _locked = 2;
 
         // Check for treasury requesting withdraw
-        if (msg.sender != treasury) {
+        if (msg.sender != l2StakingProcessor) {
             revert UnauthorizedAccount(msg.sender);
         }
 
-        //withdrawCounter++
+        // TODO Overflow sanity checks? On L1 side as well?
+        uint256 totalAmount;
+        // Traverse all staking proxies
+        for (uint256 i = 0; i < stakingProxies.length; ++i) {
+            uint256 balance = mapStakingProxyBalances[stakingProxies[i]];
+            if (balance > amounts[i]) {
+                balance -= amounts[i];
+            } else {
+                if (!isAbleWithdraw(stakingProxies[i], amounts[i])) {
+                    revert();
+                }
 
-        uint256 balance = mapStakingProxyBalances[stakingProxy];
-        if (balance > olasAmount) {
-            balance -= olasAmount;
-        } else {
-            if (!isAbleWithdraw(stakingProxy, olasAmount)) {
-                revert();
+                uint256 unstakeAmount = _unstake(stakingProxies[i]);
+                balance = balance + unstakeAmount - amounts[i];
             }
-
-            uint256 unstakeAmount = _unstake(stakingProxy);
-            balance = balance + unstakeAmount - olasAmount;
+            mapStakingProxyBalances[stakingProxies[i]] = balance;
+            totalAmount += amounts[i];
         }
-        mapStakingProxyBalances[stakingProxy] = balance;
 
         // Send OLAS to collector to initiate L1 transfer for all the balances at this time
-        IToken(olas).transfer(collector, olasAmount);
-        ICollector(collector).relayTokens{value: msg.value}(0);
+        IToken(olas).transfer(collector, totalAmount);
+        // TODO: Make sure once again no value is needed to send tokens back
+        ICollector(collector).relayTokens(0);
 
         _locked = 1;
     }

@@ -3,8 +3,8 @@ pragma solidity ^0.8.28;
 
 import {IBridgeErrors} from "../../interfaces/IBridgeErrors.sol";
 
-// Staker interface
-interface IStaker {
+// StakingManager interface
+interface IStakingManager {
     function stake(address stakingProxy, uint256 olasAmount) external;
 }
 
@@ -32,18 +32,16 @@ interface IToken {
 abstract contract DefaultStakerL2 is IBridgeErrors {
     event OwnerUpdated(address indexed owner);
     event FundsReceived(address indexed sender, uint256 value);
-    event StakingTargetDeposited(address indexed target, uint256 amount, bytes32 indexed batchHash);
-    event AmountWithheld(address indexed target, uint256 amount);
-    event StakingRequestQueued(bytes32 indexed queueHash, address indexed target, uint256 amount,
-        bytes32 indexed batchHash, uint256 olasBalance, uint256 paused);
+    event StakingRequestExecuted(address targets, uint256[] amounts, bytes32 indexed batchHash);
+    event StakingRequestQueued(bytes32 indexed queueHash, address[] targets, uint256[] amounts,
+        bytes32 indexed batchHash, bytes32 operation, uint256 olasBalance, uint256 paused);
     event MessagePosted(uint256 indexed sequence, address indexed messageSender, uint256 amount,
         bytes32 indexed batchHash);
     event MessageReceived(address indexed sender, uint256 chainId, bytes data);
     event Drain(address indexed owner, uint256 amount);
-    event TargetDispenserPaused();
-    event TargetDispenserUnpaused();
+    event StakingProcessorPaused();
+    event StakingProcessorUnpaused();
     event Migrated(address indexed sender, address indexed newL2TargetDispenser, uint256 amount);
-    event LeftoversRefunded(address indexed sender, uint256 leftovers);
 
     // receiveMessage selector (Ethereum chain)
     bytes4 public constant RECEIVE_MESSAGE = bytes4(keccak256(bytes("receiveMessage(bytes)")));
@@ -62,8 +60,8 @@ abstract contract DefaultStakerL2 is IBridgeErrors {
 
     // OLAS address
     address public immutable olas;
-    // Staking proxy factory address
-    address public immutable stakingFactory;
+    // Staking manager address
+    address public immutable stakingManager;
     // L2 Relayer address that receives the message across the bridge from the source L1 network
     address public immutable l2MessageRelayer;
     // L2 Token relayer address that sends tokens to the L1 source network
@@ -88,21 +86,21 @@ abstract contract DefaultStakerL2 is IBridgeErrors {
 
     /// @dev DefaultStakerL2 constructor.
     /// @param _olas OLAS token address on L2.
-    /// @param _stakingFactory Service staking proxy factory address.
+    /// @param _stakingManager StakingManager address.
     /// @param _l2TokenRelayer L2 token relayer bridging contract address.
     /// @param _l2MessageRelayer L2 message relayer bridging contract address.
     /// @param _l1DepositProcessor L1 deposit processor address.
     /// @param _l1SourceChainId L1 source chain Id.
     constructor(
         address _olas,
-        address _stakingFactory,
+        address _stakingManager,
         address _l2TokenRelayer,
         address _l2MessageRelayer,
         address _l1DepositProcessor,
         uint256 _l1SourceChainId
     ) {
         // Check for zero addresses
-        if (_olas == address(0) || _stakingFactory == address(0) || _l2TokenRelayer == address(0) ||
+        if (_olas == address(0) || _stakingManager == address(0) || _l2TokenRelayer == address(0) ||
             _l2MessageRelayer == address(0) || _l1DepositProcessor == address(0)) {
             revert ZeroAddress();
         }
@@ -119,7 +117,7 @@ abstract contract DefaultStakerL2 is IBridgeErrors {
 
         // Immutable parameters assignment
         olas = _olas;
-        stakingFactory = _stakingFactory;
+        stakingManager = _stakingManager;
         l2TokenRelayer = _l2TokenRelayer;
         l2MessageRelayer = _l2MessageRelayer;
         l1DepositProcessor = _l1DepositProcessor;
@@ -141,10 +139,9 @@ abstract contract DefaultStakerL2 is IBridgeErrors {
         _locked = 2;
 
         // Decode received data
-        (address[] memory targets, uint256[] memory amounts, bytes32 batchHash) =
-            abi.decode(data, (address[], uint256[], bytes32));
+        (address[] memory targets, uint256[] memory amounts, bytes32 batchHash, bytes32 operation) =
+            abi.decode(data, (address[], uint256[], bytes32, bytes32));
 
-        // TODO Check this scenario carefully now
         // Check that the batch hash has not yet being processed
         // Possible scenario: bridge failed to deliver from L1 to L2, maintenance function is called by the DAO,
         // and the bridge somehow re-delivers the same message that has already been processed
@@ -153,53 +150,42 @@ abstract contract DefaultStakerL2 is IBridgeErrors {
         }
         processedHashes[batchHash] = true;
 
-        uint256 localPaused = paused;
+        if (operation == STAKE) {
+            uint256 totalAmount;
 
-        // Traverse all the targets
-        // Note that staking target addresses are unique, guaranteed by the L1 dispenser logic
-        for (uint256 i = 0; i < targets.length; ++i) {
-            address target = targets[i];
-            uint256 amount = amounts[i];
+            // Traverse all the amounts
+            // Note that staking target addresses are unique, guaranteed by the L1 dispenser logic
+            for (uint256 i = 0; i < amounts.length; ++i) {
+                totalAmount += amounts[i];
+            }
 
-            IStaker(staker).stake(target, amount);
-
+            // Get current OLAS balance
             uint256 olasBalance = IToken(olas).balanceOf(address(this));
             // Check the OLAS balance and the contract being unpaused
-            if (olasBalance >= amount && localPaused == 1) {
-                // Approve and transfer OLAS to the service staking target
-                IToken(olas).approve(target, amount);
-                IStaking(target).deposit(amount);
+            if (olasBalance >= totalAmount && paused == 1) {
+                // Approve OLAS for stakingManager
+                IToken(olas).approve(stakingManager, totalAmount);
+                IStakingManager(stakingManager).stake(targets, amounts, totalAmount);
 
-                emit StakingTargetDeposited(target, amount, batchHash);
+                emit StakingRequestExecuted(targets, amounts, batchHash);
             } else {
-                // Hash of target + amount + batchHash + current target dispenser address (migration-proof)
-                bytes32 queueHash = keccak256(abi.encode(target, amount, batchHash, block.chainid, address(this)));
+                // Hash of target + amount + batchHash + operation + current target dispenser address (migration-proof)
+                bytes32 queueHash =
+                    keccak256(abi.encode(targets, amounts, batchHash, operation, block.chainid, address(this)));
                 // Queue the hash for further redeem
                 queuedHashes[queueHash] = true;
 
-                emit StakingRequestQueued(queueHash, target, amount, batchHash, olasBalance, localPaused);
+                emit StakingRequestQueued(queueHash, targets, amounts, batchHash, operation, olasBalance, paused);
             }
-        }
-
-        // Adjust withheld amount, if at least one target has not passed the validity check
-        if (localWithheldAmount > 0) {
-            withheldAmount += localWithheldAmount;
+        } else if (operation == UNSTAKE){
+            IStakingManager(stakingManager).unstake(target, amount);
+        } else {
+            // This must never happen
+            revert();
         }
 
         _locked = 1;
     }
-
-    /// @dev Sends message to L1 to sync the withheld amount.
-    /// @param amount Amount to sync.
-    /// @param bridgePayload Payload data for the bridge relayer.
-    /// @param batchHash Unique batch hash for each message transfer.
-    /// @return sequence Unique message sequence (if applicable) or the batch hash converted to number.
-    /// @return leftovers Native token leftovers from unused msg.value.
-    function _sendMessage(
-        uint256 amount,
-        bytes memory bridgePayload,
-        bytes32 batchHash
-    ) internal virtual returns (uint256 sequence, uint256 leftovers);
 
     /// @dev Receives a message from L1.
     /// @param messageRelayer L2 bridge message relayer address.
@@ -244,10 +230,10 @@ abstract contract DefaultStakerL2 is IBridgeErrors {
     }
 
     /// @dev Redeems queued staking incentive.
-    /// @param target Staking target address.
-    /// @param amount Staking incentive amount.
+    /// @param targets Staking target addresses.
+    /// @param amounts Staking amounts.
     /// @param batchHash Batch hash.
-    function redeem(address target, uint256 amount, bytes32 batchHash) external {
+    function redeem(address[] memory targets, uint256[] memory amounts, bytes32 batchHash) external {
         // Reentrancy guard
         if (_locked > 1) {
             revert ReentrancyGuard();
@@ -259,28 +245,35 @@ abstract contract DefaultStakerL2 is IBridgeErrors {
             revert Paused();
         }
 
-        // Hash of target + amount + batchHash + chainId + current target dispenser address (migration-proof)
-        bytes32 queueHash = keccak256(abi.encode(target, amount, batchHash, block.chainid, address(this)));
+        uint256 totalAmount;
+        // Traverse all the amounts
+        for (uint256 i = 0; i < amounts.length; ++i) {
+            // TODO targets ascending order
+            totalAmount += amounts[i];
+        }
+        
+        // Hash of target + amount + batchHash + operation + chainId + current target dispenser address (migration-proof)
+        bytes32 queueHash = keccak256(abi.encode(targets, amounts, batchHash, STAKE, block.chainid, address(this)));
         bool queued = queuedHashes[queueHash];
         // Check if the target and amount are queued
         if (!queued) {
-            revert TargetAmountNotQueued(target, amount, batchHash);
+            revert TargetAmountNotQueued(targets, amounts, batchHash, STAKE);
         }
 
         // Get the current contract OLAS balance
         uint256 olasBalance = IToken(olas).balanceOf(address(this));
-        if (olasBalance >= amount) {
-            // Approve and transfer OLAS to the service staking target
-            IToken(olas).approve(target, amount);
-            IStaking(target).deposit(amount);
+        if (olasBalance >= totalAmount) {
+            // Approve OLAS for stakingManager
+            IToken(olas).approve(stakingManager, totalAmount);
+            IStakingManager(stakingManager).stake(targets, amounts, totalAmount);
 
-            emit StakingTargetDeposited(target, amount, batchHash);
+            emit StakingRequestExecuted(targets, amounts, batchHash);
 
             // Remove processed queued nonce
             queuedHashes[queueHash] = false;
         } else {
             // OLAS balance is not enough for redeem
-            revert InsufficientBalance(olasBalance, amount);
+            revert InsufficientBalance(olasBalance, totalAmount);
         }
 
         _locked = 1;
@@ -304,66 +297,6 @@ abstract contract DefaultStakerL2 is IBridgeErrors {
         _processData(data);
     }
 
-    /// @dev Syncs withheld token amount with L1.
-    /// @param bridgePayload Payload data for the bridge relayer.
-    function syncWithheldAmount(bytes memory bridgePayload) external payable {
-        // Reentrancy guard
-        if (_locked > 1) {
-            revert ReentrancyGuard();
-        }
-        _locked = 2;
-
-        // Pause check
-        if (paused == 2) {
-            revert Paused();
-        }
-
-        // Get withheld amount
-        uint256 amount = withheldAmount;
-
-        // Get bridging decimals
-        uint256 bridgingDecimals = getBridgingDecimals();
-        // Normalized amount is equal to the withheld amount by default
-        uint256 normalizedAmount = amount;
-        // Normalize withheld amount
-        if (bridgingDecimals < 18) {
-            normalizedAmount = amount / (10 ** (18 - bridgingDecimals));
-            normalizedAmount *= 10 ** (18 - bridgingDecimals);
-        }
-
-        // Check the normalized withheld amount to be greater than zero
-        if (normalizedAmount == 0) {
-            revert ZeroValue();
-        }
-
-        // Adjust the actual withheld amount
-        // Pure amount is always bigger or equal than the normalized one
-        withheldAmount = amount - normalizedAmount;
-
-        // Get the batch hash
-        uint256 batchNonce = stakingBatchNonce;
-        bytes32 batchHash = keccak256(abi.encode(batchNonce, block.chainid, address(this)));
-
-        // Send a message to sync the normalized withheld amount
-        (uint256 sequence, uint256 leftovers) = _sendMessage(normalizedAmount, bridgePayload, batchHash);
-
-        // Send leftover amount back to the sender, if any
-        if (leftovers > 0) {
-            // If the call fails, ignore to avoid the attack that would prevent this function from executing
-            // All the undelivered funds can be drained
-            // solhint-disable-next-line avoid-low-level-calls
-            msg.sender.call{value: leftovers}("");
-
-            emit LeftoversRefunded(msg.sender, leftovers);
-        }
-
-        stakingBatchNonce = batchNonce + 1;
-
-        emit MessagePosted(sequence, msg.sender, normalizedAmount, batchHash);
-
-        _locked = 1;
-    }
-
     /// @dev Pause the contract.
     function pause() external {
         // Check for the contract ownership
@@ -372,7 +305,7 @@ abstract contract DefaultStakerL2 is IBridgeErrors {
         }
 
         paused = 2;
-        emit TargetDispenserPaused();
+        emit StakingProcessorPaused();
     }
 
     /// @dev Unpause the contract
@@ -383,7 +316,7 @@ abstract contract DefaultStakerL2 is IBridgeErrors {
         }
 
         paused = 1;
-        emit TargetDispenserUnpaused();
+        emit StakingProcessorUnpaused();
     }
 
     /// @dev Drains contract native funds.
