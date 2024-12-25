@@ -8,6 +8,10 @@ import {IStaking} from "../interfaces/IStaking.sol";
 import {IToken, INFToken} from "../interfaces/IToken.sol";
 import "hardhat/console.sol";
 
+interface IActivityModule {
+    function initialize(address _multisig, address _stakingProxy, uint256 _serviceId) external;
+}
+
 // Multisig interface
 interface IMultisig {
     /// @dev Returns array of owners.
@@ -254,7 +258,7 @@ contract StakingManager is ERC721TokenReceiver {
     function _createAndDeploy(
         address token,
         uint256 minStakingDeposit
-    ) internal returns (uint256 serviceId, address multisig) {
+    ) internal returns (uint256 serviceId, address multisig, address activityModule) {
         // Set agent params
         IService.AgentParams[] memory agentParams = new IService.AgentParams[](NUM_AGENT_INSTANCES);
         agentParams[0] = IService.AgentParams(uint32(NUM_AGENT_INSTANCES), uint96(minStakingDeposit));
@@ -269,14 +273,13 @@ contract StakingManager is ERC721TokenReceiver {
         // Create activity module proxy
         ActivityModuleProxy activityModuleProxy = new ActivityModuleProxy(olas, beacon);
         // Assign address as agent instance
-        instances[0] = address(activityModuleProxy);//msg.sender; // new ActivityModuleProxy
+        activityModule = address(activityModuleProxy);
+        instances[0] = activityModule;
 
         // Create a service owned by this contract
         serviceId = IService(serviceManager).create(address(this), token, configHash, agentIds,
             agentParams, uint32(THRESHOLD));
 
-        // Initialize activity module
-        IActivityModule(instances[0]).initialize();
         // Record activity module
         mapServiceIdActivityModules[serviceId] = instances[0];
 
@@ -318,9 +321,10 @@ contract StakingManager is ERC721TokenReceiver {
     /// @param stakingProxy Corresponding staking instance address.
     function _createAndStake(address stakingProxy, uint256 minStakingDeposit) internal {
         // Create and deploy service
-        (uint256 serviceId, address multisig) = _createAndDeploy(olas, minStakingDeposit);
+        (uint256 serviceId, address multisig, address activityModule) = _createAndDeploy(olas, minStakingDeposit);
 
-        // TODO Initialize ActivityModuleProxy
+        // Initialize activity module
+        IActivityModule(activityModule).initialize(multisig, stakingProxy, serviceId);
 
         // Stake the service
         _stake(stakingProxy, serviceId);
@@ -377,7 +381,7 @@ contract StakingManager is ERC721TokenReceiver {
 
         emit Unstake(msg.sender, stakingProxy, serviceId);
     }
-    
+
     function stake(address[] memory stakingProxies, uint256[] memory amounts, uint256 totalAmount) external virtual {
         // Reentrancy guard
         if (_locked > 1) {

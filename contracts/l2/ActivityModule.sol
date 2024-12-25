@@ -46,8 +46,18 @@ interface ISafe {
         external view returns (bytes32);
 }
 
+interface IStaking {
+    /// @dev Claims rewards for the service without an additional checkpoint call.
+    /// @param serviceId Service Id.
+    /// @return Staking reward.
+    function claim(uint256 serviceId) external returns (uint256);
+}
+
 /// @dev Zero address.
 error ZeroAddress();
+
+/// @dev Zero value.
+error ZeroValue();
 
 /// @dev The contract is already initialized.
 error AlreadyInitialized();
@@ -61,24 +71,35 @@ contract ActivityModule {
 
     // Activity tracker
     uint256 public activityNonce;
+    // Service Id
+    uint256 public serviceId;
     // Multisig address
     address public multisig;
+    // Staking proxy address
+    address public stakingProxy;
 
     constructor(address _collector) {
         collector = _collector;
     }
 
-    function initialize(address _multisig) external {
+    function initialize(address _multisig, address _stakingProxy, uint256 _serviceId) external {
         if (multisig != address(0)) {
             revert AlreadyInitialized();
         }
 
         // Check for zero address
-        if (_multisig == address(0)) {
+        if (_multisig == address(0) || _stakingProxy == address(0)) {
             revert ZeroAddress();
         }
 
+        // Check for zero value
+        if (_serviceId == 0) {
+            revert ZeroValue();
+        }
+
         multisig = _multisig;
+        stakingProxy = _stakingProxy;
+        serviceId = _serviceId;
 
         // Set up address(this) as multisig module
         uint256 nonce = ISafe(multisig).nonce();
@@ -109,8 +130,16 @@ contract ActivityModule {
         emit ActivityIncreased(1);
     }
 
-    function claim(uint256 serviceId) external {
-        IStaking(stakingInstance).claim(serviceId);
+    function claim() external {
+        // TODO What to do for the first action?
+        if (activityNonce == 0) {
+            activityNonce = 1;
+        }
+
+        uint256 reward = IStaking(stakingInstance).claim(serviceId);
+        if (reward > 0) {
+            activityNonce++;
+        }
 
         uint256 balance = IToken(olas).balanceOf(multisig);
 
