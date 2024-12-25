@@ -79,7 +79,7 @@ error Overflow(uint256 provided, uint256 max);
 /// @param account Account address.
 error UnauthorizedAccount(address account);
 
-error WrongStakingModel(uint256 modelId);
+error WrongStakingModel(uint256 stakingModelId);
 
 struct StakingModel {
     uint96 supply;
@@ -95,7 +95,7 @@ contract Depository {
     event SetGuardianServiceStatuses(address[] guardianServices, bool[] statuses);
     event AddStakingModels(address indexed sender, StakingModel[] stakingModels);
     event ChangeModelStatuses(uint256[] modelIds, bool[] statuses);
-    event Deposit(address indexed sender, uint256 indexed modelId, uint256 olasAmount, uint256 stAmount);
+    event Deposit(address indexed sender, uint256 indexed stakingModelId, uint256 olasAmount, uint256 stAmount);
 
     // Code position in storage is keccak256("DEPOSITORY_PROXY") = "0x40f951bb727bcaf251807e38aa34e1b3f20d890f9f3286454f4c473c60a21cdc"
     bytes32 public constant DEPOSITORY_PROXY = 0x40f951bb727bcaf251807e38aa34e1b3f20d890f9f3286454f4c473c60a21cdc;
@@ -104,11 +104,7 @@ contract Depository {
     address public immutable st;
     address public immutable treasury;
 
-    uint256 public numStakingModels;
-    uint256 public depositCounter;
-    uint256 public withdrawCounter;
     address public owner;
-    address public oracle;
 
     uint256 internal _nonce;
 
@@ -116,13 +112,14 @@ contract Depository {
     mapping(address => bool) public mapGuardianAgents;
     // Mapping for L2 chain Id => dedicated deposit processors
     mapping(uint256 => address) public mapChainIdDepositProcessors;
+    // Set of staking model Ids
+    uint256[] public setStakingModelIds;
 
     // TODO change to initialize in prod
-    constructor(address _olas, address _st, address _treasury, address _oracle) {
+    constructor(address _olas, address _st, address _treasury) {
         olas = _olas;
         st = _st;
         treasury = _treasury;
-        oracle = _oracle;
 
         owner = msg.sender;
     }
@@ -232,11 +229,11 @@ contract Depository {
         emit SetDepositProcessorChainIds(depositProcessors, chainIds);
     }
 
-    /// @dev Activates staking models.
+    /// @dev Creates and activates staking models.
     /// @param chainIds Chain Ids.
     /// @param stakingProxies Corresponding staking proxy addresses.
     /// @param supplies Corresponding staking supplies.
-    function activateStakingModels(
+    function createAndActivateStakingModels(
         uint256[] memory chainIds,
         address[] memory stakingProxies,
         uint256[] memory supplies
@@ -252,7 +249,6 @@ contract Depository {
 //            revert WrongArrayLength(modelIds.length, statuses.length);
 //        }
 
-        uint256 localNum = numStakingModels;
         for (uint256 i = 0; i < chainIds.length; ++i) {
             // TODO Check chainIds order
 
@@ -268,64 +264,70 @@ contract Depository {
 
             // Push a pair of key defining variables into one key: chainId | stakingProxy
             // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
-            uint256 chainIdStakingProxy = uint256(uint160(stakingProxies[i]));
-            chainIdStakingProxy |= chainIds[i] << 160;
+            uint256 stakingModelId = uint256(uint160(stakingProxies[i]));
+            stakingModelId |= chainIds[i] << 160;
 
-            StakingModel storage stakingModel = mapStakingModels[chainIdStakingProxy];
+            // Get staking model struct
+            StakingModel storage stakingModel = mapStakingModels[stakingModelId];
+
+            // Check for existent staking model
+            if (stakingModel.supply > 0) {
+                revert StakingModelAlreadyExists(stakingModelId);
+            }
+
+            // Set supply and activate
             stakingModel.supply = supplies[i];
             stakingModel.active = true;
 
-            ++localNum;
+            // Add into global staking model set
+            setStakingModelIds.push(stakingModelId);
         }
-
-        numStakingModels = localNum;
 
         emit ActivateStakingModels(chainIds, stakingProxies, supplies);
     }
 
-    // TODO What happens if there are no funds for staking in any model. How to quickly deactivate?
-    /// @notice Models must be sorted in ascending order.
-    function deactivateStakingModels(uint256[] memory modelIds) external {
+
+    /// @dev Sets staking model statuses.
+    /// @notice Models must be sorted in ascending order. If the model is deactivated, it does not meat that it must
+    ///         be unstaked right away as it might continue working and accumulating rewards until fully depleted.
+    /// @param stakingModelIds Staking model Ids in ascending order.
+    /// @param statuses Corresponding staking model statuses.
+    function setStakingModelStatuses(uint256[] memory stakingModelIds, bool[] memory statuses) external {
         // Check for ownership
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);
         }
 
-        uint256 totalUnstakedAmount;
-
-        uint256 localNum;
-        for (uint256 i = 0; i < modelIds.length; ++i) {
-            if (localNum >= modelIds[i]) {
-                revert Overflow(localNum, modelIds[i]);
-            }
-
-            StakingModel memory stakingModel = mapStakingModels[modelIds[i]];
-            uint256 unstakeAmount = stakingModel.supply - stakingModel.remainder;
-            totalUnstakedAmount += unstakeAmount;
-
-            // TODO Check if any communication is needed with L2, or contracts there just deplete and will be unstaked
-            delete mapStakingModels[modelIds[i]];
-
-            localNum = modelIds[i];
+        // Check for array length correctness
+        if (stakingModelIds.length == 0 || stakingModelIds.length != statuses.length) {
+            revert WrongArrayLength(stakingModelIds.length, statuses.length);
         }
 
-        // Sync unstaked
-        ITreasury(treasury).updateReserves(totalUnstakedAmount);
+        uint256 localNum;
+        for (uint256 i = 0; i < stakingModelIds.length; ++i) {
+            if (localNum >= stakingModelIds[i]) {
+                revert Overflow(localNum, stakingModelIds[i]);
+            }
+
+            mapStakingModels[stakingModelIds[i]].active = statuses[i];
+
+            localNum = stakingModelIds[i];
+        }
         
-        emit DeactivateStakingModels(modelIds);
+        emit ChangeModelStatuses(stakingModelIds, statuses);
     }
 
     // TODO: array of modelId-s and olasAmount-s as on stake might not fit into one model
     function deposit(
-        uint256 modelId,
+        uint256 stakingModelId,
         uint256 olasAmount,
         bytes memory bridgePayload
     ) external payable returns (uint256 stAmount) {
         // Get staking model
-        StakingModel storage stakingModel = mapStakingModels[modelId];
+        StakingModel storage stakingModel = mapStakingModels[stakingModelId];
         // Check for model existence and activity
         if (stakingModel.supply == 0 || !stakingModel.active) {
-            revert WrongStakingModel(modelId);
+            revert WrongStakingModel(stakingModelId);
         }
 
         if (olasAmount > type(uint96).max) {
@@ -346,19 +348,23 @@ contract Depository {
         // Calculates stAmount and mints stOLAS
         stAmount = ITreasury(treasury).processAndMintStToken(msg.sender, olasAmount);
 
+        // Decode chain Id and staking proxy
+        uint256 chainId = stakingModelId >> 160;
+        address stakingProxy = address(uint160(stakingModelId));
+
         // Transfer OLAS via the bridge
-        address depositProcessor = mapChainIdDepositProcessors[stakingModel.chainId];
+        address depositProcessor = mapChainIdDepositProcessors[chainId];
 
         // Approve OLAS for depositProcessor
         IToken(olas).approve(depositProcessor, olasAmount);
 
         // Transfer OLAS to its corresponding Staker on L2
-        IDepositProcessor(depositProcessor).sendMessage(stakingModel.stakingProxy, olasAmount, bridgePayload, olasAmount);
+        IDepositProcessor(depositProcessor).sendMessage(stakingProxy, olasAmount, bridgePayload, olasAmount);
 
-        emit Deposit(msg.sender, modelId, olasAmount, stAmount);
+        emit Deposit(msg.sender, stakingModelId, olasAmount, stAmount);
     }
 
-    function processUnstake(
+    function processUnstakeAmounts(
         uint256 unstakeAmount,
         uint256[] memory chainIds,
         address[][] memory stakingProxies
@@ -384,13 +390,27 @@ contract Depository {
                 mapStakingModels[backupModelIds[i]].remainder = stakingModel.supply;
             } else {
                 amounts[i] = unstakeAmount;
+                unstakeAmount = 0;
                 mapStakingModels[backupModelIds[i]].remainder += stakingModel.remainder + unstakeAmount;
                 break;
             }
         }
+
+        // Check if accumulated necessary amount of tokens
+        if (unstakeAmount > 0) {
+            revert();
+        }
+    }
+
+    function getNumStakingModels() external view returns (uint256) {
+        return setStakingModelIds.length;
     }
 
     function getStakingModelId(uint256 chainId, address stakingProxy) external pure returns (uint256) {
         return uint256(uint160(stakingProxy)) | (chainId << 160);
+    }
+
+    function getChainIdAndStakingProxy(uint256 stakingModelId) external pure returns (uint256, uint256) {
+        return ((stakingModelId >> 160), address(uint160(stakingModelId)));
     }
 }

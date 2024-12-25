@@ -224,7 +224,7 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
     ///         if there is enough amount to be unstaked from other models.
     /// @param amount Total amount to unstake.
     /// @param backupModelIds Model Ids to unstake from, in order of appearance.
-    function _unstake(uint256 unstakeAmount, uint256[] memory backupModelIds) internal {
+    function _unstake(uint256 unstakeAmount, uint256[] memory chainIds, address[][] memory stakingProxies) internal {
         uint256 curStakedBalance = stakedBalance;
         if (curStakedBalance < unstakeAmount) {
             revert Overflow(curStakedBalance, unstakeAmount);
@@ -238,18 +238,42 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         _updateReserves(curStakedBalance);
 
         // Collect staking contracts and amounts to send unstake message to L2-s
-        (uint256[] memory chainIds, address[][] memory stakingProxies, uint256[][] memory amounts) =
-            IDepository(depository).processUnstake(unstakeAmount, backupModelIds);
+        uint256[][] memory amounts =
+            IDepository(depository).processUnstakeAmounts(unstakeAmount, chainIds, stakingProxies);
         // TODO Send message to L2 to request withdrawDiff
+    }
+
+    /// @dev Unstakes specified staking models.
+    /// @notice This allows to deduct reserves from their staked part and get them back as vault part.
+    function unstake(
+        uint256 totalUnstakeAmount,
+        uint256[] memory chainIds,
+        address[][] memory stakingProxies,
+        bytes[] memory bridgePayloads
+    ) external payable {
+        // Check for ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
+        }
+
+        // TODO Check array lengths
+
+        // Update reserves
+        _updateReserves(0);
+
+        _unstake(totalUnstakeAmount, chainIds, stakingProxies);
     }
 
     function requestToWithdraw(
         uint256 stAmount,
         uint256[] memory chainIds,
-        address[][] memory stakingProxies
-    ) external returns (uint256 requestId, uint256 olasAmount) {
+        address[][] memory stakingProxies,
+        bytes[] memory bridgePayloads
+    ) external payable returns (uint256 requestId, uint256 olasAmount) {
         // Update reserves
         _updateReserves(0);
+
+        // TODO Check array lengths
 
         // Get stOLAS
         IToken(st).transferFrom(msg.sender, address(this), stAmount);
@@ -341,12 +365,12 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
 
     function getStAmount(uint256 olasAmount) external view returns (uint256 stAmount) {
         // TODO MulDiv?
-        stAmount = (olasAmount * totalReserves) / stakedBalance;
+        stAmount = (olasAmount * stakedBalance) / totalReserves;
     }
 
     function getOlasAmount(uint256 stAmount) public view returns (uint256 olasAmount) {
         // TODO MulDiv? Rounding down to zero?
-        olasAmount = (stAmount * stakedBalance) / totalReserves;
+        olasAmount = (stAmount * totalReserves) / stakedBalance;
     }
 
     function getWithdrawRequestId(uint256 requestId, uint256 withdrawTime) external pure returns (uint256) {
