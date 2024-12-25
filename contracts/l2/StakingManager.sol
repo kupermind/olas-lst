@@ -378,7 +378,6 @@ contract StakingManager is ERC721TokenReceiver {
         emit Unstake(msg.sender, stakingProxy, serviceId);
     }
     
-    // TODO: arrays
     function stake(address[] memory stakingProxies, uint256[] memory amounts, uint256 totalAmount) external virtual {
         // Reentrancy guard
         if (_locked > 1) {
