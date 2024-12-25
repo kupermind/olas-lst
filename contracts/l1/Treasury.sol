@@ -238,9 +238,7 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         _updateReserves(curStakedBalance);
 
         // Collect staking contracts and amounts to send unstake message to L2-s
-        uint256[][] memory amounts =
-            IDepository(depository).processUnstakeAmounts(unstakeAmount, chainIds, stakingProxies);
-        // TODO Send message to L2 to request withdrawDiff
+        IDepository(depository).processUnstakeAmounts(unstakeAmount, chainIds, stakingProxies);
     }
 
     /// @dev Unstakes specified staking models.
@@ -256,14 +254,13 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
             revert OwnerOnly(msg.sender, owner);
         }
 
-        // TODO Check array lengths
-
         // Update reserves
         _updateReserves(0);
 
         _unstake(totalUnstakeAmount, chainIds, stakingProxies);
     }
 
+    // TODO Move high level part to depository?
     function requestToWithdraw(
         uint256 stAmount,
         uint256[] memory chainIds,
@@ -273,12 +270,10 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         // Update reserves
         _updateReserves(0);
 
-        // TODO Check array lengths
-
         // Get stOLAS
         IToken(st).transferFrom(msg.sender, address(this), stAmount);
 
-        // Caclulate withdraw time
+        // Calculate withdraw time
         uint256 withdrawTime = block.timestamp + withdrawDelay;
 
         // Get withdraw request Id

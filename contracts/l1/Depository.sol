@@ -99,8 +99,12 @@ contract Depository {
 
     // Code position in storage is keccak256("DEPOSITORY_PROXY") = "0x40f951bb727bcaf251807e38aa34e1b3f20d890f9f3286454f4c473c60a21cdc"
     bytes32 public constant DEPOSITORY_PROXY = 0x40f951bb727bcaf251807e38aa34e1b3f20d890f9f3286454f4c473c60a21cdc;
+    // Stake operation
+    bytes32 public constant STAKE =
+    // Unstake operation
+    bytes32 public constant UNSTAKE =
 
-    address public immutable olas;
+address public immutable olas;
     address public immutable st;
     address public immutable treasury;
 
@@ -359,7 +363,7 @@ contract Depository {
         IToken(olas).approve(depositProcessor, olasAmount);
 
         // Transfer OLAS to its corresponding Staker on L2
-        IDepositProcessor(depositProcessor).sendMessage(stakingProxy, olasAmount, bridgePayload, olasAmount);
+        IDepositProcessor(depositProcessor).sendMessage(stakingProxy, olasAmount, bridgePayload, olasAmount, STAKE);
 
         emit Deposit(msg.sender, stakingModelId, olasAmount, stAmount);
     }
@@ -367,33 +371,62 @@ contract Depository {
     function processUnstakeAmounts(
         uint256 unstakeAmount,
         uint256[] memory chainIds,
-        address[][] memory stakingProxies
+        address[][] memory stakingProxies,
+        bytes[] memory bridgePayloads
     ) external returns (uint256[][] memory amounts) {
         // Allocate arrays of max possible size
         amounts = new uint256[][](chainIds.length);
 
-        // Push a pair of key defining variables into one key: chainId | stakingProxy
-        // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
-        uint256 chainIdStakingProxy = uint256(uint160(stakingProxies[i]));
-        chainIdStakingProxy |= chainIds[i] << 160;
+        // TODO Check array lengths
+
+        uint256 totalOlasAmount;
 
         // Collect staking contracts and amounts
-        for (uint256 i = 0; i < backupModelIds.length; ++i) {
-            StakingModel memory stakingModel = mapStakingModels[backupModelIds[i]];
-            uint256 maxUnstakeAmount = stakingModel.supply - stakingModel.remainder;
+        for (uint256 i = 0; i < chainIds.length; ++i) {
+            // TODO chain Ids order
 
-            stakingProxies[i] = stakingModel.stakingProxy;
-            chainIds[i] = stakingModel.chainId;
-            if (unstakeAmount > maxUnstakeAmount) {
-                amounts[i] = maxUnstakeAmount;
-                unstakeAmount -= maxUnstakeAmount;
-                mapStakingModels[backupModelIds[i]].remainder = stakingModel.supply;
-            } else {
-                amounts[i] = unstakeAmount;
-                unstakeAmount = 0;
-                mapStakingModels[backupModelIds[i]].remainder += stakingModel.remainder + unstakeAmount;
+            // Check if more cycles are needed
+            if (unstakeAmount == 0) {
                 break;
             }
+
+            uint256 olasAmount;
+
+            for (uint256 j = 0; i < stakingProxies[i].length; ++j) {
+                // TODO stakingProxies order
+                // Push a pair of key defining variables into one key: chainId | stakingProxy
+                // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
+                uint256 stakingModelId = uint256(uint160(stakingProxies[i][j]));
+                stakingModelId |= chainIds[i] << 160;
+
+                StakingModel memory stakingModel = mapStakingModels[stakingModelId];
+                uint256 maxUnstakeAmount = stakingModel.supply - stakingModel.remainder;
+
+                if (unstakeAmount > maxUnstakeAmount) {
+                    amounts[i][j] = maxUnstakeAmount;
+                    olasAmount += maxUnstakeAmount;
+                    unstakeAmount -= maxUnstakeAmount;
+                    mapStakingModels[stakingModelId].remainder = stakingModel.supply;
+                } else {
+                    amounts[i][j] = unstakeAmount;
+                    olasAmount += unstakeAmount;
+                    unstakeAmount = 0;
+                    mapStakingModels[stakingModelId].remainder += stakingModel.remainder + unstakeAmount;
+                    break;
+                }
+            }
+
+            totalOlasAmount += olasAmount;
+
+            // Transfer OLAS via the bridge
+            address depositProcessor = mapChainIdDepositProcessors[chainIds[i]];
+
+            // Approve OLAS for depositProcessor
+            IToken(olas).approve(depositProcessor, olasAmount);
+
+            // Transfer OLAS to its corresponding Staker on L2
+            IDepositProcessor(depositProcessor).sendMessage(stakingProxies[i], olasAmount, bridgePayloads[i],
+                olasAmount, UNSTAKE);
         }
 
         // Check if accumulated necessary amount of tokens
