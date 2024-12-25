@@ -47,7 +47,8 @@ contract GnosisDepositProcessorL1 is DefaultDepositProcessorL1 {
         uint256[] memory stakingShares,
         bytes memory,
         uint256 transferAmount,
-        bytes32 batchHash
+        bytes32 batchHash,
+        bytes32 operation
     ) internal override returns (uint256 sequence, uint256 leftovers) {
         // Transfer OLAS tokens
         if (transferAmount > 0) {
@@ -59,7 +60,7 @@ contract GnosisDepositProcessorL1 is DefaultDepositProcessorL1 {
         }
 
         // Assemble AMB data payload
-        bytes memory data = abi.encodeWithSelector(RECEIVE_MESSAGE, abi.encode(targets, stakingShares, batchHash));
+        bytes memory data = abi.encodeWithSelector(RECEIVE_MESSAGE, abi.encode(targets, stakingShares, batchHash, operation));
 
         // Send message to L2
         // In the current configuration, maxGasPerTx is set to 4000000 on Ethereum and 2000000 on Gnosis Chain.

@@ -107,6 +107,7 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
     /// @param bridgePayload Bridge payload necessary (if required) for a specific bridging relayer.
     /// @param transferAmount Actual total OLAS amount to be transferred.
     /// @param batchHash Unique batch hash for each message transfer.
+    /// @param operation Funds operation: stake / unstake.
     /// @return sequence Unique message sequence (if applicable) or the batch hash converted to number.
     /// @return leftovers ETH leftovers from unused msg.value.
     function _sendMessage(
@@ -114,52 +115,22 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
         uint256[] memory stakingShares,
         bytes memory bridgePayload,
         uint256 transferAmount,
-        bytes32 batchHash
+        bytes32 batchHash,
+        bytes32 operation
     ) internal virtual returns (uint256 sequence, uint256 leftovers);
-
-    // TODO Probably obsolete
-    /// @dev Receives a message on L1 sent from L2 staker side to sync withheld OLAS amount on L2.
-    /// @param l1Relayer L1 source relayer.
-    /// @param l2Dispenser L2 staker that originated the message.
-    /// @param data Message data payload sent from L2.
-    function _receiveMessage(address l1Relayer, address l2Dispenser, bytes memory data) internal virtual {
-        // Check L1 Relayer address to be the msg.sender, where applicable
-        if (l1Relayer != l1MessageRelayer) {
-            revert TargetRelayerOnly(msg.sender, l1MessageRelayer);
-        }
-
-        // Check L2 dispenser address originating the message on L2
-        if (l2Dispenser != l2Staker) {
-            revert WrongMessageSender(l2Dispenser, l2Staker);
-        }
-
-        emit MessageReceived(l2Staker, l2TargetChainId, data);
-
-        // Extract the amount of OLAS to sync and a batch hash
-        (uint256 amount, bytes32 batchHash) = abi.decode(data, (uint256, bytes32));
-
-        // Check that the batch hash has not yet being processed
-        // Possible scenario: bridge failed to deliver from L2 to L1, maintenance function is called by the DAO,
-        // and the bridge somehow re-delivers the same message that has already been processed
-        if (processedHashes[batchHash]) {
-            revert AlreadyDelivered(batchHash);
-        }
-        processedHashes[batchHash] = true;
-
-        // Sync withheld tokens in the depository contract
-        IDispenser(l1Depository).syncWithheldAmount(l2TargetChainId, amount, batchHash);
-    }
 
     /// @dev Sends a single message to the L2 side via a corresponding bridge.
     /// @param target Staking target addresses.
     /// @param stakingShare Corresponding staking amount.
     /// @param bridgePayload Bridge payload necessary (if required) for a specific bridge relayer.
     /// @param transferAmount Actual OLAS amount to be transferred.
+    /// @param operation Funds operation: stake / unstake.
     function sendMessage(
         address target,
         uint256 stakingShare,
         bytes memory bridgePayload,
-        uint256 transferAmount
+        uint256 transferAmount,
+        bytes32 operation
     ) external virtual payable {
         // Check for the dispenser contract to be the msg.sender
         if (msg.sender != l1Depository) {
@@ -178,7 +149,7 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
 
         // Send the message to L2
         (uint256 sequence, uint256 leftovers) = _sendMessage(targets, stakingShares, bridgePayload, transferAmount,
-            batchHash);
+            batchHash, operation);
 
         // Send leftover amount back to the sender, if any
         if (leftovers > 0) {
@@ -200,11 +171,13 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
     /// @param stakingShares Corresponding set of staking amounts.
     /// @param bridgePayload Bridge payload necessary (if required) for a specific bridge relayer.
     /// @param transferAmount Actual total OLAS amount across all the targets to be transferred.
+    /// @param operation Funds operation: stake / unstake.
     function sendMessageBatch(
         address[] memory targets,
         uint256[] memory stakingShares,
         bytes memory bridgePayload,
-        uint256 transferAmount
+        uint256 transferAmount,
+        bytes32 operation
     ) external virtual payable {
         // Check for the dispenser contract to be the msg.sender
         if (msg.sender != l1Depository) {
@@ -217,7 +190,7 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
 
         // Send the message to L2
         (uint256 sequence, uint256 leftovers) = _sendMessage(targets, stakingShares, bridgePayload, transferAmount,
-            batchHash);
+            batchHash, operation);
 
         // Send leftover amount back to the sender, if any
         if (leftovers > 0) {

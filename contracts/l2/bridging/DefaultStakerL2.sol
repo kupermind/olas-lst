@@ -55,6 +55,11 @@ abstract contract DefaultStakerL2 is IBridgeErrors {
     // Max gas limit for sending a message to L1
     // Several bridges consider this value as a maximum gas limit
     uint256 public constant MAX_GAS_LIMIT = 2_000_000;
+    // Stake operation
+    bytes32 public constant STAKE = 0x1bcc0f4c3fad314e585165815f94ecca9b96690a26d6417d7876448a9a867a69;
+    // Unstake operation
+    bytes32 public constant UNSTAKE = 0x8ca9a95e41b5eece253c93f5b31eed1253aed6b145d8a6e14d913fdf8e732293;
+
     // OLAS address
     address public immutable olas;
     // Staking proxy factory address
