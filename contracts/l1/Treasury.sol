@@ -234,15 +234,19 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         curStakedBalance -= unstakeAmount;
         stakedBalance = curStakedBalance;
 
+        // Update reserves
+        _updateReserves(curStakedBalance);
+
         // Collect staking contracts and amounts to send unstake message to L2-s
-        (address[] memory stakingProxies, uint256[] memory chainIds, uint256[] memory amounts) =
+        (uint256[] memory chainIds, address[][] memory stakingProxies, uint256[][] memory amounts) =
             IDepository(depository).processUnstake(unstakeAmount, backupModelIds);
         // TODO Send message to L2 to request withdrawDiff
     }
 
     function requestToWithdraw(
         uint256 stAmount,
-        uint256[] memory backupModelIds
+        uint256[] memory chainIds,
+        address[][] memory stakingProxies
     ) external returns (uint256 requestId, uint256 olasAmount) {
         // Update reserves
         _updateReserves(0);
@@ -253,8 +257,13 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         // Caclulate withdraw time
         uint256 withdrawTime = block.timestamp + withdrawDelay;
 
+        // Get withdraw request Id
         requestId = numWithdrawRequests;
         numWithdrawRequests = requestId + 1;
+
+        // Push a pair of key defining variables into one key: withdrawTime | requestId
+        // requestId occupies first 64 bits, withdrawTime occupies next bits as they both fit well in uint256
+        requestId |= withdrawTime << 64;
 
         // Calculate OLAS amount
         olasAmount = getOlasAmount(stAmount);
@@ -269,7 +278,7 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         if (curWithdrawAmountRequested > curVaultBalance) {
             uint256 withdrawDiff = curWithdrawAmountRequested - curVaultBalance;
 
-            _unstake(withdrawDiff, backupModelIds);
+            _unstake(withdrawDiff, chainIds, stakingProxies);
         }
 
         // Burn stOLAS tokens
@@ -278,17 +287,28 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         emit WithdrawRequestInitiated(msg.sender, requestId, stAmount, olasAmount, withdrawTime);
     }
 
-    function finalizeWithdrawRequests(uint256[] memory requestIds, uint256[] memory amount) external {
+    function finalizeWithdrawRequests(uint256[] memory requestIds, uint256[] memory amounts) external {
         // Update reserves
         _updateReserves(0);
 
-        safeBatchTransferFrom(msg.sender, address(this), requestIds, amount, "");
+        safeBatchTransferFrom(msg.sender, address(this), requestIds, amounts, "");
 
         uint256 totalAmount;
         // Traverse all withdraw requests
         for (uint256 i = 0; i < requestIds[i]; ++i) {
+            // Decode a pair of key defining variables from one key: withdrawTime | requestId
+            // requestId occupies first 64 bits, withdrawTime occupies next bits as they both fit well in uint256
+            uint256 requestId = requestIds[i] & type(uint64).max;
+
+            uint256 numRequests = numWithdrawRequests;
+            // This must never happen as otherwise token would not exist and none of it would be transferFrom-ed
+            if (requestId >= numRequests) {
+                revert Overflow(requestId, numRequests);
+            }
+
+            // It is safe to just move 64 bits as there is a single withdrawTime value after that
+            uint256 withdrawTime = requestIds[i] >> 64;
             // Check for earliest possible withdraw time
-            uint256 withdrawTime;
             if (withdrawTime > block.timestamp) {
                 revert();
             }
@@ -301,10 +321,16 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         // Burn withdraw tokens
         _batchBurn(address(this), requestIds[i], amounts[i]);
 
-        // TODO any checks or now overflow is possible?
+        // Check underflows: this must never happen
+        uint256 curVaultBalance = vaultBalance;
+        if (totalAmount > curVaultBalance) {
+            revert Overflow(totalAmount, curVaultBalance);
+        }
 
         // Adjust vault balances directly to avoid calling updateReserves()
-        vaultBalance -= totalAmount;
+        curVaultBalance -= totalAmount;
+        vaultBalance = curVaultBalance;
+        // This is safa, as totalReserves is always >= vaultBalance
         totalReserves -= totalAmount;
 
         // Transfer total amount
@@ -321,5 +347,13 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
     function getOlasAmount(uint256 stAmount) public view returns (uint256 olasAmount) {
         // TODO MulDiv? Rounding down to zero?
         olasAmount = (stAmount * stakedBalance) / totalReserves;
+    }
+
+    function getWithdrawRequestId(uint256 requestId, uint256 withdrawTime) external pure returns (uint256) {
+        return requestId | (withdrawTime << 64);
+    }
+
+    function getWithdrawIdAndTime(uint256 withdrawRequestId) external pure returns (uint256, uint256) {
+        return ((withdrawRequestId & type(uint64).max), (withdrawRequestId >> 64));
     }
 }

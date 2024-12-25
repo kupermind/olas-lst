@@ -82,11 +82,8 @@ error UnauthorizedAccount(address account);
 error WrongStakingModel(uint256 modelId);
 
 struct StakingModel {
-    address stakingProxy;
-    // TODO supply is renewable supposedly every epoch
     uint96 supply;
     uint96 remainder;
-    uint64 chainId;
     bool active;
 }
 
@@ -235,47 +232,87 @@ contract Depository {
         emit SetDepositProcessorChainIds(depositProcessors, chainIds);
     }
 
-    /// @dev Adds staking models.
-    /// @param stakingModels Staking models.
-    function addStakingModels(StakingModel[] memory stakingModels) external {
+    /// @dev Activates staking models.
+    /// @param chainIds Chain Ids.
+    /// @param stakingProxies Corresponding staking proxy addresses.
+    /// @param supplies Corresponding staking supplies.
+    function activateStakingModels(
+        uint256[] memory chainIds,
+        address[] memory stakingProxies,
+        uint256[] memory supplies
+    ) external {
         // Check for ownership
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);
         }
 
-        // TODO Check inputs or trust agent?
+        // TODO Check array sizes
+        // Check for array lengths
+//        if (modelIds.length == 0 || modelIds.length != statuses.length) {
+//            revert WrongArrayLength(modelIds.length, statuses.length);
+//        }
 
         uint256 localNum = numStakingModels;
-        for (uint256 i = 0; i < stakingModels.length; ++i) {
-            mapStakingModels[localNum] = stakingModels[i];
+        for (uint256 i = 0; i < chainIds.length; ++i) {
+            // TODO Check chainIds order
+
+            // Check for zero value
+            if (supplies[i] == 0) {
+                revert ZeroValue();
+            }
+
+            // Check for zero address
+            if (stakingProxies[i] == address(0)) {
+                revert ZeroAddress();
+            }
+
+            // Push a pair of key defining variables into one key: chainId | stakingProxy
+            // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
+            uint256 chainIdStakingProxy = uint256(uint160(stakingProxies[i]));
+            chainIdStakingProxy |= chainIds[i] << 160;
+
+            StakingModel storage stakingModel = mapStakingModels[chainIdStakingProxy];
+            stakingModel.supply = supplies[i];
+            stakingModel.active = true;
+
             ++localNum;
         }
 
         numStakingModels = localNum;
 
-        emit AddStakingModels(msg.sender, stakingModels);
+        emit ActivateStakingModels(chainIds, stakingProxies, supplies);
     }
 
-    function changeModelStatuses(uint256[] memory modelIds, bool[] memory statuses) external {
+    // TODO What happens if there are no funds for staking in any model. How to quickly deactivate?
+    /// @notice Models must be sorted in ascending order.
+    function deactivateStakingModels(uint256[] memory modelIds) external {
         // Check for ownership
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);
         }
 
-        // Check for array lengths
-        if (modelIds.length == 0 || modelIds.length != statuses.length) {
-            revert WrongArrayLength(modelIds.length, statuses.length);
+        uint256 totalUnstakedAmount;
+
+        uint256 localNum;
+        for (uint256 i = 0; i < modelIds.length; ++i) {
+            if (localNum >= modelIds[i]) {
+                revert Overflow(localNum, modelIds[i]);
+            }
+
+            StakingModel memory stakingModel = mapStakingModels[modelIds[i]];
+            uint256 unstakeAmount = stakingModel.supply - stakingModel.remainder;
+            totalUnstakedAmount += unstakeAmount;
+
+            // TODO Check if any communication is needed with L2, or contracts there just deplete and will be unstaked
+            delete mapStakingModels[modelIds[i]];
+
+            localNum = modelIds[i];
         }
 
-        uint256 localNum = numStakingModels;
-        for (uint256 i = 0; i < modelIds.length; ++i) {
-            if (modelIds[i] >= localNum) {
-                revert Overflow(modelIds[i], localNum);
-            }
-            mapStakingModels[modelIds[i]].active = statuses[i];
-        }
+        // Sync unstaked
+        ITreasury(treasury).updateReserves(totalUnstakedAmount);
         
-        emit ChangeModelStatuses(modelIds, statuses);
+        emit DeactivateStakingModels(modelIds);
     }
 
     // TODO: array of modelId-s and olasAmount-s as on stake might not fit into one model
@@ -321,45 +358,18 @@ contract Depository {
         emit Deposit(msg.sender, modelId, olasAmount, stAmount);
     }
 
-    // TODO: renew lock, withdraw, evict by agent if not renewed? Then need to lock from the proxy controlled by the agent as well
-
-    // Unlock veOLAS
-    function unlock() public {
-        uint256 userSupply = mapStakingTerms[msg.sender].userSupply;
-        if (userSupply == 0) {
-            revert ZeroValue();
-        }
-
-        ILock(mapStakingTerms[msg.sender].lockProxy).unlock(msg.sender, userSupply);
-        mapStakingTerms[msg.sender].userSupply = 0;
-    }
-
-    function requestToWithdraw(uint256 stAmount) external {
-        // TODO Math
-        //IToken(st).transferFrom(msg.sender, address(this), stAmount);
-    }
-
-    function withdraw(uint256 stAmount) external {
-        IToken(st).transferFrom(msg.sender, address(this), stAmount);
-
-        // TODO For testing purposes now before the stOLAS math is fixed
-        unlock();
-
-        // Change for OLAS
-        uint256 olasAmount = getOLASAmount(stAmount);
-
-        // Burn stOLAS
-        IToken(st).burn(stAmount);
-
-        // Transfer OLAS
-        IToken(olas).transfer(msg.sender, olasAmount);
-    }
-
     function processUnstake(
         uint256 unstakeAmount,
-        uint256[] memory backupModelIds
-    ) external returns (address[] memory stakingProxies, uint256[] memory chainIds, uint256[] memory amounts) {
-        // Allocate arrays
+        uint256[] memory chainIds,
+        address[][] memory stakingProxies
+    ) external returns (uint256[][] memory amounts) {
+        // Allocate arrays of max possible size
+        amounts = new uint256[][](chainIds.length);
+
+        // Push a pair of key defining variables into one key: chainId | stakingProxy
+        // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
+        uint256 chainIdStakingProxy = uint256(uint160(stakingProxies[i]));
+        chainIdStakingProxy |= chainIds[i] << 160;
 
         // Collect staking contracts and amounts
         for (uint256 i = 0; i < backupModelIds.length; ++i) {
@@ -378,5 +388,9 @@ contract Depository {
                 break;
             }
         }
+    }
+
+    function getStakingModelId(uint256 chainId, address stakingProxy) external pure returns (uint256) {
+        return uint256(uint160(stakingProxy)) | (chainId << 160);
     }
 }

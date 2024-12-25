@@ -418,6 +418,11 @@ contract StakerL2 is ERC721TokenReceiver {
 
     }
 
+    // TODO Unstake definitely terminated staking contracts - deactivated on L1 and / or ran out of funds
+    function unstake(address stakingProxy, uint256[] memory serviceIds) external {
+
+    }
+
     // TODO triggered when (curWithdrawAmountRequested - curVaultBalance) is positive, messaged by treasury
     // TODO arrays
     /// @dev Withdraws specified amounts from specified staking contracts.
@@ -432,7 +437,7 @@ contract StakerL2 is ERC721TokenReceiver {
         }
         _locked = 2;
 
-        // Check for whitelisted guardian agent
+        // Check for treasury requesting withdraw
         if (msg.sender != treasury) {
             revert UnauthorizedAccount(msg.sender);
         }
