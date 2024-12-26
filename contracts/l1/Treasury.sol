@@ -4,6 +4,24 @@ pragma solidity ^0.8.28;
 import {ERC1155, ERC1155TokenReceiver} from "../../lib/autonolas-registries/lib/solmate/src/tokens/ERC1155.sol";
 import {IToken} from "../interfaces/IToken.sol";
 
+interface IDepository {
+    /// @dev Calculates amounts and initiates cross-chain unstake request from specified models.
+    /// @param unstakeAmount Total amount to unstake.
+    /// @param chainIds Set of chain Ids with staking proxies.
+    /// @param stakingProxies Set of sets of staking proxies corresponding to each chain Id.
+    /// @param bridgePayloads Bridge payloads corresponding to each chain Id.
+    /// @param values Value amounts for each bridge interaction, if applicable.
+    /// @return amounts Corresponding OLAS amounts for each staking proxy.
+    function processUnstake(uint256 unstakeAmount, uint256[] memory chainIds, address[][] memory stakingProxies,
+        bytes[] memory bridgePayloads, uint256[] values) external payable returns (uint256[][] memory amounts);
+}
+
+interface ILock {
+    /// @dev Increases lock amount and time.
+    /// @param olasAmount OLAS amount.
+    function increaseLock(uint256 olasAmount) external;
+}
+
 /// @dev Only `owner` has a privilege, but the `sender` was provided.
 /// @param sender Sender address.
 /// @param owner Required sender address as an owner.
@@ -23,12 +41,10 @@ error ZeroValue();
 /// @dev The contract is already initialized.
 error AlreadyInitialized();
 
-struct WithdrawRequest {
-    address requester;
-    uint96 stAmount;
-    uint96 olasAmount;
-    uint32 withdrawTime;
-}
+/// @dev Value overflow.
+/// @param provided Overflow value.
+/// @param max Maximum possible value.
+error Overflow(uint256 provided, uint256 max);
 
 /// @title Treasury - Smart contract for treasury
 contract Treasury is ERC1155, ERC1155TokenReceiver {
@@ -49,6 +65,7 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
     address public immutable olas;
     address public immutable ve;
     address public immutable st;
+    address public immutable lock;
 
     // Staked balance
     uint256 public stakedBalance;
@@ -69,13 +86,12 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
     // Contract owner
     address public owner;
 
-    mapping(uint256 => WithdrawRequest) public mapWithdrawRequests;
-
     // TODO change to initialize in prod
-    constructor(address _olas, address _ve, address _st, uint256 _lockFactor) {
+    constructor(address _olas, address _ve, address _st, address _lock, uint256 _lockFactor) {
         olas = _olas;
         ve = _ve;
         st = _st;
+        lock = _lock;
         _lockFactor;
 
         owner = msg.sender;
@@ -168,7 +184,7 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         IToken(st).mint(account, stAmount);
     }
 
-    function _lock(uint256 olasAmount) internal returns (uint256 remainder) {
+    function _increaseLock(uint256 olasAmount) internal returns (uint256 remainder) {
         // Get treasury veOLAS lock amount
         uint256 lockAmount = (olasAmount * lockFactor) / MAX_LOCK_FACTOR;
         remainder = olasAmount - lockAmount;
@@ -195,7 +211,7 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
 
         // Lock required amounts if balances changed positively
         if (curVaultBalance > prevVaultBalance) {
-            uint256 lockRemainder = _lock(curVaultBalance - prevVaultBalance);
+            uint256 lockRemainder = _increaseLock(curVaultBalance - prevVaultBalance);
             curVaultBalance = prevVaultBalance + lockRemainder;
         }
         vaultBalance = curVaultBalance;
@@ -206,7 +222,7 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         emit TotalReservesUpdated(curStakedBalance, curVaultBalance, curTotalReserves);
     }
 
-    function updateReserves() public returns (uint256) {
+    function updateReserves() external returns (uint256) {
         return _updateReserves(0);
     }
 
@@ -219,12 +235,19 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         _updateReserves(0);
     }
 
-    /// @dev Calculate and unstake from specified models.
-    /// @notice Less relevant models must be placed in the back of array, such that they are not touched
-    ///         if there is enough amount to be unstaked from other models.
-    /// @param amount Total amount to unstake.
-    /// @param backupModelIds Model Ids to unstake from, in order of appearance.
-    function _unstake(uint256 unstakeAmount, uint256[] memory chainIds, address[][] memory stakingProxies) internal {
+    /// @dev Calculates amounts and initiates cross-chain unstake request from specified models.
+    /// @param unstakeAmount Total amount to unstake.
+    /// @param chainIds Set of chain Ids with staking proxies.
+    /// @param stakingProxies Set of sets of staking proxies corresponding to each chain Id.
+    /// @param bridgePayloads Bridge payloads corresponding to each chain Id.
+    /// @param values Value amounts for each bridge interaction, if applicable.
+    function _unstake(
+        uint256 unstakeAmount,
+        uint256[] memory chainIds,
+        address[][] memory stakingProxies,
+        bytes[] memory bridgePayloads,
+        uint256[] values
+    ) internal {
         uint256 curStakedBalance = stakedBalance;
         if (curStakedBalance < unstakeAmount) {
             revert Overflow(curStakedBalance, unstakeAmount);
@@ -237,17 +260,23 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         // Update reserves
         _updateReserves(curStakedBalance);
 
-        // Collect staking contracts and amounts to send unstake message to L2-s
-        IDepository(depository).processUnstakeAmounts(unstakeAmount, chainIds, stakingProxies);
+        // Calculate OLAS amounts and initiate unstake messages to L2-s
+        IDepository(depository).processUnstake(unstakeAmount, chainIds, stakingProxies, bridgePayloads, values);
     }
 
-    /// @dev Unstakes specified staking models.
+    /// @dev Unstakes from specified staking models.
     /// @notice This allows to deduct reserves from their staked part and get them back as vault part.
+    /// @param unstakeAmount Total amount to unstake.
+    /// @param chainIds Set of chain Ids with staking proxies.
+    /// @param stakingProxies Set of sets of staking proxies corresponding to each chain Id.
+    /// @param bridgePayloads Bridge payloads corresponding to each chain Id.
+    /// @param values Value amounts for each bridge interaction, if applicable.
     function unstake(
-        uint256 totalUnstakeAmount,
+        uint256 unstakeAmount,
         uint256[] memory chainIds,
         address[][] memory stakingProxies,
-        bytes[] memory bridgePayloads
+        bytes[] memory bridgePayloads,
+        uint256[] values
     ) external payable {
         // Check for ownership
         if (msg.sender != owner) {
@@ -257,15 +286,26 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         // Update reserves
         _updateReserves(0);
 
-        _unstake(totalUnstakeAmount, chainIds, stakingProxies);
+        _unstake(unstakeAmount, chainIds, stakingProxies, bridgePayloads, values);
     }
 
     // TODO Move high level part to depository?
+    /// @dev Requests withdraw of OLAS in exchange of provided stOLAS.
+    /// @notice Vault reserves are used first. If there is a lack of OLAS reserves, the backup amount is requested
+    ///         to be unstaked from other models.
+    /// @param stAmount Provided stAmount to burn in favor of OLAS tokens.
+    /// @param chainIds Set of chain Ids with staking proxies.
+    /// @param stakingProxies Set of sets of staking proxies corresponding to each chain Id.
+    /// @param bridgePayloads Bridge payloads corresponding to each chain Id.
+    /// @param values Value amounts for each bridge interaction, if applicable.
+    /// @return requestId Withdraw request ERC-1155 token.
+    /// @return olasAmount Calculated OLAS amount.
     function requestToWithdraw(
         uint256 stAmount,
         uint256[] memory chainIds,
         address[][] memory stakingProxies,
-        bytes[] memory bridgePayloads
+        bytes[] memory bridgePayloads,
+        uint256[] values
     ) external payable returns (uint256 requestId, uint256 olasAmount) {
         // Update reserves
         _updateReserves(0);
@@ -297,7 +337,7 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         if (curWithdrawAmountRequested > curVaultBalance) {
             uint256 withdrawDiff = curWithdrawAmountRequested - curVaultBalance;
 
-            _unstake(withdrawDiff, chainIds, stakingProxies);
+            _unstake(withdrawDiff, chainIds, stakingProxies, bridgePayloads, values);
         }
 
         // Burn stOLAS tokens
@@ -338,7 +378,7 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         }
 
         // Burn withdraw tokens
-        _batchBurn(address(this), requestIds[i], amounts[i]);
+        _batchBurn(address(this), requestIds, amounts);
 
         // Check underflows: this must never happen
         uint256 curVaultBalance = vaultBalance;

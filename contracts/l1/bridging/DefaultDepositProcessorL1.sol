@@ -3,10 +3,6 @@ pragma solidity ^0.8.28;
 
 import {IBridgeErrors} from "../../interfaces/IBridgeErrors.sol";
 
-interface IDispenser {
-    function syncWithheldAmount(uint256 chainId, uint256 amount, bytes32 batchHash) external;
-}
-
 interface IToken {
     /// @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
     /// @param spender Account address that will be able to transfer tokens on behalf of the caller.
@@ -18,13 +14,6 @@ interface IToken {
     /// @param account Account address.
     /// @return Amount of tokens owned.
     function balanceOf(address account) external view returns (uint256);
-}
-
-interface ITreasury {
-    /// @dev Deposits OLAS to treasury for vault and veOLAS lock.
-    /// @notice Tokens are taken from `msg.sender`'s balance.
-    /// @param olasAmount OLAS amount.
-    function depositAndLock(uint256 olasAmount) external;
 }
 
 /// @title DefaultDepositProcessorL1 - Smart contract for sending tokens and data via arbitrary bridge from L1 to L2 and processing data received from L2.
@@ -221,13 +210,6 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
             revert AlreadyDelivered(batchHash);
         }
         processedHashes[batchHash] = true;
-    }
-
-    // TODO What to do with tokens sent to this contract directly? Seems safe to just account for the overall balance
-    function finalizeStakingReward() external {
-        uint256 balance = IToken(olas).balanceOf(address(this));
-        IToken(olas).approve(treasury, balance);
-        ITreasury(treasury).depositAndLock(balance);
     }
 
     /// @dev Sets L2 staker address and zero-s the owner.

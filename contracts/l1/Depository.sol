@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ActivityModuleProxy} from "../l2/LockProxy.sol";
+import {LockProxy} from "./LockProxy.sol";
 import "hardhat/console.sol";
 
 interface IDepositProcessor {
@@ -75,6 +75,10 @@ error WrongArrayLength(uint256 numValues1, uint256 numValues2);
 /// @param max Maximum possible value.
 error Overflow(uint256 provided, uint256 max);
 
+/// @dev Staking model already exists.
+/// @param stakingModelId Staking model Id.
+error StakingModelAlreadyExists(uint256 stakingModelId);
+
 /// @dev Account is unauthorized.
 /// @param account Account address.
 error UnauthorizedAccount(address account);
@@ -93,7 +97,7 @@ contract Depository {
     event OwnerUpdated(address indexed owner);
     event SetDepositProcessorChainIds(address[] depositProcessors, uint256[] chainIds);
     event SetGuardianServiceStatuses(address[] guardianServices, bool[] statuses);
-    event AddStakingModels(address indexed sender, StakingModel[] stakingModels);
+    event StakingModelsActivated(uint256[] chainIds, address[] stakingProxies, uint256[] supplies);
     event ChangeModelStatuses(uint256[] modelIds, bool[] statuses);
     event Deposit(address indexed sender, uint256 indexed stakingModelId, uint256 olasAmount, uint256 stAmount);
 
@@ -287,7 +291,7 @@ address public immutable olas;
             setStakingModelIds.push(stakingModelId);
         }
 
-        emit ActivateStakingModels(chainIds, stakingProxies, supplies);
+        emit StakingModelsActivated(chainIds, stakingProxies, supplies);
     }
 
 
@@ -368,18 +372,26 @@ address public immutable olas;
         emit Deposit(msg.sender, stakingModelId, olasAmount, stAmount);
     }
 
-    function processUnstakeAmounts(
+    /// @dev Calculates amounts and initiates cross-chain unstake request from specified models.
+    /// @param unstakeAmount Total amount to unstake.
+    /// @param chainIds Set of chain Ids with staking proxies.
+    /// @param stakingProxies Set of sets of staking proxies corresponding to each chain Id.
+    /// @param bridgePayloads Bridge payloads corresponding to each chain Id.
+    /// @param values Value amounts for each bridge interaction, if applicable.
+    /// @return amounts Corresponding OLAS amounts for each staking proxy.
+    function processUnstake(
         uint256 unstakeAmount,
         uint256[] memory chainIds,
         address[][] memory stakingProxies,
-        bytes[] memory bridgePayloads
-    ) external returns (uint256[][] memory amounts) {
+        bytes[] memory bridgePayloads,
+        uint256[] values
+    ) external payable returns (uint256[][] memory amounts) {
         // Allocate arrays of max possible size
         amounts = new uint256[][](chainIds.length);
 
         // TODO Check array lengths
 
-        uint256 totalOlasAmount;
+        uint256 totalAmount;
 
         // Collect staking contracts and amounts
         for (uint256 i = 0; i < chainIds.length; ++i) {
@@ -416,7 +428,7 @@ address public immutable olas;
                 }
             }
 
-            totalOlasAmount += olasAmount;
+            totalAmount += olasAmount;
 
             // Transfer OLAS via the bridge
             address depositProcessor = mapChainIdDepositProcessors[chainIds[i]];
@@ -425,8 +437,8 @@ address public immutable olas;
             IToken(olas).approve(depositProcessor, olasAmount);
 
             // Transfer OLAS to its corresponding Staker on L2
-            IDepositProcessor(depositProcessor).sendMessage(stakingProxies[i], olasAmount, bridgePayloads[i],
-                olasAmount, UNSTAKE);
+            IDepositProcessor(depositProcessor).sendMessage{value: values[i]}(stakingProxies[i], amounts[i],
+                bridgePayloads[i], totalAmount, UNSTAKE);
         }
 
         // Check if accumulated necessary amount of tokens

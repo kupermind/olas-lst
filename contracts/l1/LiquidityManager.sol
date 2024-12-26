@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Treasury} from "./Treasury.sol";
-import {ITreasury} from "./bridging/DefaultDepositProcessorL1.sol";
-
 interface IToken {
     /// @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
     /// @param spender Account address that will be able to transfer tokens on behalf of the caller.
@@ -23,6 +20,10 @@ interface IToken {
     /// @param amount Amount to transfer to.
     /// @return True if the function execution is successful.
     function transferFrom(address from, address to, uint256 amount) external returns (bool);
+}
+
+interface ITreasury {
+    function updateReserves() external returns (uint256);
 }
 
 /// @dev Zero address.
@@ -89,9 +90,9 @@ contract LiquidityManager {
         // Send OLAS back to treasury
         uint256 olasBalance = IToken(olas).balanceOf(address(this));
         if (olasBalance > 0) {
-            // Approve OLAS for treasury
+            // Transfer OLAS for treasury
             IToken.approve(treasury, olasBalance);
-            ITreasury.deposit(olasBalance);
+            ITreasury.updateReserves(olasBalance);
         }
     }
 
@@ -110,7 +111,7 @@ contract LiquidityManager {
         uint256 amount1
     ) internal returns (uint256 positionId, uint256 liquidity) {
         // Ensure token order matches Uniswap convention
-        (address token0, address token1, uint256 amount0, uint256 amount1) = token0 < token1 ?
+        (token0, token1, amount0, amount1) = token0 < token1 ?
             (token0, token1, amount0, amount1) : (token1, token0, amount1, amount0);
 
         // Get factory address

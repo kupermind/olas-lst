@@ -125,6 +125,8 @@ contract Lock {
         IVEOLAS(ve).createLock(olasAmount, MAX_LOCK_TIME);
     }
 
+    /// @dev Increases lock amount and time.
+    /// @param olasAmount OLAS amount.
     function increaseLock(uint256 olasAmount) external {
         // Check for ownership
         if (msg.sender != treasury) {

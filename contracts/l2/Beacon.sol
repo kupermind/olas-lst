@@ -18,7 +18,7 @@ contract Beacon {
     address public owner;
 
     /// @dev Beacon constructor.
-    /// @param implementation Implementation address.
+    /// @param _implementation Implementation address.
     constructor(address _implementation) {
         if (_implementation == address(0)) {
             revert ZeroAddress();

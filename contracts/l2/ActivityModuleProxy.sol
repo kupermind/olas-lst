@@ -39,7 +39,7 @@ contract ActivityModuleProxy {
         }
     }
 
-    function implementation() public view returns (address) {
+    function getImplementation() public view returns (address) {
         return IBeacon(getBeacon()).implementation();
     }
 
