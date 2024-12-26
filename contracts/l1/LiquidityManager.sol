@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import {IUniswapV3} from "../interfaces/IUniswapV3.sol";
+
 interface IToken {
     /// @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
     /// @param spender Account address that will be able to transfer tokens on behalf of the caller.
@@ -29,6 +31,9 @@ interface ITreasury {
 /// @dev Zero address.
 error ZeroAddress();
 
+/// @dev Zero value when it has to be different from zero.
+error ZeroValue();
+
 /// @dev Only `owner` has a privilege, but the `sender` was provided.
 /// @param sender Sender address.
 /// @param owner Required sender address as an owner.
@@ -41,6 +46,9 @@ error TreasuryOnly(address sender, address treasury);
 
 /// @dev The contract is already initialized.
 error AlreadyInitialized();
+
+// @dev Reentrancy guard.
+error ReentrancyGuard();
 
 /// @title LiquidityManager - Smart contract for managing different token liquidity
 contract LiquidityManager {
@@ -60,6 +68,8 @@ contract LiquidityManager {
 
     // Owner address
     address public owner;
+    // Reentrancy lock
+    uint256 internal _locked;
 
     /// @dev LiquidityManager constructor.
     /// @param _olas OLAS address.
@@ -84,6 +94,7 @@ contract LiquidityManager {
         }
 
         owner = msg.sender;
+        _locked = 1;
     }
 
     function _depositOlasToTreasury() internal {
@@ -164,8 +175,9 @@ contract LiquidityManager {
             // Get position tokens
             (uint256 token0, uint256 token1) = IUniswapV3().getTolens(positionIds[i]);
 
+            // TODO
             // Check current pool prices
-            IBuyBackBurner(buyBackBurner).checkPoolPrices(token0, token1, uniV3PositionManager, FEE_TIER);
+            //IBuyBackBurner(buyBackBurner).checkPoolPrices(token0, token1, uniV3PositionManager, FEE_TIER);
 
             IUniswapV3.CollectParams memory params = IUniswapV3.CollectParams({
                 tokenId: positionIds[i],
@@ -179,9 +191,6 @@ contract LiquidityManager {
             if (amount0 == 0 && amount1 == 0) {
                 revert ZeroValue();
             }
-
-            (uint256 nativeAmountForOLASBurn, uint256 memeAmountToBurn) = isNativeFirst ? (amount0, amount1) :
-                (amount1, amount0);
         }
 
         _depositOlasToTreasury();

@@ -56,7 +56,7 @@ contract GnosisDepositProcessorL1 is DefaultDepositProcessorL1 {
             IToken(olas).approve(l1TokenRelayer, transferAmount);
 
             // Transfer tokens
-            IBridge(l1TokenRelayer).relayTokens(olas, l2TargetDispenser, transferAmount);
+            IBridge(l1TokenRelayer).relayTokens(olas, l2StakingProcessor, transferAmount);
         }
 
         // Assemble AMB data payload
@@ -65,21 +65,11 @@ contract GnosisDepositProcessorL1 is DefaultDepositProcessorL1 {
         // Send message to L2
         // In the current configuration, maxGasPerTx is set to 4000000 on Ethereum and 2000000 on Gnosis Chain.
         // Source: https://docs.gnosischain.com/bridges/Token%20Bridge/amb-bridge#how-to-check-if-amb-is-down-not-relaying-message
-        bytes32 iMsg = IBridge(l1MessageRelayer).requireToPassMessage(l2TargetDispenser, data, MESSAGE_GAS_LIMIT);
+        bytes32 iMsg = IBridge(l1MessageRelayer).requireToPassMessage(l2StakingProcessor, data, MESSAGE_GAS_LIMIT);
 
         sequence = uint256(iMsg);
 
         // Return msg.value, if provided by mistake
         leftovers = msg.value;
-    }
-
-    /// @dev Process message received from L2.
-    /// @param data Bytes message data sent from L2.
-    function receiveMessage(bytes memory data) external {
-        // Get L2 dispenser address
-        address l2Dispenser = IBridge(l1MessageRelayer).messageSender();
-
-        // Process the data
-        _receiveMessage(msg.sender, l2Dispenser, data);
     }
 }

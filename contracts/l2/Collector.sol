@@ -14,6 +14,9 @@ contract Collector {
     // Max protocol factor
     uint256 public constant MAX_PROTOCOL_FACTOR = 10_000;
 
+    // OLAS contract address
+    address public immutable olas;
+
     // Protocol balance
     uint256 public protocolBalance;
     // Protocol factor in 10_000 value

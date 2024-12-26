@@ -21,7 +21,7 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
     event MessagePosted(uint256 indexed sequence, address[] targets, uint256[] stakingShares,
         uint256 transferAmount, bytes32 indexed batchHash);
     event MessageReceived(address indexed l1Relayer, uint256 indexed chainId, bytes data);
-    event L2StakerUpdated(address indexed l2Staker);
+    event L2StakerUpdated(address indexed l2StakingProcessor);
     event LeftoversRefunded(address indexed sender, uint256 leftovers);
 
     // receiveMessage selector to be executed on L2
@@ -44,8 +44,8 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
     // L2 target chain Id
     uint256 public immutable l2TargetChainId;
     // L2 staker address, set by the deploying owner
-    address public l2Staker;
-    // Contract owner until the time when the l2Staker is set
+    address public l2StakingProcessor;
+    // Contract owner until the time when the l2StakingProcessor is set
     address public owner;
     // Nonce for each staking batch
     uint256 public stakingBatchNonce;
@@ -212,30 +212,30 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
         processedHashes[batchHash] = true;
     }
 
-    /// @dev Sets L2 staker address and zero-s the owner.
-    /// @param l2Dispenser L2 staker address.
-    function _setL2Staker(address l2Dispenser) internal {
+    /// @dev Sets L2 staking processor address and zero-s the owner.
+    /// @param l2Processor L2 staking processor address.
+    function _setL2StakingProcessor(address l2Processor) internal {
         // Check the contract ownership
         if (msg.sender != owner) {
             revert OwnerOnly(owner, msg.sender);
         }
 
         // The L2 staker must have a non zero address
-        if (l2Dispenser == address(0)) {
+        if (l2Processor == address(0)) {
             revert ZeroAddress();
         }
-        l2Staker = l2Dispenser;
+        l2StakingProcessor = l2Processor;
 
         // Revoke the owner role making the contract ownerless
         owner = address(0);
 
-        emit L2StakerUpdated(l2Dispenser);
+        emit L2StakerUpdated(l2Processor);
     }
 
-    /// @dev Sets L2 staker address.
-    /// @param l2Dispenser L2 staker address.
-    function setL2Staker(address l2Dispenser) external virtual {
-        _setL2Staker(l2Dispenser);
+    /// @dev Sets L2 staking processor address.
+    /// @param l2Processor L2 staking processor address.
+    function setL2StakingProcessor(address l2Processor) external virtual {
+        _setL2StakingProcessor(l2Processor);
     }
 
     /// @dev Gets the maximum number of token decimals able to be transferred across the bridge.

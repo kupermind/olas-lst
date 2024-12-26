@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {LockProxy} from "./LockProxy.sol";
+import {IToken} from "../interfaces/IToken.sol";
 import "hardhat/console.sol";
 
 interface IDepositProcessor {
@@ -10,7 +10,9 @@ interface IDepositProcessor {
     /// @param stakingShare Corresponding staking amount.
     /// @param bridgePayload Bridge payload necessary (if required) for a specific bridge relayer.
     /// @param transferAmount Actual OLAS amount to be transferred.
-    function sendMessage(address target, uint256 stakingShare, bytes memory bridgePayload, uint256 transferAmount) external payable;
+    /// @param operatrion Operation type: stake / unstake
+    function sendMessage(address target, uint256 stakingShare, bytes memory bridgePayload, uint256 transferAmount,
+        bytes32 operation) external payable;
 }
 
 interface ITreasury {
@@ -19,36 +21,6 @@ interface ITreasury {
     /// @param olasAmount OLAS amount.
     /// @return Amount of stOLAS
     function processAndMintStToken(address account, uint256 olasAmount) external returns (uint256);
-}
-
-interface IToken {
-    /// @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
-    /// @param spender Account address that will be able to transfer tokens on behalf of the caller.
-    /// @param amount Token amount.
-    /// @return True if the function execution is successful.
-    function approve(address spender, uint256 amount) external returns (bool);
-
-    /// @dev Transfers the token amount.
-    /// @param to Address to transfer to.
-    /// @param amount The amount to transfer.
-    /// @return True if the function execution is successful.
-    function transfer(address to, uint256 amount) external returns (bool);
-
-    /// @dev Transfers the token amount that was previously approved up until the maximum allowance.
-    /// @param from Account address to transfer from.
-    /// @param to Account address to transfer to.
-    /// @param amount Amount to transfer to.
-    /// @return True if the function execution is successful.
-    function transferFrom(address from, address to, uint256 amount) external returns (bool);
-
-    /// @dev Mints tokens.
-    /// @param account Account address.
-    /// @param amount Token amount.
-    function mint(address account, uint256 amount) external;
-
-    /// @dev Burns tokens.
-    /// @param amount Token amount.
-    function burn(uint256 amount) external;
 }
 
 /// @dev Only `owner` has a privilege, but the `sender` was provided.
@@ -108,7 +80,7 @@ contract Depository {
     // Unstake operation
     bytes32 public constant UNSTAKE = 0x8ca9a95e41b5eece253c93f5b31eed1253aed6b145d8a6e14d913fdf8e732293;
 
-address public immutable olas;
+    address public immutable olas;
     address public immutable st;
     address public immutable treasury;
 

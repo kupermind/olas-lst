@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {ERC721TokenReceiver} from "../../lib/autonolas-registries/lib/solmate/src/tokens/ERC721.sol";
-import {ActivityModuleProxy} from "./ActivityModuleProxy.sol";
+import {ActivityModuleProxy} from "./proxies/ActivityModuleProxy.sol";
 import {IService} from "../interfaces/IService.sol";
 import {IStaking} from "../interfaces/IStaking.sol";
 import {IToken, INFToken} from "../interfaces/IToken.sol";

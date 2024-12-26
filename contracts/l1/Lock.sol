@@ -3,6 +3,20 @@ pragma solidity ^0.8.28;
 
 import {Treasury} from "./Treasury.sol";
 
+interface IGovernor {
+    /// @dev Create a new proposal to change the protocol / contract parameters.
+    /// @param targets The ordered list of target addresses for calls to be made during proposal execution.
+    /// @param values The ordered list of values to be passed to the calls made during proposal execution.
+    /// @param calldatas The ordered list of data to be passed to each individual function call during proposal execution.
+    /// @param description A human readable description of the proposal and the changes it will enact.
+    /// @return The Id of the newly created proposal.
+    function propose(address[] memory targets, uint256[] memory values, bytes[] memory calldatas,
+        string memory description) external returns (uint256);
+
+    /// @dev Casts a vote
+    function castVote(uint256 proposalId, uint8 support) external returns (uint256);
+}
+
 interface IToken {
     /// @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
     /// @param spender Account address that will be able to transfer tokens on behalf of the caller.
@@ -152,7 +166,7 @@ contract Lock {
         }
 
         // TODO Never withdraw the full amount, i.e. neve close the treasury lock
-        LockedBalance memory lockedBalance = IVEOLAS(ve).mapLockedBalances(address(this));
+        IVEOLAS.LockedBalance memory lockedBalance = IVEOLAS(ve).mapLockedBalances(address(this));
 
         // Withdraw veOLAS
         IVEOLAS(ve).withdraw();
@@ -162,21 +176,36 @@ contract Lock {
         IToken(olas).transfer(treasury, amount);
     }
 
-    function proposeBatch(address[] memory targets) external {
+    /// @dev Create a new proposal to change the protocol / contract parameters.
+    /// @param targets The ordered list of target addresses for calls to be made during proposal execution.
+    /// @param values The ordered list of values to be passed to the calls made during proposal execution.
+    /// @param calldatas The ordered list of data to be passed to each individual function call during proposal execution.
+    /// @param description A human readable description of the proposal and the changes it will enact.
+    /// @return The Id of the newly created proposal.
+    function propose(
+        address[] memory targets,
+        uint256[] memory values,
+        bytes[] memory calldatas,
+        string memory description
+    ) external returns (uint256){
         // Check for ownership
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);
         }
 
-        IGovernor(olasGovernor).proposeBatch(targets);
+        return IGovernor(olasGovernor).propose(targets, values, calldatas, description);
     }
 
-    function castVote(uint256 proposalId, uint8 vote) external {
+    /// @dev Casts a vote.
+    /// @param proposalId Proposal Id.
+    /// @param support Support value: against, for, abstain.
+    /// @return Vote weight.
+    function castVote(uint256 proposalId, uint8 support) external returns (uint256) {
         // Check for ownership
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);
         }
 
-        IGovernor(olasGovernor).castVote(proposalId, vote);
+        return IGovernor(olasGovernor).castVote(proposalId, support);
     }
 }

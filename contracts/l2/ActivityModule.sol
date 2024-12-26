@@ -25,7 +25,7 @@ interface ISafe {
     /// @param gasToken Token address (or 0 if ETH) that is used for the payment.
     /// @param refundReceiver Address of receiver of gas payment (or 0 if tx.origin).
     /// @param signatures Packed signature data ({bytes32 r}{bytes32 s}{uint8 v})
-    function execTransaction(address to, uint256 value, bytes calldata data, Enum.Operation operation, uint256 safeTxGas,
+    function execTransaction(address to, uint256 value, bytes calldata data, Operation operation, uint256 safeTxGas,
         uint256 baseGas, uint256 gasPrice, address gasToken, address payable refundReceiver, bytes memory signatures)
         external payable returns (bool success);
 
@@ -66,6 +66,8 @@ error AlreadyInitialized();
 contract ActivityModule {
     event ActivityIncreased(uint256 activityChange);
 
+    // OLAS token address
+    address public immutable olas;
     // Rewards collector address
     address public immutable collector;
 
@@ -136,15 +138,17 @@ contract ActivityModule {
             activityNonce = 1;
         }
 
-        uint256 reward = IStaking(stakingInstance).claim(serviceId);
-        if (reward > 0) {
-            activityNonce++;
-        }
+        // TODO
 
-        uint256 balance = IToken(olas).balanceOf(multisig);
-
-        if (balance > 0) {
-            multisig.execute(transfer(olas), collector, balance);
-        }
+//        uint256 reward = IStaking(stakingProxy).claim(serviceId);
+//        if (reward > 0) {
+//            activityNonce++;
+//        }
+//
+//        uint256 balance = IToken(olas).balanceOf(multisig);
+//
+//        if (balance > 0) {
+//            multisig.execute(transfer(olas), collector, balance);
+//        }
     }
 }

@@ -346,6 +346,9 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         emit WithdrawRequestInitiated(msg.sender, requestId, stAmount, olasAmount, withdrawTime);
     }
 
+    /// @dev Finalizes withdraw requests.
+    /// @param requestIds Withdraw request Ids.
+    /// @param amounts Token amounts corresponding to request Ids.
     function finalizeWithdrawRequests(uint256[] memory requestIds, uint256[] memory amounts) external {
         // Update reserves
         _updateReserves(0);
@@ -398,14 +401,20 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         IToken(olas).transfer(msg.sender, totalAmount);
     }
 
-    function getStAmount(uint256 olasAmount) external view returns (uint256 stAmount) {
+    /// @dev Gets stOLAS amount from provided OLAS amount.
+    /// @param olasAmount OLAS amount.
+    /// @return stOLAS amount.
+    function getStAmount(uint256 olasAmount) external view returns (uint256) {
         // TODO MulDiv?
-        stAmount = (olasAmount * stakedBalance) / totalReserves;
+        return (olasAmount * stakedBalance) / totalReserves;
     }
 
-    function getOlasAmount(uint256 stAmount) public view returns (uint256 olasAmount) {
+    /// @dev Gets OLAS amount from provided stOLAS amount.
+    /// @param stAmount stOLAS amount.
+    /// @return OLAS amount.
+    function getOlasAmount(uint256 stAmount) public view returns (uint256) {
         // TODO MulDiv? Rounding down to zero?
-        olasAmount = (stAmount * totalReserves) / stakedBalance;
+        return (stAmount * totalReserves) / stakedBalance;
     }
 
     function getWithdrawRequestId(uint256 requestId, uint256 withdrawTime) external pure returns (uint256) {
