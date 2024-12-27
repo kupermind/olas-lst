@@ -5,14 +5,24 @@ import {IToken} from "../interfaces/IToken.sol";
 import "hardhat/console.sol";
 
 interface IDepositProcessor {
+    // TODO remove later
     /// @dev Sends a single message to the L2 side via a corresponding bridge.
     /// @param target Staking target addresses.
     /// @param stakingShare Corresponding staking amount.
     /// @param bridgePayload Bridge payload necessary (if required) for a specific bridge relayer.
     /// @param transferAmount Actual OLAS amount to be transferred.
-    /// @param operatrion Operation type: stake / unstake
+    /// @param operation Funds operation: stake / unstake.
     function sendMessage(address target, uint256 stakingShare, bytes memory bridgePayload, uint256 transferAmount,
         bytes32 operation) external payable;
+
+    /// @dev Sends a batch message to the L2 side via a corresponding bridge.
+    /// @param targets Set of staking target addresses.
+    /// @param stakingShares Corresponding set of staking amounts.
+    /// @param bridgePayload Bridge payload necessary (if required) for a specific bridge relayer.
+    /// @param transferAmount Actual total OLAS amount across all the targets to be transferred.
+    /// @param operation Funds operation: stake / unstake.
+    function sendMessageBatch(address[] memory targets, uint256[] memory stakingShares, bytes memory bridgePayload,
+        uint256 transferAmount, bytes32 operation) external payable;
 }
 
 interface ITreasury {
@@ -237,6 +247,8 @@ contract Depository {
                 revert ZeroValue();
             }
 
+            // TODO Check supplies overflow
+
             // Check for zero address
             if (stakingProxies[i] == address(0)) {
                 revert ZeroAddress();
@@ -256,7 +268,7 @@ contract Depository {
             }
 
             // Set supply and activate
-            stakingModel.supply = supplies[i];
+            stakingModel.supply = uint96(supplies[i]);
             stakingModel.active = true;
 
             // Add into global staking model set
@@ -356,7 +368,7 @@ contract Depository {
         uint256[] memory chainIds,
         address[][] memory stakingProxies,
         bytes[] memory bridgePayloads,
-        uint256[] values
+        uint256[] memory values
     ) external payable returns (uint256[][] memory amounts) {
         // Allocate arrays of max possible size
         amounts = new uint256[][](chainIds.length);
@@ -395,7 +407,7 @@ contract Depository {
                     amounts[i][j] = unstakeAmount;
                     olasAmount += unstakeAmount;
                     unstakeAmount = 0;
-                    mapStakingModels[stakingModelId].remainder += stakingModel.remainder + unstakeAmount;
+                    mapStakingModels[stakingModelId].remainder += stakingModel.remainder + uint96(unstakeAmount);
                     break;
                 }
             }
@@ -409,7 +421,7 @@ contract Depository {
             IToken(olas).approve(depositProcessor, olasAmount);
 
             // Transfer OLAS to its corresponding Staker on L2
-            IDepositProcessor(depositProcessor).sendMessage{value: values[i]}(stakingProxies[i], amounts[i],
+            IDepositProcessor(depositProcessor).sendMessageBatch{value: values[i]}(stakingProxies[i], amounts[i],
                 bridgePayloads[i], totalAmount, UNSTAKE);
         }
 
@@ -427,7 +439,7 @@ contract Depository {
         return uint256(uint160(stakingProxy)) | (chainId << 160);
     }
 
-    function getChainIdAndStakingProxy(uint256 stakingModelId) external pure returns (uint256, uint256) {
+    function getChainIdAndStakingProxy(uint256 stakingModelId) external pure returns (uint256, address) {
         return ((stakingModelId >> 160), address(uint160(stakingModelId)));
     }
 }

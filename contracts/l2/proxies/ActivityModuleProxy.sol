@@ -43,17 +43,15 @@ contract ActivityModuleProxy {
         return IBeacon(getBeacon()).implementation();
     }
 
-    function getBeacon() public view returns (address) {
-        address beacon;
+    function getBeacon() public view returns (address beacon) {
         assembly {
-            let beacon := sload(BEACON_SLOT)
+            beacon := sload(BEACON_SLOT)
         }
-        return beacon;
     }
 
     /// @dev Delegatecall to all the incoming data.
     fallback() external payable {
-        address implementation = implementation();
+        address implementation = getImplementation();
 
         assembly {
             calldatacopy(0, 0, calldatasize())

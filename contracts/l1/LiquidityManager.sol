@@ -22,6 +22,11 @@ interface IToken {
     /// @param amount Amount to transfer to.
     /// @return True if the function execution is successful.
     function transferFrom(address from, address to, uint256 amount) external returns (bool);
+
+    /// @dev Gets the amount of tokens owned by a specified account.
+    /// @param account Account address.
+    /// @return Amount of tokens owned.
+    function balanceOf(address account) external view returns (uint256);
 }
 
 interface ITreasury {
@@ -102,8 +107,8 @@ contract LiquidityManager {
         uint256 olasBalance = IToken(olas).balanceOf(address(this));
         if (olasBalance > 0) {
             // Transfer OLAS for treasury
-            IToken.approve(treasury, olasBalance);
-            ITreasury.updateReserves(olasBalance);
+            IToken(olas).transfer(treasury, olasBalance);
+            ITreasury(treasury).updateReserves();
         }
     }
 
@@ -172,8 +177,9 @@ contract LiquidityManager {
 
         // Traverse to collect fees
         for (uint256 i = 0; i < positionIds.length; ++i) {
+            // TODO
             // Get position tokens
-            (uint256 token0, uint256 token1) = IUniswapV3().getTolens(positionIds[i]);
+            //(uint256 token0, uint256 token1) = IUniswapV3(uniV3PositionManager).getTokens(positionIds[i]);
 
             // TODO
             // Check current pool prices
@@ -206,7 +212,7 @@ contract LiquidityManager {
         _locked = 2;
 
         if (token == olas) {
-            revert;
+            revert();
         }
 
         // Check for ownership

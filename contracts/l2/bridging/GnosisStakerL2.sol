@@ -47,40 +47,6 @@ contract GnosisStakerL2 is DefaultStakerL2 {
         DefaultStakerL2(_olas, _proxyFactory, _l2TokenRelayer, _l2MessageRelayer, _l1DepositProcessor, _l1SourceChainId)
     {}
 
-    /// @inheritdoc DefaultStakerL2
-    function _sendMessage(
-        uint256 amount,
-        bytes memory bridgePayload,
-        bytes32 batchHash
-    ) internal override returns (uint256 sequence, uint256 leftovers) {
-        uint256 gasLimitMessage;
-
-        // Check for the bridge payload length
-        if (bridgePayload.length == BRIDGE_PAYLOAD_LENGTH) {
-            // Decode bridge payload
-            gasLimitMessage = abi.decode(bridgePayload, (uint256));
-
-            // Check the gas limit value for the maximum recommended one
-            if (gasLimitMessage > MAX_GAS_LIMIT) {
-                gasLimitMessage = MAX_GAS_LIMIT;
-            }
-        }
-
-        // Check the gas limit value for the minimum recommended one
-        if (gasLimitMessage < MIN_GAS_LIMIT) {
-            gasLimitMessage = MIN_GAS_LIMIT;
-        }
-
-        // Assemble AMB data payload
-        bytes memory data = abi.encodeWithSelector(RECEIVE_MESSAGE, abi.encode(amount, batchHash));
-
-        // Send message to L1
-        bytes32 iMsg = IBridge(l2MessageRelayer).requireToPassMessage(l1DepositProcessor, data, gasLimitMessage);
-        sequence = uint256(iMsg);
-
-        leftovers = msg.value;
-    }
-
     /// @dev Processes a message received from the AMB Contract Proxy (Home) contract.
     /// @param data Bytes message data sent from the AMB Contract Proxy (Home) contract.
     function receiveMessage(bytes memory data) external {

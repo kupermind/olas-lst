@@ -13,7 +13,7 @@ interface IDepository {
     /// @param values Value amounts for each bridge interaction, if applicable.
     /// @return amounts Corresponding OLAS amounts for each staking proxy.
     function processUnstake(uint256 unstakeAmount, uint256[] memory chainIds, address[][] memory stakingProxies,
-        bytes[] memory bridgePayloads, uint256[] values) external payable returns (uint256[][] memory amounts);
+        bytes[] memory bridgePayloads, uint256[] memory values) external payable returns (uint256[][] memory amounts);
 }
 
 interface ILock {
@@ -246,7 +246,7 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         uint256[] memory chainIds,
         address[][] memory stakingProxies,
         bytes[] memory bridgePayloads,
-        uint256[] values
+        uint256[] memory values
     ) internal {
         uint256 curStakedBalance = stakedBalance;
         if (curStakedBalance < unstakeAmount) {
@@ -276,7 +276,7 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         uint256[] memory chainIds,
         address[][] memory stakingProxies,
         bytes[] memory bridgePayloads,
-        uint256[] values
+        uint256[] memory values
     ) external payable {
         // Check for ownership
         if (msg.sender != owner) {
@@ -305,7 +305,7 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         uint256[] memory chainIds,
         address[][] memory stakingProxies,
         bytes[] memory bridgePayloads,
-        uint256[] values
+        uint256[] memory values
     ) external payable returns (uint256 requestId, uint256 olasAmount) {
         // Update reserves
         _updateReserves(0);

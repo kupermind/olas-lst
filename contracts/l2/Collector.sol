@@ -1,14 +1,36 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+interface IBridge {
+    function relayToL1(uint256 olasAmount) external payable;
+}
+
+// ERC20 token interface
+interface IToken {
+    /// @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
+    /// @param spender Account address that will be able to transfer tokens on behalf of the caller.
+    /// @param amount Token amount.
+    /// @return True if the function execution is successful.
+    function approve(address spender, uint256 amount) external returns (bool);
+}
+
 /// @dev Zero address.
 error ZeroAddress();
+
+/// @dev Zero value.
+error ZeroValue();
 
 /// @dev The contract is already initialized.
 error AlreadyInitialized();
 
+/// @dev Only `owner` has a privilege, but the `sender` was provided.
+/// @param sender Sender address.
+/// @param owner Required sender address as an owner.
+error OwnerOnly(address sender, address owner);
+
 /// @title Collector - Smart contract for collecting staking rewards
 contract Collector {
+    event ProtocolFactorUpdated(uint256 protocolFactor);
     event ActivityIncreased(uint256 activityChange);
 
     // Max protocol factor
@@ -26,7 +48,8 @@ contract Collector {
     // Owner address
     address public owner;
 
-    constructor(address _l2StakingProcessor) {
+    constructor(address _olas, address _l2StakingProcessor) {
+        olas = _olas;
         l2StakingProcessor = _l2StakingProcessor;
     }
 
@@ -41,7 +64,7 @@ contract Collector {
 
     /// @dev Changes protocol factor value.
     /// @param newProtocolFactor New lock factor value.
-    function changeLockFactor(address newProtocolFactor) external {
+    function changeLockFactor(uint256 newProtocolFactor) external {
         // Check for ownership
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);
@@ -53,7 +76,7 @@ contract Collector {
         }
 
         protocolFactor = newProtocolFactor;
-        emit LockFactorUpdated(newProtocolFactor);
+        emit ProtocolFactorUpdated(newProtocolFactor);
     }
     
     // TODO service to post info about incoming transfers on L1?
@@ -63,13 +86,14 @@ contract Collector {
         // Get current protocol balance
         uint256 curProtocolBalance = protocolBalance;
 
+        // TODO overflow check
         uint256 amount = olasBalance - curProtocolBalance;
         // Minimum balance is 1 OLAS
         if (amount < 1 ether) {
             revert ZeroValue();
         }
 
-        uint256 protocolAmount = (balance * protocolFactor) / MAX_PROTOCOL_FACTOR;
+        uint256 protocolAmount = (olasBalance * protocolFactor) / MAX_PROTOCOL_FACTOR;
         amount -= protocolAmount;
 
         // Update protocol balance

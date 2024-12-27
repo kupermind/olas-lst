@@ -5,7 +5,13 @@ import {IBridgeErrors} from "../../interfaces/IBridgeErrors.sol";
 
 // StakingManager interface
 interface IStakingManager {
-    function stake(address stakingProxy, uint256 olasAmount) external;
+    function stake(address[] memory stakingProxies, uint256[] memory amounts, uint256 totalAmount) external;
+
+    /// @dev Unstakes, if needed, and withdraws specified amounts from specified staking contracts.
+    /// @notice Unstakes services if needed to satisfy withdraw requests.
+    ///         Call this to unstake definitely terminated staking contracts - deactivated on L1 and / or ran out of funds.
+    ///         The majority of discovered chains does not need any value to process token bridge transfer.
+    function unstake(address[] memory stakingProxies, uint256[] memory amounts) external;
 }
 
 // Necessary ERC20 token interface
@@ -178,7 +184,7 @@ abstract contract DefaultStakerL2 is IBridgeErrors {
                 emit StakingRequestQueued(queueHash, targets, amounts, batchHash, operation, olasBalance, paused);
             }
         } else if (operation == UNSTAKE){
-            IStakingManager(stakingManager).unstake(target, amount);
+            IStakingManager(stakingManager).unstake(targets, amounts);
         } else {
             // This must never happen
             revert();

@@ -19,8 +19,8 @@ interface IMultisig {
     function getOwners() external view returns (address[] memory);
 }
 
-interface ITokenRelayer {
-    function relayToL1(uint256 olasAmount) external payable;
+interface ICollector {
+    function relayTokens() external payable;
 }
 
 /// @dev Only `owner` has a privilege, but the `sender` was provided.
@@ -33,6 +33,9 @@ error ZeroAddress();
 
 /// @dev Zero value.
 error ZeroValue();
+
+/// @dev The contract is already initialized.
+error AlreadyInitialized();
 
 /// @dev Wrong length of two arrays.
 /// @param numValues1 Number of values in a first array.
@@ -448,7 +451,7 @@ contract StakingManager is ERC721TokenReceiver {
     /// @notice Unstakes services if needed to satisfy withdraw requests.
     ///         Call this to unstake definitely terminated staking contracts - deactivated on L1 and / or ran out of funds.
     ///         The majority of discovered chains does not need any value to process token bridge transfer.
-    function unstake(address[] memory stakingProxies, uint256[] amounts) external virtual {
+    function unstake(address[] memory stakingProxies, uint256[] memory amounts) external virtual {
         // Reentrancy guard
         if (_locked > 1) {
             revert ReentrancyGuard();
@@ -482,7 +485,7 @@ contract StakingManager is ERC721TokenReceiver {
         // Send OLAS to collector to initiate L1 transfer for all the balances at this time
         IToken(olas).transfer(collector, totalAmount);
         // TODO: Make sure once again no value is needed to send tokens back
-        ICollector(collector).relayTokens(0);
+        ICollector(collector).relayTokens();
 
         _locked = 1;
     }
