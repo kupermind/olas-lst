@@ -73,7 +73,8 @@ contract StakingManager is ERC721TokenReceiver {
     event Unstake(address indexed sender, address indexed stakingProxy, uint256 indexed serviceId);
 
     // Safe module payload
-    bytes public constant SAFE_MODULE_PAYLOAD = 0xfe51f64300000000000000000000000029fcb43b46531bca003ddc8fcb67ffe91900c762;
+    // encodeWithSignature("setupToL2(address)", (0x29fcb43b46531bca003ddc8fcb67ffe91900c762))
+    bytes public constant SAFE_MODULE_PAYLOAD = "0xfe51f64300000000000000000000000029fcb43b46531bca003ddc8fcb67ffe91900c762";
     // Number of agent instances
     uint256 public constant NUM_AGENT_INSTANCES = 1;
     // Threshold
@@ -408,7 +409,6 @@ contract StakingManager is ERC721TokenReceiver {
             // TODO How many stakes are needed?
 
             uint256 balance = mapStakingProxyBalances[stakingProxies[i]];
-            uint256 lastBalance = balance;
             uint256 minStakingDeposit = IStaking(stakingProxies[i]).minStakingDeposit();
             uint256 stakeDeposit = minStakingDeposit * (1 + NUM_AGENT_INSTANCES);
 

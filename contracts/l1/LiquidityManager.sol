@@ -224,7 +224,7 @@ contract LiquidityManager {
         if (tokenBalance > 0) {
             // TODO Check result?
             // Transfer tokens
-            IToken.transfer(to, tokenBalance);
+            IToken(token).transfer(to, tokenBalance);
         }
 
         _locked = 1;

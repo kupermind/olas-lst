@@ -50,12 +50,12 @@ error Overflow(uint256 provided, uint256 max);
 contract Treasury is ERC1155, ERC1155TokenReceiver {
     event ImplementationUpdated(address indexed implementation);
     event OwnerUpdated(address indexed owner);
-    event TotalReservesUpdated(uint256 stakedBalance, uint256 totalReserves);
+    event TotalReservesUpdated(uint256 stakedBalance, uint256 vaultBalance, uint256 totalReserves);
     event LockFactorUpdated(uint256 lockFactor);
     event Locked(address indexed account, uint256 olasAmount, uint256 lockAmount, uint256 vaultBalance);
     event WithdrawRequestInitiated(address indexed requester, uint256 indexed requestId, uint256 stAmount,
         uint256 olasAmount, uint256 withdrawTime);
-    event WithdrawRequestExecuted(uint256 indexed requestId);
+    event WithdrawRequestExecuted(uint256 requestId, uint256 amount);
 
     // Code position in storage is keccak256("TREASURY_PROXY") = "0x9b3195704d7d8da1c9110d90b2bf37e7d1d93753debd922cc1f20df74288b870"
     bytes32 public constant TREASURY_PROXY = 0x9b3195704d7d8da1c9110d90b2bf37e7d1d93753debd922cc1f20df74288b870;
@@ -147,13 +147,13 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
 
     /// @dev Changes lock factor value.
     /// @param newLockFactor New lock factor value.
-    function changeLockFactor(address newLockFactor) external {
+    function changeLockFactor(uint256 newLockFactor) external {
         // Check for ownership
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);
         }
 
-        // Check for the zero address
+        // Check for zero value
         if (lockFactor == 0) {
             revert ZeroValue();
         }
@@ -222,7 +222,7 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         emit TotalReservesUpdated(curStakedBalance, curVaultBalance, curTotalReserves);
     }
 
-    function updateReserves() external returns (uint256) {
+    function updateReserves() external returns (uint256, uint256) {
         return _updateReserves(0);
     }
 
@@ -349,11 +349,16 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
     /// @dev Finalizes withdraw requests.
     /// @param requestIds Withdraw request Ids.
     /// @param amounts Token amounts corresponding to request Ids.
-    function finalizeWithdrawRequests(uint256[] memory requestIds, uint256[] memory amounts) external {
+    function finalizeWithdrawRequests(
+        uint256[] calldata requestIds,
+        uint256[] calldata amounts,
+        bytes calldata data
+    ) external {
         // Update reserves
         _updateReserves(0);
 
-        safeBatchTransferFrom(msg.sender, address(this), requestIds, amounts, "");
+        // TODO Check for empty data?
+        safeBatchTransferFrom(msg.sender, address(this), requestIds, amounts, data);
 
         uint256 totalAmount;
         // Traverse all withdraw requests
@@ -423,5 +428,9 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
 
     function getWithdrawIdAndTime(uint256 withdrawRequestId) external pure returns (uint256, uint256) {
         return ((withdrawRequestId & type(uint64).max), (withdrawRequestId >> 64));
+    }
+
+    function uri(uint256 id) public view virtual override returns (string memory) {
+        return "";
     }
 }

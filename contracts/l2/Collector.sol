@@ -12,6 +12,11 @@ interface IToken {
     /// @param amount Token amount.
     /// @return True if the function execution is successful.
     function approve(address spender, uint256 amount) external returns (bool);
+
+    /// @dev Gets the amount of tokens owned by a specified account.
+    /// @param account Account address.
+    /// @return Amount of tokens owned.
+    function balanceOf(address account) external view returns (uint256);
 }
 
 /// @dev Zero address.
@@ -70,7 +75,7 @@ contract Collector {
             revert OwnerOnly(msg.sender, owner);
         }
 
-        // Check for the zero address
+        // Check for zero value
         if (protocolFactor == 0) {
             revert ZeroValue();
         }

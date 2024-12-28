@@ -16,11 +16,6 @@ interface IStakingManager {
 
 // Necessary ERC20 token interface
 interface IToken {
-    /// @dev Gets the amount of tokens owned by a specified account.
-    /// @param account Account address.
-    /// @return Amount of tokens owned.
-    function balanceOf(address account) external view returns (uint256);
-
     /// @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
     /// @param spender Account address that will be able to transfer tokens on behalf of the caller.
     /// @param amount Token amount.
@@ -32,13 +27,25 @@ interface IToken {
     /// @param amount The amount to transfer.
     /// @return True if the function execution is successful.
     function transfer(address to, uint256 amount) external returns (bool);
+
+    /// @dev Transfers the token amount that was previously approved up until the maximum allowance.
+    /// @param from Account address to transfer from.
+    /// @param to Account address to transfer to.
+    /// @param amount Amount to transfer to.
+    /// @return True if the function execution is successful.
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+
+    /// @dev Gets the amount of tokens owned by a specified account.
+    /// @param account Account address.
+    /// @return Amount of tokens owned.
+    function balanceOf(address account) external view returns (uint256);
 }
 
 /// @title DefaultStakerL2 - Smart contract for processing tokens and data received on L2, and data sent back to L1.
 abstract contract DefaultStakerL2 is IBridgeErrors {
     event OwnerUpdated(address indexed owner);
     event FundsReceived(address indexed sender, uint256 value);
-    event StakingRequestExecuted(address targets, uint256[] amounts, bytes32 indexed batchHash);
+    event StakingRequestExecuted(address[] targets, uint256[] amounts, bytes32 indexed batchHash);
     event StakingRequestQueued(bytes32 indexed queueHash, address[] targets, uint256[] amounts,
         bytes32 indexed batchHash, bytes32 operation, uint256 olasBalance, uint256 paused);
     event MessagePosted(uint256 indexed sequence, address indexed messageSender, uint256 amount,
