@@ -211,6 +211,7 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
 
         // Lock required amounts if balances changed positively
         if (curVaultBalance > prevVaultBalance) {
+            // TODO lock amount will be charged at the beginning
             uint256 lockRemainder = _increaseLock(curVaultBalance - prevVaultBalance);
             curVaultBalance = prevVaultBalance + lockRemainder;
         }
@@ -393,6 +394,8 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         if (totalAmount > curVaultBalance) {
             revert Overflow(totalAmount, curVaultBalance);
         }
+
+        // TODO curVaultBalance must always be >= totalAmount
 
         // Adjust vault balances directly to avoid calling updateReserves()
         curVaultBalance -= totalAmount;
