@@ -89,8 +89,9 @@ abstract contract DefaultStakerL2 is IBridgeErrors {
     address public owner;
     // Pause switcher
     uint8 public paused;
+    // TODO change to transient bool
     // Reentrancy lock
-    uint8 internal _locked;
+    uint256 internal _locked;
 
     // Processed batch hashes
     mapping(bytes32 => bool) public processedHashes;

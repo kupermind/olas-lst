@@ -22,6 +22,25 @@ interface ILock {
     function increaseLock(uint256 olasAmount) external;
 }
 
+interface IST {
+    /// @dev Deposits OLAS in exchange for stOLAS tokens.
+    /// @param assets OLAS amount.
+    /// @param receiver Receiver account address.
+    /// @return shares stOLAS amount.
+    function deposit(uint256 assets, address receiver) external returns (uint256 shares);
+
+    /// @dev Redeems OLAS in exchange for stOLAS tokens.
+    /// @param shares stOLAS amount.
+    /// @param receiver Receiver account address.
+    /// @param owner Token owner account address.
+    /// @return assets OLAS amount.
+    function redeem(uint256 shares, address receiver, address owner) external returns (uint256 assets);
+
+    function updateTotalAssets(int256 olasAmount) external;
+
+    function vaultBalance() external returns(uint256);
+}
+
 /// @dev Only `owner` has a privilege, but the `sender` was provided.
 /// @param sender Sender address.
 /// @param owner Required sender address as an owner.
@@ -50,7 +69,6 @@ error Overflow(uint256 provided, uint256 max);
 contract Treasury is ERC1155, ERC1155TokenReceiver {
     event ImplementationUpdated(address indexed implementation);
     event OwnerUpdated(address indexed owner);
-    event TotalReservesUpdated(uint256 stakedBalance, uint256 vaultBalance, uint256 totalReserves);
     event LockFactorUpdated(uint256 lockFactor);
     event Locked(address indexed account, uint256 olasAmount, uint256 lockAmount, uint256 vaultBalance);
     event WithdrawRequestInitiated(address indexed requester, uint256 indexed requestId, uint256 stAmount,
@@ -67,12 +85,6 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
     address public immutable st;
     address public immutable lock;
 
-    // Staked balance
-    uint256 public stakedBalance;
-    // Vault balance
-    uint256 public vaultBalance;
-    // Total OLAS reserves that include staked and vault balance
-    uint256 public totalReserves;
     // Lock factor in 10_000 value
     uint256 public lockFactor;
     // Total withdraw amount requested
@@ -168,20 +180,14 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
             revert DepositoryOnly(msg.sender, depository);
         }
 
-        // Get staked OLAS balance
-        uint256 curStakedBalance = stakedBalance;
+        // Lock OLAS for veOLAS
+        uint256 olasAmountAfterLock = _increaseLock(olasAmount);
 
-        // Adjust staked balance
-        curStakedBalance += olasAmount;
-        stakedBalance = curStakedBalance;
+        // Update stOLAS total assets
+        IST(st).updateTotalAssets(int256(olasAmountAfterLock));
 
-        (, uint256 curTotalReserves) = _updateReserves(curStakedBalance);
-
-        // Get stOLAS amount from the provided OLAS amount
-        stAmount = (olasAmount * curTotalReserves) / curStakedBalance;
-
-        // Mint stOLAS
-        IToken(st).mint(account, stAmount);
+        // mint stOLAS
+        stAmount = IST(st).deposit(olasAmountAfterLock, account);
     }
 
     function _increaseLock(uint256 olasAmount) internal returns (uint256 remainder) {
@@ -198,42 +204,25 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         emit Locked(msg.sender, olasAmount, lockAmount, remainder);
     }
 
-    function _updateReserves(uint256 curStakedBalance)
-        internal returns (uint256 curVaultBalance, uint256 curTotalReserves) {
-        if (curStakedBalance == 0) {
-            curStakedBalance = stakedBalance;
-        }
-
-        // Get current vault balance
-        curVaultBalance = IToken(olas).balanceOf(address(this));
-        // Get previous vault balance
-        uint256 prevVaultBalance = vaultBalance;
-
-        // Lock required amounts if balances changed positively
-        if (curVaultBalance > prevVaultBalance) {
-            // TODO lock amount will be charged at the beginning
-            uint256 lockRemainder = _increaseLock(curVaultBalance - prevVaultBalance);
-            curVaultBalance = prevVaultBalance + lockRemainder;
-        }
-        vaultBalance = curVaultBalance;
-
-        curTotalReserves = curStakedBalance + curVaultBalance;
-        totalReserves = curTotalReserves;
-
-        emit TotalReservesUpdated(curStakedBalance, curVaultBalance, curTotalReserves);
-    }
-
-    function updateReserves() external returns (uint256, uint256) {
-        return _updateReserves(0);
-    }
-
-    /// @dev Deposits OLAS to treasury for vault and veOLAS lock.
+    /// @dev Deposits OLAS for Vault and veOLAS lock.
     /// @notice Tokens are taken from `msg.sender`'s balance.
     /// @param olasAmount OLAS amount.
     function depositAndLock(uint256 olasAmount) external {
+        if (olasAmount == 0) {
+            revert ZeroValue();
+        }
+
         IToken(olas).transferFrom(msg.sender, address(this), olasAmount);
 
-        _updateReserves(0);
+        // TODO Is this correctly accounted for staked balance? Or accident OLAS funds must be sent as just Vault amount?
+        // Get any other possible OLAS balance on Treasury account
+        olasAmount += IToken(olas).balanceOf(address(this)) - withdrawAmountRequested;
+
+        // Lock corresponding amounts and send everything else to Vault (stOLAS)
+        uint256 olasAmountAfterLock = _increaseLock(olasAmount);
+
+        // Update stOLAS total assets
+        IST(st).updateTotalAssets(int256(olasAmountAfterLock));
     }
 
     /// @dev Calculates amounts and initiates cross-chain unstake request from specified models.
@@ -249,17 +238,8 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         bytes[] memory bridgePayloads,
         uint256[] memory values
     ) internal {
-        uint256 curStakedBalance = stakedBalance;
-        if (curStakedBalance < unstakeAmount) {
-            revert Overflow(curStakedBalance, unstakeAmount);
-        }
-
-        // Update staked balance
-        curStakedBalance -= unstakeAmount;
-        stakedBalance = curStakedBalance;
-
-        // Update reserves
-        _updateReserves(curStakedBalance);
+        // Update stOLAS total assets
+        IST(st).updateTotalAssets(-int256(unstakeAmount));
 
         // Calculate OLAS amounts and initiate unstake messages to L2-s
         IDepository(depository).processUnstake(unstakeAmount, chainIds, stakingProxies, bridgePayloads, values);
@@ -284,9 +264,6 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
             revert OwnerOnly(msg.sender, owner);
         }
 
-        // Update reserves
-        _updateReserves(0);
-
         _unstake(unstakeAmount, chainIds, stakingProxies, bridgePayloads, values);
     }
 
@@ -308,9 +285,6 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         bytes[] memory bridgePayloads,
         uint256[] memory values
     ) external payable returns (uint256 requestId, uint256 olasAmount) {
-        // Update reserves
-        _updateReserves(0);
-
         // Get stOLAS
         IToken(st).transferFrom(msg.sender, address(this), stAmount);
 
@@ -325,14 +299,21 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         // requestId occupies first 64 bits, withdrawTime occupies next bits as they both fit well in uint256
         requestId |= withdrawTime << 64;
 
-        // Calculate OLAS amount
-        olasAmount = getOlasAmount(stAmount);
+        // Update stOLAS total assets
+        IST(st).updateTotalAssets(0);
+
+        // Redeem OLAS and burn stOLAS tokens
+        olasAmount = IST(st).redeem(stAmount, address(this), address(this));
+
         // Mint request tokens
         _mint(msg.sender, requestId, olasAmount, "");
 
+        // Update total withdraw amount requested
         uint256 curWithdrawAmountRequested = withdrawAmountRequested + olasAmount;
         withdrawAmountRequested = curWithdrawAmountRequested;
-        uint256 curVaultBalance = vaultBalance;
+
+        // Get current vault balance
+        uint256 curVaultBalance = IST(st).vaultBalance();
 
         // If withdraw amount is bigger than the current one, need to unstake
         if (curWithdrawAmountRequested > curVaultBalance) {
@@ -340,9 +321,6 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
 
             _unstake(withdrawDiff, chainIds, stakingProxies, bridgePayloads, values);
         }
-
-        // Burn stOLAS tokens
-        IToken(st).burn(stAmount);
 
         emit WithdrawRequestInitiated(msg.sender, requestId, stAmount, olasAmount, withdrawTime);
     }
@@ -355,9 +333,6 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         uint256[] calldata amounts,
         bytes calldata data
     ) external {
-        // Update reserves
-        _updateReserves(0);
-
         // TODO Check for empty data?
         safeBatchTransferFrom(msg.sender, address(this), requestIds, amounts, data);
 
@@ -389,40 +364,10 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         // Burn withdraw tokens
         _batchBurn(address(this), requestIds, amounts);
 
-        // Check underflows: this must never happen
-        uint256 curVaultBalance = vaultBalance;
-        if (totalAmount > curVaultBalance) {
-            revert Overflow(totalAmount, curVaultBalance);
-        }
-
-        // TODO curVaultBalance must always be >= totalAmount
-
-        // Adjust vault balances directly to avoid calling updateReserves()
-        curVaultBalance -= totalAmount;
-        vaultBalance = curVaultBalance;
-        // This is safa, as totalReserves is always >= vaultBalance
-        totalReserves -= totalAmount;
-
-        // Transfer total amount
+        // Transfer total amount of OLAS
         // The transfer overflow check is not needed since balances are in sync
-        // This fails here
+        // OLAS has been redeemed when withdraw request was posted
         IToken(olas).transfer(msg.sender, totalAmount);
-    }
-
-    /// @dev Gets stOLAS amount from provided OLAS amount.
-    /// @param olasAmount OLAS amount.
-    /// @return stOLAS amount.
-    function getStAmount(uint256 olasAmount) external view returns (uint256) {
-        // TODO MulDiv?
-        return (olasAmount * stakedBalance) / totalReserves;
-    }
-
-    /// @dev Gets OLAS amount from provided stOLAS amount.
-    /// @param stAmount stOLAS amount.
-    /// @return OLAS amount.
-    function getOlasAmount(uint256 stAmount) public view returns (uint256) {
-        // TODO MulDiv? Rounding down to zero?
-        return (stAmount * totalReserves) / stakedBalance;
     }
 
     function getWithdrawRequestId(uint256 requestId, uint256 withdrawTime) external pure returns (uint256) {
