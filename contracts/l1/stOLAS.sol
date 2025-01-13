@@ -106,7 +106,7 @@ contract stOLAS is ERC4626 {
 
         uint256 curStakedBalance = stakedBalance;
         if (assets < 0 && (int256(curStakedBalance) < -assets)) {
-            revert Overflow(curStakedBalance, uint256(-assets));
+            revert Overflow(uint256(-assets), curStakedBalance);
         }
 
         curStakedBalance = uint256(int256(curStakedBalance) + assets);
