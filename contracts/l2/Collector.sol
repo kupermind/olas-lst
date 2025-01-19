@@ -13,6 +13,13 @@ interface IToken {
     /// @return True if the function execution is successful.
     function approve(address spender, uint256 amount) external returns (bool);
 
+    /// @dev Transfers the token amount that was previously approved up until the maximum allowance.
+    /// @param from Account address to transfer from.
+    /// @param to Account address to transfer to.
+    /// @param amount Amount to transfer to.
+    /// @return True if the function execution is successful.
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+
     /// @dev Gets the amount of tokens owned by a specified account.
     /// @param account Account address.
     /// @return Amount of tokens owned.
@@ -27,6 +34,11 @@ error ZeroValue();
 
 /// @dev The contract is already initialized.
 error AlreadyInitialized();
+
+/// @dev Value overflow.
+/// @param provided Overflow value.
+/// @param max Maximum possible value.
+error Overflow(uint256 provided, uint256 max);
 
 /// @dev Only `owner` has a privilege, but the `sender` was provided.
 /// @param sender Sender address.
@@ -83,15 +95,18 @@ contract Collector {
         protocolFactor = newProtocolFactor;
         emit ProtocolFactorUpdated(newProtocolFactor);
     }
-    
-    // TODO service to post info about incoming transfers on L1?
-    function relayTokens() external payable {
+
+    function relayRewardTokens() external payable {
         // Get OLAS balance
         uint256 olasBalance = IToken(olas).balanceOf(address(this));
         // Get current protocol balance
         uint256 curProtocolBalance = protocolBalance;
 
-        // TODO overflow check
+        // Overflow check: this must never happen, as protocol balance is included in total OLAS balance
+        if (olasBalance < curProtocolBalance) {
+            revert Overflow(olasBalance, curProtocolBalance);
+        }
+
         uint256 amount = olasBalance - curProtocolBalance;
         // Minimum balance is 1 OLAS
         if (amount < 1 ether) {
@@ -108,6 +123,21 @@ contract Collector {
         // Approve tokens
         IToken(olas).approve(l2StakingProcessor, amount);
 
+        // TODO Check on relays, but the majority of them does not require value
+        // TODO: Make sure once again no value is needed to send tokens back
+        // Send tokens to L1
+        IBridge(l2StakingProcessor).relayToL1{value: msg.value}(amount);
+    }
+
+    function relayStakedTokens(uint256 amount) external payable {
+        // Get tokens
+        IToken(olas).transferFrom(msg.sender, address(this), amount);
+
+        // Approve tokens
+        IToken(olas).approve(l2StakingProcessor, amount);
+
+        // TODO Check on relays, but the majority of them does not require value
+        // Send tokens to L1
         IBridge(l2StakingProcessor).relayToL1{value: msg.value}(amount);
     }
 }

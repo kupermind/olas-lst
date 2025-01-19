@@ -77,6 +77,7 @@ struct StakingModel {
 contract Depository {
     event ImplementationUpdated(address indexed implementation);
     event OwnerUpdated(address indexed owner);
+    event TreasuryUpdated(address indexed treasury);
     event SetDepositProcessorChainIds(address[] depositProcessors, uint256[] chainIds);
     event SetGuardianServiceStatuses(address[] guardianServices, bool[] statuses);
     event StakingModelsActivated(uint256[] chainIds, address[] stakingProxies, uint256[] supplies);
@@ -91,9 +92,8 @@ contract Depository {
     bytes32 public constant UNSTAKE = 0x8ca9a95e41b5eece253c93f5b31eed1253aed6b145d8a6e14d913fdf8e732293;
 
     address public immutable olas;
-    address public immutable st;
-    address public immutable treasury;
 
+    address public treasury;
     address public owner;
 
     uint256 internal _nonce;
@@ -106,15 +106,14 @@ contract Depository {
     uint256[] public setStakingModelIds;
 
     // TODO change to initialize in prod
-    constructor(address _olas, address _st, address _treasury) {
+    constructor(address _olas, address _treasury) {
         olas = _olas;
-        st = _st;
         treasury = _treasury;
 
         owner = msg.sender;
     }
 
-    /// @dev Contributors initializer.
+    /// @dev Depository initializer.
     function initialize() external{
         // Check for already initialized
         if (owner != address(0)) {
@@ -160,6 +159,23 @@ contract Depository {
 
         owner = newOwner;
         emit OwnerUpdated(newOwner);
+    }
+
+    /// @dev Changes Treasury contract address.
+    /// @param newTreasury Address of a new treasury.
+    function changeTreasury(address newTreasury) external {
+        // Check for ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
+        }
+
+        // Check for zero address
+        if (newTreasury == address(0)) {
+            revert ZeroAddress();
+        }
+
+        treasury = newTreasury;
+        emit TreasuryUpdated(newTreasury);
     }
 
     /// @dev Sets guardian service multisig statues.

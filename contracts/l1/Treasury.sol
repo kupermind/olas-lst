@@ -84,6 +84,8 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
     address public immutable ve;
     address public immutable st;
     address public immutable lock;
+    // Depository address
+    address public immutable depository;
 
     // Lock factor in 10_000 value
     uint256 public lockFactor;
@@ -93,16 +95,15 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
     uint256 public withdrawDelay;
     // Number of withdraw requests
     uint256 public numWithdrawRequests;
-    // Depository address
-    address public depository;
     // Contract owner
     address public owner;
 
     // TODO change to initialize in prod
-    constructor(address _olas, address _ve, address _st, address _lock, uint256 _lockFactor) {
+    constructor(address _olas, address _ve, address _st, address _depository, address _lock, uint256 _lockFactor) {
         olas = _olas;
         ve = _ve;
         st = _st;
+        depository = _depository;
         lock = _lock;
         _lockFactor;
 

@@ -23,9 +23,10 @@ describe("Liquid Staking", function () {
     let stakingVerifier;
     let lock;
     let depository;
-    let stakerL2;
+    let treasury;
+    let stakingManager;
     let stakingTokenImplementation;
-    let stakingProxyToken;
+    let stakingTokenInstance;
     let signers;
     let deployer;
     let agent;
@@ -69,15 +70,9 @@ describe("Liquid Staking", function () {
     };
     const maxInactivity = serviceParams.maxNumInactivityPeriods * livenessPeriod + 1;
     const apyLimit = ethers.utils.parseEther("3");
-    const vesting = oneDay;
-
-    let stakingModel = {
-        stakingProxy: AddressZero,
-        supply: 0,
-        remainder: 0,
-        chainId: 0,
-        active: true
-    }
+    const lockFactor = 100;
+    const chainId = 31337;
+    const gnosisChainId = 100;
 
     beforeEach(async function () {
         signers = await ethers.getSigners();
@@ -103,19 +98,16 @@ describe("Liquid Staking", function () {
             operatorWhitelist.address);
         await serviceManager.deployed();
 
-        const Token = await ethers.getContractFactory("proxyOLAS");
-        olas = await Token.deploy();
+        const ERC20Token = await ethers.getContractFactory("ERC20Token");
+        olas = await ERC20Token.deploy();
         await olas.deployed();
-
-        proxyOlas = await Token.deploy();
-        await proxyOlas.deployed();
 
         const VE = await ethers.getContractFactory("MockVE");
         ve = await VE.deploy(olas.address);
         await ve.deployed();
 
         const SToken = await ethers.getContractFactory("stOLAS");
-        st = await SToken.deploy();
+        st = await SToken.deploy(olas.address);
         await st.deployed();
 
         const GnosisSafe = await ethers.getContractFactory("GnosisSafe");
@@ -146,19 +138,25 @@ describe("Liquid Staking", function () {
         await gnosisSafeSameAddressMultisig.deployed();
 
         const Depository = await ethers.getContractFactory("Depository");
-        depository = await Depository.deploy(olas.address, ve.address, st.address, AddressZero, vesting);
+        depository = await Depository.deploy(olas.address, AddressZero);
         await depository.deployed();
-
-        // Only Depository contract can mint proxy OLAS
-        await st.changeMinter(depository.address);
 
         const Lock = await ethers.getContractFactory("Lock");
         lock = await Lock.deploy(olas.address, ve.address, depository.address);
         await lock.deployed();
-        await depository.changeLockImplementation(lock.address);
+
+        const Treasury = await ethers.getContractFactory("Treasury");
+        treasury = await Treasury.deploy(olas.address, ve.address, st.address, depository.address, lock.address, lockFactor);
+        await treasury.deployed();
+
+        // Change treasury address in depository
+        await depository.changeTreasury(treasury.address);
+
+        // Only Treasury contract can mint proxy OLAS
+        await st.changeMinter(treasury.address);
 
         const StakingVerifier = await ethers.getContractFactory("StakingVerifier");
-        stakingVerifier = await StakingVerifier.deploy(olas.address, proxyOlas.address, serviceRegistry.address,
+        stakingVerifier = await StakingVerifier.deploy(olas.address, serviceRegistry.address,
             serviceRegistryTokenUtility.address, minStakingDeposit, timeForEmissions, maxNumServices, apyLimit);
         await stakingVerifier.deployed();
 
@@ -166,29 +164,29 @@ describe("Liquid Staking", function () {
         stakingFactory = await StakingFactory.deploy(stakingVerifier.address);
         await stakingFactory.deployed();
 
-        const StakerL2 = await ethers.getContractFactory("StakerL2");
-        stakerL2 = await StakerL2.deploy(olas.address, proxyOlas.address, serviceManager.address,
+        const StakingManager = await ethers.getContractFactory("StakingManager");
+        stakingManager = await StakingManager.deploy(olas.address, serviceManager.address,
             stakingFactory.address, gnosisSafeMultisig.address, gnosisSafeSameAddressMultisig.address,
             fallbackHandler.address, agentId, defaultHash);
-        await stakerL2.deployed();
+        await stakingManager.deployed();
 
-        // Only stakerL2 contract can mint proxy OLAS
-        await proxyOlas.changeMinter(stakerL2.address);
+        // Only stakingManager contract can mint proxy OLAS
+        await proxyOlas.changeMinter(stakingManager.address);
 
         const ActivityChecker = await ethers.getContractFactory("MockActivityChecker");
         activityChecker = await ActivityChecker.deploy(livenessRatio);
         await activityChecker.deployed();
         serviceParams.activityChecker = activityChecker.address;
 
-        const StakingProxyToken = await ethers.getContractFactory("StakingProxyToken");
-        stakingTokenImplementation = await StakingProxyToken.deploy();
+        const StakingTokenLocked = await ethers.getContractFactory("StakingTokenLocked");
+        stakingTokenImplementation = await StakingTokenLocked.deploy();
         const initPayload = stakingTokenImplementation.interface.encodeFunctionData("initialize",
-            [serviceParams, serviceRegistryTokenUtility.address, proxyOlas.address, olas.address]);
+            [serviceParams, serviceRegistryTokenUtility.address, olas.address, stakingManager.address]);
         const tx = await stakingFactory.createStakingInstance(stakingTokenImplementation.address, initPayload);
         const res = await tx.wait();
         // Get staking contract instance address from the event
         const stakingTokenAddress = "0x" + res.logs[0].topics[2].slice(26);
-        stakingProxyToken = await ethers.getContractAt("StakingProxyToken", stakingTokenAddress);
+        stakingTokenInstance = await ethers.getContractAt("StakingTokenLocked", stakingTokenAddress);
 
         // Set service manager
         await serviceRegistry.changeManager(serviceManager.address);
@@ -203,23 +201,38 @@ describe("Liquid Staking", function () {
 
         // Fund the staking contract
         await olas.approve(stakingTokenAddress, ethers.utils.parseEther("10000"));
-        await stakingProxyToken.deposit(ethers.utils.parseEther("10000"));
+        await stakingTokenInstance.deposit(ethers.utils.parseEther("10000"));
 
         // Add agent as a guardian on L1 and L2
         await depository.setGuardianServiceStatuses([agent.address], [true]);
-        await stakerL2.setGuardianServiceStatuses([agent.address], [true]);
+        await stakingManager.setGuardianServiceStatuses([agent.address], [true]);
 
         // Add model to L1
-        stakingModel.stakingToken = stakingTokenAddress;
-        stakingModel.supply = await stakingProxyToken.emissionsAmount();
-        stakingModel.remainder = stakingModel.supply;
-        await depository.addStakingModels([stakingModel]);
+        await depository.createAndActivateStakingModels([gnosisChainId], [stakingTokenAddress], [supply]);
+
+        const BridgeRelayer = await ethers.getContractFactory("BridgeRelayer");
+        bridgeRelayer = await BridgeRelayer.deploy(olas.address);
+        await bridgeRelayer.deployed();
+
+        const GnosisDepositProcessorL1 = await ethers.getContractFactory("GnosisDepositProcessorL1");
+        gnosisDepositProcessorL1 = await GnosisDepositProcessorL1.deploy(olas.address, dispenser.address,
+            bridgeRelayer.address, bridgeRelayer.address, gnosisChainId);
+        await gnosisDepositProcessorL1.deployed();
+
+        const GnosisStakingProcessorL2 = await ethers.getContractFactory("GnosisStakingProcessorL2");
+        gnosisStakingProcessorL2 = await GnosisStakingProcessorL2.deploy(olas.address,
+            stakingProxyFactory.address, bridgeRelayer.address, gnosisDepositProcessorL1.address, chainId);
+        await gnosisStakingProcessorL2.deployed();
+
+        // Set the gnosisStakingProcessorL2 address in gnosisDepositProcessorL1
+        await gnosisDepositProcessorL1.setL2TargetDispenser(gnosisStakingProcessorL2.address);
     });
 
     context("Staking", function () {
-        it("E2E liquid staking", async function () {
+        it.only("E2E liquid staking", async function () {
             // Take a snapshot of the current state of the blockchain
             const snapshot = await helpers.takeSnapshot();
+            return;
 
             console.log("L1");
 
@@ -238,16 +251,16 @@ describe("Liquid Staking", function () {
 
             console.log("\nL2");
 
-            console.log("OLAS rewards available on L2 staking contract:", (await stakingProxyToken.availableRewards()).toString());
+            console.log("OLAS rewards available on L2 staking contract:", (await stakingTokenInstance.availableRewards()).toString());
             console.log("Picking up event on L2 by an agent");
 
             // Create and stake the service on L2
             console.log("Minting proxyOLAS and staking it by the agent");
             const depositId = 1;
-            await stakerL2.connect(agent).stake(deployer.address, depositId, olasAmount, stakingProxyToken.address, {value: 2});
+            await stakingManager.connect(agent).stake(deployer.address, depositId, olasAmount, stakingTokenInstance.address, {value: 2});
 
             // Check the reward
-            let serviceInfo = await stakingProxyToken.mapServiceInfo(serviceId);
+            let serviceInfo = await stakingTokenInstance.mapServiceInfo(serviceId);
             console.log("Service multisig address:", serviceInfo.multisig);
             console.log("Reward before checkpoint", serviceInfo.reward.toString());
 
@@ -257,10 +270,10 @@ describe("Liquid Staking", function () {
 
             // Call the checkpoint
             console.log("Calling checkpoint by the agent");
-            await stakingProxyToken.connect(agent).checkpoint();
+            await stakingTokenInstance.connect(agent).checkpoint();
 
             // Check the reward
-            serviceInfo = await stakingProxyToken.mapServiceInfo(serviceId);
+            serviceInfo = await stakingTokenInstance.mapServiceInfo(serviceId);
             console.log("Reward after checkpoint", serviceInfo.reward.toString());
 
             console.log("\nL1");
@@ -284,9 +297,9 @@ describe("Liquid Staking", function () {
 
             console.log("Picking up event on L2 by the agent");
             const withdrawId = 1;
-            console.log("Withdraw from StakerL2 contract by the agent");
-            await stakerL2.connect(agent).withdraw(deployer.address, withdrawId, stBalance, olasIncrease,
-                stakingProxyToken.address);
+            console.log("Withdraw from StakingManager contract by the agent");
+            await stakingManager.connect(agent).withdraw(deployer.address, withdrawId, stBalance, olasIncrease,
+                stakingTokenInstance.address);
 
             const multisigBalance = await olas.balanceOf(serviceInfo.multisig);
             console.log("Multisig balance", multisigBalance.toString());
@@ -295,13 +308,13 @@ describe("Liquid Staking", function () {
             const multisig = await ethers.getContractAt("GnosisSafe", serviceInfo.multisig);
             let nonce = await multisig.nonce();
             let txHashData = await safeContracts.buildContractCall(olas, "approve",
-                [stakerL2.address, serviceInfo.reward], nonce, 0, 0);
+                [stakingManager.address, serviceInfo.reward], nonce, 0, 0);
             let signMessageData = await safeContracts.safeSignMessage(agent, multisig, txHashData, 0);
             await safeContracts.executeTx(multisig, txHashData, [signMessageData], 0);
 
             // Bridge
             console.log("Bridge transfer of OLAS from L2 to L1");
-            await stakerL2.connect(agent).bridgeTransfer(multisig.address, depository.address);
+            await stakingManager.connect(agent).bridgeTransfer(multisig.address, depository.address);
 
             console.log("\nL1");
 

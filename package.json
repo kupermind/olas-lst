@@ -32,13 +32,14 @@
     "eslint": "^8.57.0",
     "solhint": "^5.0.3",
     "ethers": "^5.7.2",
-    "hardhat": "^2.22.15",
+    "hardhat": "^2.22.18",
     "hardhat-contract-sizer": "^2.10.0",
     "hardhat-deploy": "^0.12.1",
     "hardhat-deploy-ethers": "^0.4.1",
     "hardhat-gas-reporter": "^1.0.10",
     "hardhat-tracer": "^2.8.1",
-    "solidity-coverage": "^0.8.13"
+    "solidity-coverage": "^0.8.13",
+    "solidity-docgen": "^0.6.0-beta.36"
   },
   "dependencies": {
     "@anders-t/ethers-ledger": "^1.0.4",

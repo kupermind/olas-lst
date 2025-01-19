@@ -20,7 +20,7 @@ interface IMultisig {
 }
 
 interface ICollector {
-    function relayTokens() external payable;
+    function relayStakedTokens(uint256 amount) external payable;
 }
 
 /// @dev Only `owner` has a privilege, but the `sender` was provided.
@@ -276,7 +276,7 @@ contract StakingManager is ERC721TokenReceiver {
         address[] memory instances = new address[](NUM_AGENT_INSTANCES);
 
         // Create activity module proxy
-        ActivityModuleProxy activityModuleProxy = new ActivityModuleProxy(olas, beacon);
+        ActivityModuleProxy activityModuleProxy = new ActivityModuleProxy(beacon);
         // Assign address as agent instance
         activityModule = address(activityModuleProxy);
         instances[0] = activityModule;
@@ -403,7 +403,7 @@ contract StakingManager is ERC721TokenReceiver {
 
         for (uint256 i = 0; i < stakingProxies.length; ++i) {
             // TODO: check that stakingProxy is able to host another service
-            if (!isAbleStake(stakingProxies[i], amounts[i])) {
+            if (!isAbleStake(stakingProxies[i])) {
                 revert();
             }
 
@@ -472,7 +472,8 @@ contract StakingManager is ERC721TokenReceiver {
             if (balance > amounts[i]) {
                 balance -= amounts[i];
             } else {
-                if (!isAbleWithdraw(stakingProxies[i], amounts[i])) {
+                // This must never happen
+                if (!isAbleWithdraw(stakingProxies[i])) {
                     revert();
                 }
 
@@ -484,14 +485,13 @@ contract StakingManager is ERC721TokenReceiver {
         }
 
         // Send OLAS to collector to initiate L1 transfer for all the balances at this time
-        IToken(olas).transfer(collector, totalAmount);
-        // TODO: Make sure once again no value is needed to send tokens back
-        ICollector(collector).relayTokens();
+        IToken(olas).approve(collector, totalAmount);
+        ICollector(collector).relayStakedTokens(totalAmount);
 
         _locked = 1;
     }
 
-    function isAbleStake(address stakingProxy, uint256 olasAmount) public view returns (bool) {
+    function isAbleStake(address stakingProxy) public view returns (bool) {
         // Check for staking instance validity
         if(!IStaking(stakingFactory).verifyInstance(stakingProxy)) {
             revert WrongStakingInstance(stakingProxy);
@@ -513,7 +513,7 @@ contract StakingManager is ERC721TokenReceiver {
         return true;
     }
 
-    function isAbleWithdraw(address stakingProxy, uint256 olasAmount) public view returns (bool) {
+    function isAbleWithdraw(address stakingProxy) public view returns (bool) {
         uint256 numServices = mapStakedServiceIds[stakingProxy].length;
         if (numServices == 0) {
             revert ZeroValue();

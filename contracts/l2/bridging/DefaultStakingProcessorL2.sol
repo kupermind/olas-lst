@@ -41,8 +41,8 @@ interface IToken {
     function balanceOf(address account) external view returns (uint256);
 }
 
-/// @title DefaultStakerL2 - Smart contract for processing tokens and data received on L2, and data sent back to L1.
-abstract contract DefaultStakerL2 is IBridgeErrors {
+/// @title DefaultStakingProcessorL2 - Smart contract for processing tokens and data received on L2, and tokens sent back to L1.
+abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
     event OwnerUpdated(address indexed owner);
     event FundsReceived(address indexed sender, uint256 value);
     event StakingRequestExecuted(address[] targets, uint256[] amounts, bytes32 indexed batchHash);

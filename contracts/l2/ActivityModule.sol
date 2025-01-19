@@ -80,7 +80,11 @@ contract ActivityModule {
     // Staking proxy address
     address public stakingProxy;
 
-    constructor(address _collector) {
+    /// @dev ActivityModule constructor.
+    /// @param _olas OLAS address.
+    /// @param _collector Collector address.
+    constructor(address _olas, address _collector) {
+        olas = _olas;
         collector = _collector;
     }
 
@@ -133,7 +137,7 @@ contract ActivityModule {
     }
 
     function claim() external {
-        // TODO What to do for the first action?
+        // TODO What to do for the first action or activity in general?
         if (activityNonce == 0) {
             activityNonce = 1;
         }
