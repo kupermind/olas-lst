@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import {ERC1155, ERC1155TokenReceiver} from "../../lib/autonolas-registries/lib/solmate/src/tokens/ERC1155.sol";
 import {IToken} from "../interfaces/IToken.sol";
+import "hardhat/console.sol";
 
 interface IDepository {
     /// @dev Calculates amounts and initiates cross-chain unstake request from specified models.
@@ -105,7 +106,7 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         st = _st;
         depository = _depository;
         lock = _lock;
-        _lockFactor;
+        lockFactor = _lockFactor;
 
         owner = msg.sender;
     }
@@ -181,11 +182,18 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
             revert DepositoryOnly(msg.sender, depository);
         }
 
+        // Get OLAS
+        IToken(olas).transferFrom(msg.sender, address(this), olasAmount);
+
         // Lock OLAS for veOLAS
         uint256 olasAmountAfterLock = _increaseLock(olasAmount);
 
         // Update stOLAS total assets
         IST(st).updateTotalAssets(int256(olasAmountAfterLock));
+
+        // Approve tokens
+        IToken(olas).approve(st, olasAmountAfterLock);
+        console.log(olasAmountAfterLock);
 
         // mint stOLAS
         stAmount = IST(st).deposit(olasAmountAfterLock, account);

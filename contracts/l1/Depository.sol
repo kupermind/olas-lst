@@ -285,6 +285,7 @@ contract Depository {
 
             // Set supply and activate
             stakingModel.supply = uint96(supplies[i]);
+            stakingModel.remainder = uint96(supplies[i]);
             stakingModel.active = true;
 
             // Add into global staking model set

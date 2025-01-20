@@ -35,6 +35,7 @@ describe("Liquid Staking", function () {
     let agent;
     let agentInstances;
     let bytecodeHash;
+    let stakingModelId;
     const AddressZero = ethers.constants.AddressZero;
     const HashZero = ethers.constants.HashZero;
     const oneDay = 86400;
@@ -43,7 +44,6 @@ describe("Liquid Staking", function () {
     const regBond = regDeposit;
     const serviceId = 1;
     const agentId = 1;
-    const modelId = 0;
     const agentIds = [1];
     const agentParams = [[1, regBond]];
     const threshold = 1;
@@ -77,6 +77,7 @@ describe("Liquid Staking", function () {
     const chainId = 31337;
     const gnosisChainId = 100;
     const stakingSupply = ethers.utils.parseEther("10000");
+    const bridgePayload = "0x";
 
     beforeEach(async function () {
         signers = await ethers.getSigners();
@@ -150,12 +151,15 @@ describe("Liquid Staking", function () {
         await depository.deployed();
 
         const Lock = await ethers.getContractFactory("Lock");
-        lock = await Lock.deploy(olas.address, ve.address, depository.address);
+        lock = await Lock.deploy(olas.address, ve.address);
         await lock.deployed();
 
         const Treasury = await ethers.getContractFactory("Treasury");
         treasury = await Treasury.deploy(olas.address, ve.address, st.address, depository.address, lock.address, lockFactor);
         await treasury.deployed();
+
+        // Initialize lock
+        await lock.initialize(treasury.address, deployer.address);
 
         // Change treasury address in depository
         await depository.changeTreasury(treasury.address);
@@ -246,13 +250,15 @@ describe("Liquid Staking", function () {
 
         // Add model to L1
         await depository.createAndActivateStakingModels([gnosisChainId], [stakingTokenAddress], [stakingSupply]);
+
+        // Get staking model Id
+        stakingModelId = await depository.getStakingModelId(gnosisChainId, stakingTokenAddress);
     });
 
     context("Staking", function () {
         it.only("E2E liquid staking", async function () {
             // Take a snapshot of the current state of the blockchain
             const snapshot = await helpers.takeSnapshot();
-            return;
 
             console.log("L1");
 
@@ -265,9 +271,10 @@ describe("Liquid Staking", function () {
 
             // Stake OLAS on L1
             console.log("User deposits OLAS for stOLAS");
-            await depository.deposit(modelId, olasAmount);
+            await depository.deposit(stakingModelId, olasAmount, bridgePayload);
             let stBalance = await st.balanceOf(deployer.address);
             console.log("User stOLAS balance now:", stBalance.toString());
+            return;
 
             console.log("\nL2");
 

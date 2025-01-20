@@ -91,9 +91,9 @@ contract Lock {
     address public immutable ve;
     // OLAS address
     address public immutable olas;
-    // Treasury address
-    address public immutable treasury;
 
+    // Treasury address
+    address public treasury;
     // OLAS olasGovernor address
     address public olasGovernor;
     // Owner address
@@ -102,26 +102,32 @@ contract Lock {
     /// @dev Lock constructor.
     /// @param _olas OLAS address.
     /// @param _ve veOLAS address.
-    /// @param _treasury Treasury address.
-    constructor(address _olas, address _ve, address _treasury) {
-        // Check for the zero address
-        if (_olas == address(0) || _ve == address(0) || _treasury == address(0)) {
+    constructor(address _olas, address _ve) {
+        // Check for zero addresses
+        if (_olas == address(0) || _ve == address(0)) {
             revert ZeroAddress();
         }
 
         ve = _ve;
         olas = _olas;
-        treasury = _treasury;
     }
 
     /// @dev Lock initializer.
-    function initialize(address _olasGovernor) external{
+    /// @param _treasury Treasury address.
+    /// @param _olasGovernor OLAS governor address.
+    function initialize(address _treasury, address _olasGovernor) external{
         // Check for already initialized
         if (owner != address(0)) {
             revert AlreadyInitialized();
         }
 
+        // Check for zero addresses
+        if (_treasury == address(0) || _olasGovernor == address(0)) {
+            revert ZeroAddress();
+        }
+
         owner = msg.sender;
+        treasury = _treasury;
         olasGovernor = _olasGovernor;
     }
 
@@ -147,12 +153,6 @@ contract Lock {
         if (msg.sender != treasury) {
             revert TreasuryOnly(msg.sender, treasury);
         }
-
-        // Get OLAS from treasury
-        IToken(olas).transferFrom(msg.sender, address(this), olasAmount);
-
-        // Approve OLAS for veOLAS
-        IToken(olas).approve(ve, olasAmount);
 
         // Increase amount and unlock time to a maximum
         IVEOLAS(ve).increaseAmount(olasAmount);

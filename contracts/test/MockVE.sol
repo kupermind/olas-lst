@@ -24,6 +24,7 @@ contract MockVE {
     uint256 public supply = 100 ether;
     uint256 public weightedBalance = 10_000 ether;
     mapping(address => uint256) public accountWeightedBalances;
+    mapping(address => uint256) public accountLockTimes;
 
     constructor(address _olas) {
         olas = _olas;
@@ -33,6 +34,19 @@ contract MockVE {
     function createLock(uint256 amount, uint256) external {
         IToken(olas).transferFrom(msg.sender, address(this), amount);
         accountWeightedBalances[msg.sender] = amount;
+    }
+
+    /// @dev Deposits `amount` additional tokens for `msg.sender` without modifying the unlock time.
+    /// @param amount Amount of tokens to deposit and add to the lock.
+    function increaseAmount(uint256 amount) external {
+        IToken(olas).transferFrom(msg.sender, address(this), amount);
+        accountWeightedBalances[msg.sender] = amount;
+    }
+
+    /// @dev Extends the unlock time.
+    /// @param unlockTime New tokens unlock time.
+    function increaseUnlockTime(uint256 unlockTime) external {
+        accountLockTimes[msg.sender] = unlockTime;
     }
 
     /// @dev Simulates a lock for the specified account.
