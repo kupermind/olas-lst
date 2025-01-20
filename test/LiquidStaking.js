@@ -10,11 +10,11 @@ describe("Liquid Staking", function () {
     let operatorWhitelist;
     let serviceManager;
     let olas;
-    let proxyOlas;
     let ve;
     let st;
     let gnosisSafe;
     let gnosisSafeProxyFactory;
+    let safeModuleInitializer;
     let fallbackHandler;
     let gnosisSafeMultisig;
     let gnosisSafeSameAddressMultisig;
@@ -24,6 +24,9 @@ describe("Liquid Staking", function () {
     let lock;
     let depository;
     let treasury;
+    let collector;
+    let beacon;
+    let activityModule;
     let stakingManager;
     let stakingTokenImplementation;
     let stakingTokenInstance;
@@ -73,6 +76,7 @@ describe("Liquid Staking", function () {
     const lockFactor = 100;
     const chainId = 31337;
     const gnosisChainId = 100;
+    const stakingSupply = ethers.utils.parseEther("10000");
 
     beforeEach(async function () {
         signers = await ethers.getSigners();
@@ -117,6 +121,10 @@ describe("Liquid Staking", function () {
         const GnosisSafeProxyFactory = await ethers.getContractFactory("GnosisSafeProxyFactory");
         gnosisSafeProxyFactory = await GnosisSafeProxyFactory.deploy();
         await gnosisSafeProxyFactory.deployed();
+
+        const SafeToL2Setup = await ethers.getContractFactory("SafeToL2Setup");
+        safeModuleInitializer = await SafeToL2Setup.deploy();
+        await safeModuleInitializer.deployed();
 
         const FallbackHandler = await ethers.getContractFactory("DefaultCallbackHandler");
         fallbackHandler = await FallbackHandler.deploy();
@@ -164,14 +172,43 @@ describe("Liquid Staking", function () {
         stakingFactory = await StakingFactory.deploy(stakingVerifier.address);
         await stakingFactory.deployed();
 
+        const Collector = await ethers.getContractFactory("Collector");
+        collector = await Collector.deploy(olas.address, AddressZero);
+        await collector.deployed();
+
+        const ActivityModule = await ethers.getContractFactory("ActivityModule");
+        activityModule = await ActivityModule.deploy(olas.address, collector.address);
+        await activityModule.deployed();
+
+        const Beacon = await ethers.getContractFactory("Beacon");
+        beacon = await Beacon.deploy(activityModule.address);
+        await beacon.deployed();
+
         const StakingManager = await ethers.getContractFactory("StakingManager");
         stakingManager = await StakingManager.deploy(olas.address, serviceManager.address,
             stakingFactory.address, gnosisSafeMultisig.address, gnosisSafeSameAddressMultisig.address,
-            fallbackHandler.address, agentId, defaultHash);
+            beacon.address, safeModuleInitializer.address, fallbackHandler.address, collector.address, agentId, defaultHash);
         await stakingManager.deployed();
 
-        // Only stakingManager contract can mint proxy OLAS
-        await proxyOlas.changeMinter(stakingManager.address);
+        const BridgeRelayer = await ethers.getContractFactory("BridgeRelayer");
+        bridgeRelayer = await BridgeRelayer.deploy(olas.address);
+        await bridgeRelayer.deployed();
+
+        const GnosisDepositProcessorL1 = await ethers.getContractFactory("GnosisDepositProcessorL1");
+        gnosisDepositProcessorL1 = await GnosisDepositProcessorL1.deploy(olas.address, depository.address,
+            bridgeRelayer.address, bridgeRelayer.address, gnosisChainId);
+        await gnosisDepositProcessorL1.deployed();
+
+        const GnosisStakingProcessorL2 = await ethers.getContractFactory("GnosisStakingProcessorL2");
+        gnosisStakingProcessorL2 = await GnosisStakingProcessorL2.deploy(olas.address, stakingManager.address,
+            bridgeRelayer.address, bridgeRelayer.address, gnosisDepositProcessorL1.address, chainId);
+        await gnosisStakingProcessorL2.deployed();
+
+        // Change collector address
+        await collector.changeStakingProcessorL2(gnosisStakingProcessorL2.address);
+
+        // Set the gnosisStakingProcessorL2 address in gnosisDepositProcessorL1
+        await gnosisDepositProcessorL1.setL2StakingProcessor(gnosisStakingProcessorL2.address);
 
         const ActivityChecker = await ethers.getContractFactory("MockActivityChecker");
         activityChecker = await ActivityChecker.deploy(livenessRatio);
@@ -200,32 +237,15 @@ describe("Liquid Staking", function () {
         await olas.mint(deployer.address, initSupply);
 
         // Fund the staking contract
-        await olas.approve(stakingTokenAddress, ethers.utils.parseEther("10000"));
-        await stakingTokenInstance.deposit(ethers.utils.parseEther("10000"));
+        await olas.approve(stakingTokenAddress, stakingSupply);
+        await stakingTokenInstance.deposit(stakingSupply);
 
         // Add agent as a guardian on L1 and L2
         await depository.setGuardianServiceStatuses([agent.address], [true]);
         await stakingManager.setGuardianServiceStatuses([agent.address], [true]);
 
         // Add model to L1
-        await depository.createAndActivateStakingModels([gnosisChainId], [stakingTokenAddress], [supply]);
-
-        const BridgeRelayer = await ethers.getContractFactory("BridgeRelayer");
-        bridgeRelayer = await BridgeRelayer.deploy(olas.address);
-        await bridgeRelayer.deployed();
-
-        const GnosisDepositProcessorL1 = await ethers.getContractFactory("GnosisDepositProcessorL1");
-        gnosisDepositProcessorL1 = await GnosisDepositProcessorL1.deploy(olas.address, dispenser.address,
-            bridgeRelayer.address, bridgeRelayer.address, gnosisChainId);
-        await gnosisDepositProcessorL1.deployed();
-
-        const GnosisStakingProcessorL2 = await ethers.getContractFactory("GnosisStakingProcessorL2");
-        gnosisStakingProcessorL2 = await GnosisStakingProcessorL2.deploy(olas.address,
-            stakingProxyFactory.address, bridgeRelayer.address, gnosisDepositProcessorL1.address, chainId);
-        await gnosisStakingProcessorL2.deployed();
-
-        // Set the gnosisStakingProcessorL2 address in gnosisDepositProcessorL1
-        await gnosisDepositProcessorL1.setL2TargetDispenser(gnosisStakingProcessorL2.address);
+        await depository.createAndActivateStakingModels([gnosisChainId], [stakingTokenAddress], [stakingSupply]);
     });
 
     context("Staking", function () {

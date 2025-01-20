@@ -68,6 +68,9 @@ contract Collector {
     constructor(address _olas, address _l2StakingProcessor) {
         olas = _olas;
         l2StakingProcessor = _l2StakingProcessor;
+
+        // TODO Remove
+        owner = msg.sender;
     }
 
     function initialize(uint256 _protocolFactor) external {
@@ -77,6 +80,19 @@ contract Collector {
 
         protocolFactor = _protocolFactor;
         owner = msg.sender;
+    }
+
+    function changeStakingProcessorL2(address newStakingProcessorL2) external {
+        // Check for ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
+        }
+
+        if (newStakingProcessorL2 == address(0)) {
+            revert ZeroAddress();
+        }
+
+        l2StakingProcessor = newStakingProcessorL2;
     }
 
     /// @dev Changes protocol factor value.
