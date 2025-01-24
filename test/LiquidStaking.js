@@ -146,16 +146,16 @@ describe("Liquid Staking", function () {
         gnosisSafeSameAddressMultisig = await GnosisSafeSameAddressMultisig.deploy(bytecodeHash);
         await gnosisSafeSameAddressMultisig.deployed();
 
-        const Depository = await ethers.getContractFactory("Depository");
-        depository = await Depository.deploy(olas.address, AddressZero);
-        await depository.deployed();
-
         const Lock = await ethers.getContractFactory("Lock");
         lock = await Lock.deploy(olas.address, ve.address);
         await lock.deployed();
 
+        const Depository = await ethers.getContractFactory("Depository");
+        depository = await Depository.deploy(olas.address, ve.address, AddressZero, lock.address, lockFactor);
+        await depository.deployed();
+
         const Treasury = await ethers.getContractFactory("Treasury");
-        treasury = await Treasury.deploy(olas.address, ve.address, st.address, depository.address, lock.address, lockFactor);
+        treasury = await Treasury.deploy(olas.address, st.address, depository.address);
         await treasury.deployed();
 
         // Initialize lock
@@ -213,6 +213,9 @@ describe("Liquid Staking", function () {
 
         // Set the gnosisStakingProcessorL2 address in gnosisDepositProcessorL1
         await gnosisDepositProcessorL1.setL2StakingProcessor(gnosisStakingProcessorL2.address);
+
+        // Whitelist deposit processors
+        await depository.setDepositProcessorChainIds([gnosisDepositProcessorL1.address], [gnosisChainId]);
 
         const ActivityChecker = await ethers.getContractFactory("MockActivityChecker");
         activityChecker = await ActivityChecker.deploy(livenessRatio);

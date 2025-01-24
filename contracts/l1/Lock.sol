@@ -149,10 +149,8 @@ contract Lock {
     /// @dev Increases lock amount and time.
     /// @param olasAmount OLAS amount.
     function increaseLock(uint256 olasAmount) external {
-        // Check for ownership
-        if (msg.sender != treasury) {
-            revert TreasuryOnly(msg.sender, treasury);
-        }
+        // Approve OLAS for veOLAS
+        IToken(olas).approve(ve, olasAmount);
 
         // Increase amount and unlock time to a maximum
         IVEOLAS(ve).increaseAmount(olasAmount);

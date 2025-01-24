@@ -59,7 +59,12 @@ contract stOLAS is ERC4626 {
             revert MinterOnly(msg.sender, minter);
         }
 
-        shares = super.deposit(assets, receiver);
+        // Check for rounding error since we round down in previewDeposit.
+        require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
+
+        _mint(receiver, shares);
+
+        emit Deposit(msg.sender, receiver, assets, shares);
     }
 
     /// @dev Redeems OLAS in exchange for stOLAS tokens.
