@@ -59,8 +59,6 @@ contract stOLAS is ERC4626 {
             revert MinterOnly(msg.sender, minter);
         }
 
-        stakedBalance += assets;
-
         // Check for rounding error since we round down in previewDeposit.
         require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
 
@@ -79,31 +77,54 @@ contract stOLAS is ERC4626 {
             revert MinterOnly(msg.sender, minter);
         }
 
-        assets = super.redeem(shares, receiver, owner);
-    }
+        // TODO Is this check needed?
+        if (msg.sender != owner) {
+            uint256 allowed = allowance[owner][msg.sender]; // Saves gas for limited approvals.
 
-    /// @dev Mints stOLAS tokens.
-    /// @param shares stOLAS token amount.
-    /// @param receiver Receiver account address.
-    /// @return assets Corresponding amount of OLAS tokens based on stOLAS amount.
-    function mint(uint256 shares, address receiver) public override returns (uint256 assets) {
-        if (msg.sender != minter) {
-            revert MinterOnly(msg.sender, minter);
+            if (allowed != type(uint256).max) allowance[owner][msg.sender] = allowed - shares;
         }
 
-        assets = super.mint(shares, receiver);
-    }
+        // Check for rounding error since we round down in previewRedeem.
+        require((assets = previewRedeem(shares)) != 0, "ZERO_ASSETS");
 
-    function withdraw(
-        uint256 assets,
-        address receiver,
-        address owner
-    ) public override returns (uint256 shares) {
-        if (msg.sender != minter) {
-            revert MinterOnly(msg.sender, minter);
+        _burn(owner, shares);
+
+        // Get current staked and vault balance
+        uint256 curStakedBalance = stakedBalance;
+        uint256 curVaultBalance = asset.balanceOf(address(this));
+        uint256 transferAmount;
+
+        if (curVaultBalance > assets) {
+            transferAmount = assets;
+            // TODO: use when updating in-place
+//            curVaultBalance -= assets;
+        } else {
+            transferAmount = curVaultBalance;
+            // TODO: use when updating in-place
+//            uint256 diff = assets - curVaultBalance;
+//            curVaultBalance = 0;
+//            curStakedBalance -= diff;
+//            stakedBalance = curStakedBalance;
         }
 
-        shares = super.withdraw(assets, receiver, owner);
+        // TODO: use when updating in-place
+//        uint256 curTotalReserves = curStakedBalance + curVaultBalance;
+//        totalReserves = curTotalReserves;
+//        vaultBalance = curVaultBalance;
+
+        asset.transfer(receiver, transferAmount);
+
+        emit Withdraw(msg.sender, receiver, owner, assets, shares);
+    }
+
+    /// @dev Overrides mint function that is never used.
+    function mint(uint256, address) public override returns (uint256) {
+        return 0;
+    }
+
+    /// @dev Overrides withdraw function that is never used.
+    function withdraw(uint256, address, address) public override returns (uint256) {
+        return 0;
     }
 
     // TODO Optimize
@@ -111,8 +132,10 @@ contract stOLAS is ERC4626 {
         // TODO Vault inflation attack
         uint256 curStakedBalance = stakedBalance;
 
+        // TODO Change with function balanceOf()
         // Get current vault balance
         uint256 curVaultBalance = asset.balanceOf(address(this));
+        vaultBalance = curVaultBalance;
 
         uint256 curTotalReserves = curStakedBalance + curVaultBalance;
         totalReserves = curTotalReserves;
@@ -120,6 +143,7 @@ contract stOLAS is ERC4626 {
         emit TotalReservesUpdated(curStakedBalance, curVaultBalance, curTotalReserves);
     }
 
+    // TODO Perform in deposit / redeem
     function updateTotalAssets(int256 assets) external {
         if (msg.sender != minter) {
             revert MinterOnly(msg.sender, minter);
@@ -130,11 +154,15 @@ contract stOLAS is ERC4626 {
             revert Overflow(uint256(-assets), curStakedBalance);
         }
 
-        curStakedBalance = uint256(int256(curStakedBalance) + assets);
+        if (assets != 0) {
+            curStakedBalance = uint256(int256(curStakedBalance) + assets);
+            stakedBalance = curStakedBalance;
+        }
 
         // TODO Vault inflation attack
         // Get current vault balance
         uint256 curVaultBalance = asset.balanceOf(address(this));
+        vaultBalance = curVaultBalance;
 
         uint256 curTotalReserves = curStakedBalance + curVaultBalance;
         totalReserves = curTotalReserves;

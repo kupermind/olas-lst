@@ -348,8 +348,33 @@ describe("Liquid Staking", function () {
             console.log("User approves stOLAS for treasury:", stBalance.toString());
             await st.approve(treasury.address, stBalance);
 
-            console.log("User requests stOLAS to get OLAS");
-            await treasury.requestToWithdraw(stBalance);
+            // Divide reward by 10 to definitely cover OLAS that is physically on stOLAS contract
+            let stAmount = collectorBalance.div(10);
+            // Request withdraw
+            console.log("User requests withdraw of small amount of stOLAS:", stAmount.toString());
+            let tx = await treasury.requestToWithdraw(stAmount, [gnosisChainId], [[stakingTokenInstance.address]],
+                [bridgePayload], [0]);
+            let res = await tx.wait();
+            // Get withdraw request Id
+            //console.log(res.logs);
+            res = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
+            let requestId = ethers.BigNumber.from(res[0]);
+            let olasWithdrawAmount = ethers.BigNumber.from(res[1]);
+            console.log("Withdraw requestId:", requestId.toString());
+            console.log("User is minted ERC1155 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
+
+            // Finalize withdraw
+            console.log("User to finalize withdraw request after withdraw cool down period");
+            console.log("Approve 1155 requestId tokens for treasury");
+            await treasury.setApprovalForAll(treasury.address, true);
+
+            console.log("Finalize withdraw");
+            let balanceBefore = await olas.balanceOf(deployer.address);
+            await treasury.finalizeWithdrawRequests([requestId], [olasWithdrawAmount], "0x");
+            let balanceAfter = await olas.balanceOf(deployer.address);
+            let balanceDiff = balanceAfter.sub(balanceBefore);
+            expect(balanceDiff).to.equal(olasWithdrawAmount);
+            console.log("User got OLAS:", olasWithdrawAmount.toString());
             return;
 
             console.log("\nL2");

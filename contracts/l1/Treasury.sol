@@ -273,7 +273,7 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
 
         uint256 totalAmount;
         // Traverse all withdraw requests
-        for (uint256 i = 0; i < requestIds[i]; ++i) {
+        for (uint256 i = 0; i < requestIds.length; ++i) {
             // Decode a pair of key defining variables from one key: withdrawTime | requestId
             // requestId occupies first 64 bits, withdrawTime occupies next bits as they both fit well in uint256
             uint256 requestId = requestIds[i] & type(uint64).max;
