@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
+import "hardhat/console.sol";
+import {IStaking} from "../interfaces/IStaking.sol";
 
 interface ISafe {
     enum Operation {Call, DelegateCall}
@@ -44,13 +46,36 @@ interface ISafe {
     function getTransactionHash(address to, uint256 value, bytes calldata data, Operation operation, uint256 safeTxGas,
         uint256 baseGas, uint256 gasPrice, address gasToken, address refundReceiver, uint256 _nonce)
         external view returns (bytes32);
+
+    /// @dev Allows a Module to execute a Safe transaction without any further confirmations.
+    /// @param to Destination address of module transaction.
+    /// @param value Ether value of module transaction.
+    /// @param data Data payload of module transaction.
+    /// @param operation Operation type of module transaction.
+    function execTransactionFromModule(address to, uint256 value, bytes memory data,
+        Operation operation) external returns (bool success);
 }
 
-interface IStaking {
-    /// @dev Claims rewards for the service without an additional checkpoint call.
+interface IStakingManager {
+    /// @dev Claims specified service rewards.
+    /// @param stakingProxy Staking proxy address.
     /// @param serviceId Service Id.
     /// @return Staking reward.
-    function claim(uint256 serviceId) external returns (uint256);
+    function claim(address stakingProxy, uint256 serviceId) external returns (uint256);
+}
+
+// ERC20 token interface
+interface IToken {
+    /// @dev Transfers the token amount.
+    /// @param to Address to transfer to.
+    /// @param amount The amount to transfer.
+    /// @return True if the function execution is successful.
+    function transfer(address to, uint256 amount) external returns (bool);
+
+    /// @dev Gets the amount of tokens owned by a specified account.
+    /// @param account Account address.
+    /// @return Amount of tokens owned.
+    function balanceOf(address account) external view returns (uint256);
 }
 
 /// @dev Zero address.
@@ -79,6 +104,8 @@ contract ActivityModule {
     address public multisig;
     // Staking proxy address
     address public stakingProxy;
+    // Staking manager address
+    address public stakingManager;
 
     /// @dev ActivityModule constructor.
     /// @param _olas OLAS address.
@@ -105,6 +132,7 @@ contract ActivityModule {
 
         multisig = _multisig;
         stakingProxy = _stakingProxy;
+        stakingManager = msg.sender;
         serviceId = _serviceId;
 
         // Set up address(this) as multisig module
@@ -124,7 +152,7 @@ contract ActivityModule {
         uint8 v = 1;
         bytes32 r = bytes32(uint256(uint160(address(this))));
         bytes32 s;
-        bytes memory signature = abi.encodePacked(v, r, s);
+        bytes memory signature = abi.encodePacked(r, s, v);
 
         // Execute multisig transaction
         ISafe(multisig).execTransaction(multisig, 0, data, operation, 0, 0, 0, address(0), payable(address(0)), signature);
@@ -142,17 +170,22 @@ contract ActivityModule {
             activityNonce = 1;
         }
 
-        // TODO
+        // Get staking reward
+        uint256 reward = IStakingManager(stakingManager).claim(stakingProxy, serviceId);
+        if (reward > 0) {
+            activityNonce++;
+        }
 
-//        uint256 reward = IStaking(stakingProxy).claim(serviceId);
-//        if (reward > 0) {
-//            activityNonce++;
-//        }
-//
-//        uint256 balance = IToken(olas).balanceOf(multisig);
-//
-//        if (balance > 0) {
-//            multisig.execute(transfer(olas), collector, balance);
-//        }
+        uint256 balance = IToken(olas).balanceOf(multisig);
+
+        if (balance == 0) {
+            revert ZeroValue();
+        }
+
+        // Encode olas transfer function call
+        bytes memory data = abi.encodeCall(IToken.transfer, (collector, balance));
+
+        // Send collected funds to collector
+        ISafe(multisig).execTransactionFromModule(olas, 0, data, ISafe.Operation.Call);
     }
 }

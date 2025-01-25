@@ -65,16 +65,14 @@ error AlreadyProcessed(uint256 requestId);
 /// @title StakingManager - Smart contract for OLAS staking management
 contract StakingManager is ERC721TokenReceiver {
     event OwnerUpdated(address indexed owner);
-    event TokenRelayerUpdated(address indexed l2StakingProcessor);
+    event StakingProcessorL2Updated(address indexed l2StakingProcessor);
     event SetGuardianServiceStatuses(address[] guardianServices, bool[] statuses);
     event StakingBalanceUpdated(address indexed stakingProxy, uint256 balance);
-    event CreateAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig);
+    event CreateAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig,
+        address activityModule);
     event DeployAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig);
     event Unstake(address indexed sender, address indexed stakingProxy, uint256 indexed serviceId);
 
-    // Safe module payload
-    // encodeWithSignature("setupToL2(address)", (0x29fcb43b46531bca003ddc8fcb67ffe91900c762))
-    bytes public constant SAFE_MODULE_PAYLOAD = "0xfe51f64300000000000000000000000029fcb43b46531bca003ddc8fcb67ffe91900c762";
     // Number of agent instances
     uint256 public constant NUM_AGENT_INSTANCES = 1;
     // Threshold
@@ -106,8 +104,10 @@ contract StakingManager is ERC721TokenReceiver {
     address public immutable fallbackHandler;
     // OLAS collector address
     address public immutable collector;
-    // Activity module beacon
+    // Activity module beacon address
     address public immutable beacon;
+    // SafeL2 address
+    address public immutable safeL2;
 
     // L2 staking processor address
     address public l2StakingProcessor;
@@ -128,6 +128,7 @@ contract StakingManager is ERC721TokenReceiver {
     mapping(uint256 => address) public mapServiceIdActivityModules;
     mapping(address => uint256) public mapLastStakedServiceIdxs;
 
+    // TODO Identify params that could change in the future as well (safeMultisig, safeSameAddressMultisig, fallbackHandler, etc.)
     /// @dev StakerL2 constructor.
     /// @param _olas OLAS token address.
     /// @param _serviceManager Service manager address.
@@ -138,6 +139,7 @@ contract StakingManager is ERC721TokenReceiver {
     /// @param _safeModuleInitializer Safe module initializer address.
     /// @param _fallbackHandler Multisig fallback handler address.
     /// @param _collector OLAS collector address.
+    /// @param _safeL2 SafeL2 contract address.
     /// @param _agentId Contributor agent Id.
     /// @param _configHash Contributor service config hash.
     constructor(
@@ -150,13 +152,15 @@ contract StakingManager is ERC721TokenReceiver {
         address _safeModuleInitializer,
         address _fallbackHandler,
         address _collector,
+        address _safeL2,
         uint256 _agentId,
         bytes32 _configHash
     ) {
         // Check for zero addresses
         if (_serviceManager == address(0) || _olas == address(0) || _stakingFactory == address(0) ||
             _safeMultisig == address(0) || _safeSameAddressMultisig == address(0) || _beacon ==address(0) ||
-            _safeModuleInitializer ==address(0) || _fallbackHandler == address(0) || _collector == address(0)) {
+            _safeModuleInitializer ==address(0) || _fallbackHandler == address(0) || _collector == address(0) ||
+            _safeL2 == address(0)) {
             revert ZeroAddress();
         }
 
@@ -177,6 +181,7 @@ contract StakingManager is ERC721TokenReceiver {
         safeModuleInitializer = _safeModuleInitializer;
         fallbackHandler = _fallbackHandler;
         collector = _collector;
+        safeL2 = _safeL2;
         serviceRegistry = IService(serviceManager).serviceRegistry();
         serviceRegistryTokenUtility = IService(serviceManager).serviceRegistryTokenUtility();
 
@@ -197,7 +202,7 @@ contract StakingManager is ERC721TokenReceiver {
     /// @dev Changes contract owner address.
     /// @param newOwner Address of a new owner.
     function changeOwner(address newOwner) external {
-        // Check for the ownership
+        // Check for ownership
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);
         }
@@ -212,27 +217,27 @@ contract StakingManager is ERC721TokenReceiver {
     }
 
     /// @dev Changes token relayer address.
-    /// @param newTokenRelayer Address of a new owner.
-    function changeTokenRelayer(address newTokenRelayer) external {
-        // Check for the ownership
+    /// @param newStakingProcessorL2 Address of a new owner.
+    function changeStakingProcessorL2(address newStakingProcessorL2) external {
+        // Check for ownership
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);
         }
 
         // Check for the zero address
-        if (newTokenRelayer == address(0)) {
+        if (newStakingProcessorL2 == address(0)) {
             revert ZeroAddress();
         }
 
-        l2StakingProcessor = newTokenRelayer;
-        emit TokenRelayerUpdated(newTokenRelayer);
+        l2StakingProcessor = newStakingProcessorL2;
+        emit StakingProcessorL2Updated(newStakingProcessorL2);
     }
 
     /// @dev Sets guardian service multisig statues.
     /// @param guardianServices Guardian service multisig addresses.
     /// @param statuses Corresponding whitelisting statues.
     function setGuardianServiceStatuses(address[] memory guardianServices, bool[] memory statuses) external {
-        // Check for the ownership
+        // Check for ownership
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);
         }
@@ -297,8 +302,11 @@ contract StakingManager is ERC721TokenReceiver {
         // Prepare Safe multisig data
         uint256 localNonce = _nonce;
         uint256 randomNonce = uint256(keccak256(abi.encodePacked(block.timestamp, msg.sender, localNonce)));
+        // Safe module payload
+        bytes memory safeModulePayload = abi.encodeWithSignature("setupToL2(address)", safeL2);
         bytes memory data = abi.encodePacked(safeModuleInitializer, fallbackHandler, address(0), address(0), uint256(0),
-            randomNonce, SAFE_MODULE_PAYLOAD);
+            randomNonce, safeModulePayload);
+
         // Deploy the service
         multisig = IService(serviceManager).deploy(serviceId, safeMultisig, data);
 
@@ -334,7 +342,7 @@ contract StakingManager is ERC721TokenReceiver {
         // Stake the service
         _stake(stakingProxy, serviceId);
 
-        emit CreateAndStake(stakingProxy, serviceId, multisig);
+        emit CreateAndStake(stakingProxy, serviceId, multisig, activityModule);
     }
 
     /// @dev Stakes the already deployed service.
@@ -491,6 +499,32 @@ contract StakingManager is ERC721TokenReceiver {
         _locked = 1;
     }
 
+    /// @dev Claims specified service rewards.
+    /// @param stakingProxy Staking proxy address.
+    /// @param serviceId Service Id.
+    /// @return Staking reward.
+    function claim(address stakingProxy, uint256 serviceId) external returns (uint256) {
+        // TODO Check that activityModule is eligible, i.e. created by address(this)
+        // TODO map of activityModule => staking proxy?
+        return IStaking(stakingProxy).claim(serviceId);
+    }
+
+    // TODO
+    function drain(address token) external {
+        // Reentrancy guard
+        if (_locked > 1) {
+            revert ReentrancyGuard();
+        }
+        _locked = 2;
+
+        // Check for ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
+        }
+
+        _locked = 1;
+    }
+
     function isAbleStake(address stakingProxy) public view returns (bool) {
         // Check for staking instance validity
         if(!IStaking(stakingFactory).verifyInstance(stakingProxy)) {
@@ -521,4 +555,6 @@ contract StakingManager is ERC721TokenReceiver {
 
         return true;
     }
+
+    receive() external payable {}
 }

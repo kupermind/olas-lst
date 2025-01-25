@@ -59,6 +59,8 @@ contract stOLAS is ERC4626 {
             revert MinterOnly(msg.sender, minter);
         }
 
+        stakedBalance += assets;
+
         // Check for rounding error since we round down in previewDeposit.
         require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
 
@@ -102,6 +104,20 @@ contract stOLAS is ERC4626 {
         }
 
         shares = super.withdraw(assets, receiver, owner);
+    }
+
+    // TODO Optimize
+    function updateTotalAssetsVault() external {
+        // TODO Vault inflation attack
+        uint256 curStakedBalance = stakedBalance;
+
+        // Get current vault balance
+        uint256 curVaultBalance = asset.balanceOf(address(this));
+
+        uint256 curTotalReserves = curStakedBalance + curVaultBalance;
+        totalReserves = curTotalReserves;
+
+        emit TotalReservesUpdated(curStakedBalance, curVaultBalance, curTotalReserves);
     }
 
     function updateTotalAssets(int256 assets) external {

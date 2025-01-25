@@ -13,6 +13,7 @@ describe("Liquid Staking", function () {
     let ve;
     let st;
     let gnosisSafe;
+    let gnosisSafeL2;
     let gnosisSafeProxyFactory;
     let safeModuleInitializer;
     let fallbackHandler;
@@ -119,6 +120,10 @@ describe("Liquid Staking", function () {
         gnosisSafe = await GnosisSafe.deploy();
         await gnosisSafe.deployed();
 
+        const GnosisSafeL2 = await ethers.getContractFactory("GnosisSafeL2");
+        gnosisSafeL2 = await GnosisSafe.deploy();
+        await gnosisSafeL2.deployed();
+
         const GnosisSafeProxyFactory = await ethers.getContractFactory("GnosisSafeProxyFactory");
         gnosisSafeProxyFactory = await GnosisSafeProxyFactory.deploy();
         await gnosisSafeProxyFactory.deployed();
@@ -191,8 +196,12 @@ describe("Liquid Staking", function () {
         const StakingManager = await ethers.getContractFactory("StakingManager");
         stakingManager = await StakingManager.deploy(olas.address, serviceManager.address,
             stakingFactory.address, gnosisSafeMultisig.address, gnosisSafeSameAddressMultisig.address,
-            beacon.address, safeModuleInitializer.address, fallbackHandler.address, collector.address, agentId, defaultHash);
+            beacon.address, safeModuleInitializer.address, fallbackHandler.address, collector.address,
+            gnosisSafeL2.address, agentId, defaultHash);
         await stakingManager.deployed();
+
+        // Fund staking manager with native to support staking creation
+        await deployer.sendTransaction({to: stakingManager.address, value: ethers.utils.parseEther("1")});
 
         const BridgeRelayer = await ethers.getContractFactory("BridgeRelayer");
         bridgeRelayer = await BridgeRelayer.deploy(olas.address);
@@ -205,7 +214,7 @@ describe("Liquid Staking", function () {
 
         const GnosisStakingProcessorL2 = await ethers.getContractFactory("GnosisStakingProcessorL2");
         gnosisStakingProcessorL2 = await GnosisStakingProcessorL2.deploy(olas.address, stakingManager.address,
-            bridgeRelayer.address, bridgeRelayer.address, gnosisDepositProcessorL1.address, chainId);
+            bridgeRelayer.address, bridgeRelayer.address, gnosisDepositProcessorL1.address, st.address, chainId);
         await gnosisStakingProcessorL2.deployed();
 
         // Change collector address
@@ -216,6 +225,9 @@ describe("Liquid Staking", function () {
 
         // Whitelist deposit processors
         await depository.setDepositProcessorChainIds([gnosisDepositProcessorL1.address], [gnosisChainId]);
+
+        // Set StakingProcessorL2 in stakingManager
+        await stakingManager.changeStakingProcessorL2(gnosisStakingProcessorL2.address);
 
         const ActivityChecker = await ethers.getContractFactory("MockActivityChecker");
         activityChecker = await ActivityChecker.deploy(livenessRatio);
@@ -277,21 +289,18 @@ describe("Liquid Staking", function () {
             await depository.deposit(stakingModelId, olasAmount, bridgePayload);
             let stBalance = await st.balanceOf(deployer.address);
             console.log("User stOLAS balance now:", stBalance.toString());
-            return;
+            let stTotalAssets = await st.totalAssets();
+            console.log("stOLAS total assets:", stTotalAssets);
+
+            let veBalance = await ve.getVotes(lock.address);
+            console.log("Protocol current veOLAS balance:", veBalance.toString());
 
             console.log("\nL2");
 
             console.log("OLAS rewards available on L2 staking contract:", (await stakingTokenInstance.availableRewards()).toString());
-            console.log("Picking up event on L2 by an agent");
-
-            // Create and stake the service on L2
-            console.log("Minting proxyOLAS and staking it by the agent");
-            const depositId = 1;
-            await stakingManager.connect(agent).stake(deployer.address, depositId, olasAmount, stakingTokenInstance.address, {value: 2});
 
             // Check the reward
             let serviceInfo = await stakingTokenInstance.mapServiceInfo(serviceId);
-            console.log("Service multisig address:", serviceInfo.multisig);
             console.log("Reward before checkpoint", serviceInfo.reward.toString());
 
             // Increase the time for the livenessPeriod
@@ -299,29 +308,49 @@ describe("Liquid Staking", function () {
             await helpers.time.increase(maxInactivity);
 
             // Call the checkpoint
-            console.log("Calling checkpoint by the agent");
+            console.log("Calling checkpoint by agent or manually");
             await stakingTokenInstance.connect(agent).checkpoint();
 
             // Check the reward
             serviceInfo = await stakingTokenInstance.mapServiceInfo(serviceId);
             console.log("Reward after checkpoint", serviceInfo.reward.toString());
 
+            // Get multisig address
+            const multisig = await ethers.getContractAt("GnosisSafe", serviceInfo.multisig);
+
+            // Get activity module proxy address
+            const owners = await multisig.getOwners();
+            const activityModuleProxy = await ethers.getContractAt("ActivityModule", owners[0]);
+
+            // Claim rewards
+            console.log("Calling claim by agent or manually");
+            await activityModuleProxy.claim();
+            const multisigBalance = await olas.balanceOf(serviceInfo.multisig);
+            console.log("Multisig balance after claim:", multisigBalance.toString());
+
+            // Check collector balance
+            const collectorBalance = await olas.balanceOf(collector.address);
+            console.log("Collector balance:", collectorBalance.toString());
+
+            // Relay rewards to L1
+            console.log("Calling relay tokens to L1 by agent or manually");
+            await collector.relayRewardTokens();
+
             console.log("\nL1");
 
-            const stakingTerm = await depository.mapStakingTerms(deployer.address);
-            let veBalance = await ve.getVotes(stakingTerm.lockProxy);
+            // Update st total assets
+            console.log("Calling stOLAS total assets update by agent or manually");
+            await st.updateTotalAssetsVault();
 
-            //const lockProxy = await ethers.getContractAt("Lock", lockProxyAddress);
-            //console.log(await lockProxy.depository());
+            stTotalAssets = await st.totalAssets();
+            console.log("stOLAS total assets now:", stTotalAssets.toString());
 
-            console.log("User current veOLAS balance:", veBalance.toString());
-
-            console.log("User approves stOLAS for depository:", stBalance.toString());
-            await st.approve(depository.address, stBalance);
+            console.log("User approves stOLAS for treasury:", stBalance.toString());
+            await st.approve(treasury.address, stBalance);
 
             console.log("User requests stOLAS to get OLAS");
-            await depository.requestToWithdraw(stBalance);
-            const olasIncrease = await depository.getOLASAmount(stBalance);
+            await treasury.requestToWithdraw(stBalance);
+            return;
 
             console.log("\nL2");
 
@@ -331,11 +360,7 @@ describe("Liquid Staking", function () {
             await stakingManager.connect(agent).withdraw(deployer.address, withdrawId, stBalance, olasIncrease,
                 stakingTokenInstance.address);
 
-            const multisigBalance = await olas.balanceOf(serviceInfo.multisig);
-            console.log("Multisig balance", multisigBalance.toString());
-
             // Approve for corresponding multisig
-            const multisig = await ethers.getContractAt("GnosisSafe", serviceInfo.multisig);
             let nonce = await multisig.nonce();
             let txHashData = await safeContracts.buildContractCall(olas, "approve",
                 [stakingManager.address, serviceInfo.reward], nonce, 0, 0);

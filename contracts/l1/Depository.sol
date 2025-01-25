@@ -375,6 +375,7 @@ contract Depository {
     }
 
     // TODO: array of modelId-s and olasAmount-s as on stake might not fit into one model
+    // TODO: consider taking any amount, just add to the stOLAS balance unused remainder
     function deposit(
         uint256 stakingModelId,
         uint256 olasAmount,
@@ -406,7 +407,7 @@ contract Depository {
         olasAmount = _increaseLock(olasAmount);
 
         // Calculates stAmount and mints stOLAS
-        (stAmount) = ITreasury(treasury).processAndMintStToken(msg.sender, olasAmount);
+        stAmount = ITreasury(treasury).processAndMintStToken(msg.sender, olasAmount);
 
         // Decode chain Id and staking proxy
         uint256 chainId = stakingModelId >> 160;

@@ -51,6 +51,7 @@ contract GnosisStakingProcessorL2 is DefaultStakingProcessorL2 {
     /// @param _l2TokenRelayer L2 token relayer bridging contract address.
     /// @param _l2MessageRelayer L2 message relayer bridging contract address (AMBHomeProxy).
     /// @param _l1DepositProcessor L1 deposit processor address.
+    /// @param _l1St stOLAS address on L1.
     /// @param _l1SourceChainId L1 source chain Id.
     constructor(
         address _olas,
@@ -58,9 +59,11 @@ contract GnosisStakingProcessorL2 is DefaultStakingProcessorL2 {
         address _l2TokenRelayer,
         address _l2MessageRelayer,
         address _l1DepositProcessor,
+        address _l1St,
         uint256 _l1SourceChainId
     )
-        DefaultStakingProcessorL2(_olas, _proxyFactory, _l2TokenRelayer, _l2MessageRelayer, _l1DepositProcessor, _l1SourceChainId)
+        DefaultStakingProcessorL2(_olas, _proxyFactory, _l2TokenRelayer, _l2MessageRelayer, _l1DepositProcessor,
+            _l1St, _l1SourceChainId)
     {}
 
     /// @dev Processes a message received from the AMB Contract Proxy (Home) contract.
@@ -79,8 +82,7 @@ contract GnosisStakingProcessorL2 is DefaultStakingProcessorL2 {
             revert();
         }
 
-        IToken(olas).transferFrom(msg.sender, address(this), olasAmount);
         IToken(olas).approve(l2TokenRelayer, olasAmount);
-        IBridge(l2TokenRelayer).relayTokens(olas, l1DepositProcessor, olasAmount);
+        IBridge(l2TokenRelayer).relayTokens(olas, l1St, olasAmount);
     }
 }

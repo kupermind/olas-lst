@@ -7,11 +7,11 @@ interface IBridge {
 
 // ERC20 token interface
 interface IToken {
-    /// @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
-    /// @param spender Account address that will be able to transfer tokens on behalf of the caller.
-    /// @param amount Token amount.
+    /// @dev Transfers the token amount.
+    /// @param to Address to transfer to.
+    /// @param amount The amount to transfer.
     /// @return True if the function execution is successful.
-    function approve(address spender, uint256 amount) external returns (bool);
+    function transfer(address to, uint256 amount) external returns (bool);
 
     /// @dev Transfers the token amount that was previously approved up until the maximum allowance.
     /// @param from Account address to transfer from.
@@ -50,6 +50,9 @@ contract Collector {
     event ProtocolFactorUpdated(uint256 protocolFactor);
     event ActivityIncreased(uint256 activityChange);
 
+    // TODO adjust
+    // Min olas balance to relay
+    uint256 public constant MIN_OLAS_BALANCE = 1;// ether;
     // Max protocol factor
     uint256 public constant MAX_PROTOCOL_FACTOR = 10_000;
 
@@ -124,8 +127,8 @@ contract Collector {
         }
 
         uint256 amount = olasBalance - curProtocolBalance;
-        // Minimum balance is 1 OLAS
-        if (amount < 1 ether) {
+        // Check for minimum balance
+        if (amount < MIN_OLAS_BALANCE) {
             revert ZeroValue();
         }
 
@@ -136,8 +139,8 @@ contract Collector {
         curProtocolBalance += protocolAmount;
         protocolBalance = curProtocolBalance;
 
-        // Approve tokens
-        IToken(olas).approve(l2StakingProcessor, amount);
+        // Transfer tokens
+        IToken(olas).transfer(l2StakingProcessor, amount);
 
         // TODO Check on relays, but the majority of them does not require value
         // TODO: Make sure once again no value is needed to send tokens back
@@ -149,8 +152,8 @@ contract Collector {
         // Get tokens
         IToken(olas).transferFrom(msg.sender, address(this), amount);
 
-        // Approve tokens
-        IToken(olas).approve(l2StakingProcessor, amount);
+        // Transfer tokens
+        IToken(olas).transfer(l2StakingProcessor, amount);
 
         // TODO Check on relays, but the majority of them does not require value
         // Send tokens to L1
