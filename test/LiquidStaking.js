@@ -75,6 +75,7 @@ describe("Liquid Staking", function () {
     const maxInactivity = serviceParams.maxNumInactivityPeriods * livenessPeriod + 1;
     const apyLimit = ethers.utils.parseEther("3");
     const lockFactor = 100;
+    const protocolFactor = 0;
     const chainId = 31337;
     const gnosisChainId = 100;
     const stakingSupply = ethers.utils.parseEther("10000");
@@ -182,7 +183,7 @@ describe("Liquid Staking", function () {
         await stakingFactory.deployed();
 
         const Collector = await ethers.getContractFactory("Collector");
-        collector = await Collector.deploy(olas.address, AddressZero);
+        collector = await Collector.deploy(olas.address, st.address);
         await collector.deployed();
 
         const ActivityModule = await ethers.getContractFactory("ActivityModule");
@@ -194,10 +195,9 @@ describe("Liquid Staking", function () {
         await beacon.deployed();
 
         const StakingManager = await ethers.getContractFactory("StakingManager");
-        stakingManager = await StakingManager.deploy(olas.address, serviceManager.address,
-            stakingFactory.address, gnosisSafeMultisig.address, gnosisSafeSameAddressMultisig.address,
-            beacon.address, safeModuleInitializer.address, fallbackHandler.address, collector.address,
-            gnosisSafeL2.address, agentId, defaultHash);
+        stakingManager = await StakingManager.deploy(olas.address, treasury.address, serviceManager.address,
+            stakingFactory.address, safeModuleInitializer.address, gnosisSafeL2.address, beacon.address,
+            collector.address, agentId, defaultHash);
         await stakingManager.deployed();
 
         // Fund staking manager with native to support staking creation
@@ -214,11 +214,11 @@ describe("Liquid Staking", function () {
 
         const GnosisStakingProcessorL2 = await ethers.getContractFactory("GnosisStakingProcessorL2");
         gnosisStakingProcessorL2 = await GnosisStakingProcessorL2.deploy(olas.address, stakingManager.address,
-            bridgeRelayer.address, bridgeRelayer.address, gnosisDepositProcessorL1.address, st.address, chainId);
+            bridgeRelayer.address, bridgeRelayer.address, gnosisDepositProcessorL1.address, chainId);
         await gnosisStakingProcessorL2.deployed();
 
-        // Change collector address
-        await collector.changeStakingProcessorL2(gnosisStakingProcessorL2.address);
+        // Initialize collector address
+        await collector.initialize(gnosisStakingProcessorL2.address, protocolFactor);
 
         // Set the gnosisStakingProcessorL2 address in gnosisDepositProcessorL1
         await gnosisDepositProcessorL1.setL2StakingProcessor(gnosisStakingProcessorL2.address);
@@ -226,8 +226,9 @@ describe("Liquid Staking", function () {
         // Whitelist deposit processors
         await depository.setDepositProcessorChainIds([gnosisDepositProcessorL1.address], [gnosisChainId]);
 
-        // Set StakingProcessorL2 in stakingManager
-        await stakingManager.changeStakingProcessorL2(gnosisStakingProcessorL2.address);
+        // Set rest of contracts in stakingManager
+        await stakingManager.initialize(gnosisSafeMultisig.address, gnosisSafeSameAddressMultisig.address,
+            fallbackHandler.address, gnosisStakingProcessorL2.address);
 
         const ActivityChecker = await ethers.getContractFactory("MockActivityChecker");
         activityChecker = await ActivityChecker.deploy(livenessRatio);
@@ -271,7 +272,7 @@ describe("Liquid Staking", function () {
     });
 
     context("Staking", function () {
-        it.only("E2E liquid staking", async function () {
+        it("E2E liquid staking", async function () {
             // Take a snapshot of the current state of the blockchain
             const snapshot = await helpers.takeSnapshot();
 
@@ -340,7 +341,7 @@ describe("Liquid Staking", function () {
 
             // Update st total assets
             console.log("Calling stOLAS total assets update by agent or manually");
-            await st.updateTotalAssetsVault();
+            await st.updateTotalAssets();
 
             stTotalAssets = await st.totalAssets();
             console.log("stOLAS total assets now:", stTotalAssets.toString());
@@ -357,7 +358,7 @@ describe("Liquid Staking", function () {
             let res = await tx.wait();
             // Get withdraw request Id
             //console.log(res.logs);
-            res = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
+            res = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[6].data);
             let requestId = ethers.BigNumber.from(res[0]);
             let olasWithdrawAmount = ethers.BigNumber.from(res[1]);
             console.log("Withdraw requestId:", requestId.toString());
@@ -375,44 +376,42 @@ describe("Liquid Staking", function () {
             let balanceDiff = balanceAfter.sub(balanceBefore);
             expect(balanceDiff).to.equal(olasWithdrawAmount);
             console.log("User got OLAS:", olasWithdrawAmount.toString());
-            return;
 
-            console.log("\nL2");
+            console.log("\nL1 - L2 - L1");
 
-            console.log("Picking up event on L2 by the agent");
-            const withdrawId = 1;
-            console.log("Withdraw from StakingManager contract by the agent");
-            await stakingManager.connect(agent).withdraw(deployer.address, withdrawId, stBalance, olasIncrease,
-                stakingTokenInstance.address);
-
-            // Approve for corresponding multisig
-            let nonce = await multisig.nonce();
-            let txHashData = await safeContracts.buildContractCall(olas, "approve",
-                [stakingManager.address, serviceInfo.reward], nonce, 0, 0);
-            let signMessageData = await safeContracts.safeSignMessage(agent, multisig, txHashData, 0);
-            await safeContracts.executeTx(multisig, txHashData, [signMessageData], 0);
-
-            // Bridge
-            console.log("Bridge transfer of OLAS from L2 to L1");
-            await stakingManager.connect(agent).bridgeTransfer(multisig.address, depository.address);
+            // Request withdraw of all the remaining stOLAS
+            stBalance = await st.balanceOf(deployer.address);
+            console.log("User requests withdraw of all remaining stOLAS:", stBalance.toString());
+            tx = await treasury.requestToWithdraw(stBalance, [gnosisChainId], [[stakingTokenInstance.address]],
+                [bridgePayload], [0]);
+            res = await tx.wait();
+            // Get withdraw request Id
+            //console.log(res.logs);
+            res = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[6].data);
+            requestId = ethers.BigNumber.from(res[0]);
+            olasWithdrawAmount = ethers.BigNumber.from(res[1]);
+            console.log("Withdraw requestId:", requestId.toString());
+            console.log("User is minted ERC1155 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
+            console.log("OLAS is not enough on L1, sending request to L2 to unstake and transfer back to L1");
 
             console.log("\nL1");
 
-            console.log("For testing purposes only: stOLAS for OLAS is possible after veOLAS unlock");
-            //await depository.unlock();
+            // Finalize withdraw
+            console.log("User to finalize withdraw request after withdraw cool down period");
 
-            const olasBalance = await olas.balanceOf(depository.address);
-            console.log("OLAS balance in Depository on L1 before the unlock:", olasBalance.toString());
+            console.log("Finalize withdraw");
+            balanceBefore = await olas.balanceOf(deployer.address);
+            await treasury.finalizeWithdrawRequests([requestId], [olasWithdrawAmount], "0x");
+            balanceAfter = await olas.balanceOf(deployer.address);
+            balanceDiff = balanceAfter.sub(balanceBefore);
+            expect(balanceDiff).to.equal(olasWithdrawAmount);
+            console.log("User got OLAS:", olasWithdrawAmount.toString());
 
-            console.log("veOLAS unlock");
-            console.log("User gives back stOLAS to get OLAS");
-            await depository.withdraw(stBalance);
+            stBalance = await st.balanceOf(deployer.address);
+            console.log("Final user stOLAS remainder:", stBalance.toString());
 
-            console.log("Increased User OLAS balance:", olasIncrease.toString());
-
-            // Check updated veOLAS
-            veBalance = await ve.getVotes(stakingTerm.lockProxy);
-            console.log("User veOLAS balance now:", veBalance.toString());
+            stBalance = await st.totalAssets();
+            console.log("Final stOLAS total assets:", stBalance.toString());
 
             // Restore a previous state of blockchain
             snapshot.restore();

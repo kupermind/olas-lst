@@ -459,6 +459,8 @@ contract Depository {
             uint256 olasAmount;
 
             for (uint256 j = 0; i < stakingProxies[i].length; ++j) {
+                amounts[i] = new uint256[](stakingProxies[i].length);
+
                 // TODO stakingProxies order
                 // Push a pair of key defining variables into one key: chainId | stakingProxy
                 // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256

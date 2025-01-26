@@ -31,9 +31,7 @@ interface IST {
     /// @return assets OLAS amount.
     function redeem(uint256 shares, address receiver, address owner) external returns (uint256 assets);
 
-    function updateTotalAssets(int256 olasAmount) external;
-
-    function vaultBalance() external returns(uint256);
+    function stakedBalance() external returns(uint256);
 }
 
 /// @dev Only `owner` has a privilege, but the `sender` was provided.
@@ -153,9 +151,6 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
             revert DepositoryOnly(msg.sender, depository);
         }
 
-        // Update stOLAS total assets
-        IST(st).updateTotalAssets(int256(olasAmount));
-
         // mint stOLAS
         stAmount = IST(st).deposit(olasAmount, account);
     }
@@ -173,9 +168,6 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         bytes[] memory bridgePayloads,
         uint256[] memory values
     ) internal {
-        // Update stOLAS total assets
-        IST(st).updateTotalAssets(-int256(unstakeAmount));
-
         // Calculate OLAS amounts and initiate unstake messages to L2-s
         IDepository(depository).processUnstake(unstakeAmount, chainIds, stakingProxies, bridgePayloads, values);
     }
@@ -234,8 +226,8 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         // requestId occupies first 64 bits, withdrawTime occupies next bits as they both fit well in uint256
         requestId |= withdrawTime << 64;
 
-        // Update stOLAS total assets
-        IST(st).updateTotalAssets(0);
+        // Get current staked balance
+        uint256 stakedBalanceBefore = IST(st).stakedBalance();
 
         // Redeem OLAS and burn stOLAS tokens
         olasAmount = IST(st).redeem(stAmount, address(this), address(this));
@@ -247,12 +239,12 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         uint256 curWithdrawAmountRequested = withdrawAmountRequested + olasAmount;
         withdrawAmountRequested = curWithdrawAmountRequested;
 
-        // Get current vault balance
-        uint256 curVaultBalance = IST(st).vaultBalance();
+        // Get updated staked balance
+        uint256 stakedBalanceAfter = IST(st).stakedBalance();
 
         // If withdraw amount is bigger than the current one, need to unstake
-        if (curWithdrawAmountRequested > curVaultBalance) {
-            uint256 withdrawDiff = curWithdrawAmountRequested - curVaultBalance;
+        if (stakedBalanceBefore > stakedBalanceAfter) {
+            uint256 withdrawDiff = stakedBalanceBefore - stakedBalanceAfter;
 
             _unstake(withdrawDiff, chainIds, stakingProxies, bridgePayloads, values);
         }

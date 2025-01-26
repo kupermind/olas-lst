@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 interface IBridge {
-    function relayToL1(uint256 olasAmount) external payable;
+    function relayToL1(address to, uint256 olasAmount) external payable;
 }
 
 // ERC20 token interface
@@ -58,6 +58,8 @@ contract Collector {
 
     // OLAS contract address
     address public immutable olas;
+    // stOLAS contract address on L1
+    address public immutable l1St;
 
     // Protocol balance
     uint256 public protocolBalance;
@@ -68,19 +70,22 @@ contract Collector {
     // Owner address
     address public owner;
 
-    constructor(address _olas, address _l2StakingProcessor) {
+    /// @param _olas OLAS address on L2.
+    /// @param _l1St stOLAS address on L1.
+    constructor(address _olas, address _l1St) {
         olas = _olas;
-        l2StakingProcessor = _l2StakingProcessor;
-
-        // TODO Remove
-        owner = msg.sender;
+        l1St = _l1St;
     }
 
-    function initialize(uint256 _protocolFactor) external {
+    /// @dev Initializes collector.
+    /// @param _l2StakingProcessor L2 Staking Processor address.
+    /// @param _protocolFactor Protocol factor in 10_000 value.
+    function initialize(address _l2StakingProcessor, uint256 _protocolFactor) external {
         if (owner != address(0)) {
             revert AlreadyInitialized();
         }
 
+        l2StakingProcessor = _l2StakingProcessor;
         protocolFactor = _protocolFactor;
         owner = msg.sender;
     }
@@ -145,18 +150,6 @@ contract Collector {
         // TODO Check on relays, but the majority of them does not require value
         // TODO: Make sure once again no value is needed to send tokens back
         // Send tokens to L1
-        IBridge(l2StakingProcessor).relayToL1{value: msg.value}(amount);
-    }
-
-    function relayStakedTokens(uint256 amount) external payable {
-        // Get tokens
-        IToken(olas).transferFrom(msg.sender, address(this), amount);
-
-        // Transfer tokens
-        IToken(olas).transfer(l2StakingProcessor, amount);
-
-        // TODO Check on relays, but the majority of them does not require value
-        // Send tokens to L1
-        IBridge(l2StakingProcessor).relayToL1{value: msg.value}(amount);
+        IBridge(l2StakingProcessor).relayToL1{value: msg.value}(l1St, amount);
     }
 }

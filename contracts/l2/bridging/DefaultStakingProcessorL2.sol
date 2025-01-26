@@ -81,8 +81,6 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
     address public immutable l2TokenRelayer;
     // Deposit processor address on L1 that is authorized to propagate the transaction execution across the bridge
     address public immutable l1DepositProcessor;
-    // stOLAS address on L1
-    address public immutable l1St;
     // Deposit processor chain Id
     uint256 public immutable l1SourceChainId;
     // Nonce for each staking batch
@@ -105,8 +103,6 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
     /// @param _stakingManager StakingManager address.
     /// @param _l2TokenRelayer L2 token relayer bridging contract address.
     /// @param _l2MessageRelayer L2 message relayer bridging contract address.
-    /// @param _l1DepositProcessor L1 deposit processor address.
-    /// @param _l1St stOLAS address on L1.
     /// @param _l1SourceChainId L1 source chain Id.
     constructor(
         address _olas,
@@ -114,12 +110,11 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
         address _l2TokenRelayer,
         address _l2MessageRelayer,
         address _l1DepositProcessor,
-        address _l1St,
         uint256 _l1SourceChainId
     ) {
         // Check for zero addresses
         if (_olas == address(0) || _stakingManager == address(0) || _l2TokenRelayer == address(0) ||
-            _l2MessageRelayer == address(0) || _l1DepositProcessor == address(0) || _l1St == address(0)) {
+            _l2MessageRelayer == address(0) || _l1DepositProcessor == address(0)) {
             revert ZeroAddress();
         }
 
@@ -139,7 +134,6 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
         l2TokenRelayer = _l2TokenRelayer;
         l2MessageRelayer = _l2MessageRelayer;
         l1DepositProcessor = _l1DepositProcessor;
-        l1St = _l1St;
         l1SourceChainId = _l1SourceChainId;
 
         // State variables assignment
@@ -421,7 +415,7 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
         // _locked is now set to 2 for good
     }
 
-    function relayToL1(uint256 olasAmount) external virtual payable;
+    function relayToL1(address to, uint256 olasAmount) external virtual payable;
 
     /// @dev Gets the maximum number of token decimals able to be transferred across the bridge.
     /// @return Number of supported decimals.

@@ -12,6 +12,10 @@ interface IActivityModule {
     function initialize(address _multisig, address _stakingProxy, uint256 _serviceId) external;
 }
 
+interface IBridge {
+    function relayToL1(address to, uint256 olasAmount) external payable;
+}
+
 // Multisig interface
 interface IMultisig {
     /// @dev Returns array of owners.
@@ -88,20 +92,16 @@ contract StakingManager is ERC721TokenReceiver {
     address public immutable serviceManager;
     // OLAS token address
     address public immutable olas;
+    // Treasury address on L1
+    address public immutable l1Treasury;
     // Service registry address
     address public immutable serviceRegistry;
     // Service registry token utility address
     address public immutable serviceRegistryTokenUtility;
     // Staking factory address
     address public immutable stakingFactory;
-    // Safe multisig processing contract address
-    address public immutable safeMultisig;
-    // Safe same address multisig processing contract address
-    address public immutable safeSameAddressMultisig;
     /// Safe module initializer address
     address public immutable safeModuleInitializer;
-    // Safe fallback handler
-    address public immutable fallbackHandler;
     // OLAS collector address
     address public immutable collector;
     // Activity module beacon address
@@ -109,6 +109,12 @@ contract StakingManager is ERC721TokenReceiver {
     // SafeL2 address
     address public immutable safeL2;
 
+    // Safe multisig processing contract address
+    address public safeMultisig;
+    // Safe same address multisig processing contract address
+    address public safeSameAddressMultisig;
+    // Safe fallback handler
+    address public fallbackHandler;
     // L2 staking processor address
     address public l2StakingProcessor;
     // Owner address
@@ -128,39 +134,34 @@ contract StakingManager is ERC721TokenReceiver {
     mapping(uint256 => address) public mapServiceIdActivityModules;
     mapping(address => uint256) public mapLastStakedServiceIdxs;
 
-    // TODO Identify params that could change in the future as well (safeMultisig, safeSameAddressMultisig, fallbackHandler, etc.)
     /// @dev StakerL2 constructor.
     /// @param _olas OLAS token address.
+    /// @param _l1Treasury Treasury address on L1.
     /// @param _serviceManager Service manager address.
     /// @param _stakingFactory Staking factory address.
-    /// @param _safeMultisig Safe multisig address.
-    /// @param _safeSameAddressMultisig Safe multisig processing contract address.
-    /// @param _beacon Activity module beacon.
     /// @param _safeModuleInitializer Safe module initializer address.
-    /// @param _fallbackHandler Multisig fallback handler address.
-    /// @param _collector OLAS collector address.
     /// @param _safeL2 SafeL2 contract address.
+    /// @param _beacon Activity module beacon.
+    /// @param _collector OLAS collector address.
     /// @param _agentId Contributor agent Id.
     /// @param _configHash Contributor service config hash.
     constructor(
         address _olas,
+        address _l1Treasury,
         address _serviceManager,
         address _stakingFactory,
-        address _safeMultisig,
-        address _safeSameAddressMultisig,
-        address _beacon,
         address _safeModuleInitializer,
-        address _fallbackHandler,
-        address _collector,
         address _safeL2,
+        address _beacon,
+        address _collector,
         uint256 _agentId,
         bytes32 _configHash
     ) {
         // Check for zero addresses
-        if (_serviceManager == address(0) || _olas == address(0) || _stakingFactory == address(0) ||
-            _safeMultisig == address(0) || _safeSameAddressMultisig == address(0) || _beacon ==address(0) ||
-            _safeModuleInitializer ==address(0) || _fallbackHandler == address(0) || _collector == address(0) ||
-            _safeL2 == address(0)) {
+        if (_olas == address(0) || _l1Treasury == address(0) || _serviceManager == address(0) ||
+            _stakingFactory == address(0) || _safeModuleInitializer ==address(0) || _safeL2 == address(0) ||
+            _beacon ==address(0) || _collector == address(0))
+        {
             revert ZeroAddress();
         }
 
@@ -172,31 +173,39 @@ contract StakingManager is ERC721TokenReceiver {
         agentId = _agentId;
         configHash = _configHash;
 
-        serviceManager = _serviceManager;
         olas = _olas;
+        l1Treasury = _l1Treasury;
+        serviceManager = _serviceManager;
         stakingFactory = _stakingFactory;
-        safeMultisig = _safeMultisig;
-        safeSameAddressMultisig = _safeSameAddressMultisig;
-        beacon = _beacon;
         safeModuleInitializer = _safeModuleInitializer;
-        fallbackHandler = _fallbackHandler;
-        collector = _collector;
         safeL2 = _safeL2;
+        beacon = _beacon;
+        collector = _collector;
         serviceRegistry = IService(serviceManager).serviceRegistry();
         serviceRegistryTokenUtility = IService(serviceManager).serviceRegistryTokenUtility();
-
-        owner = msg.sender;
     }
 
-    function initialize(address _l2StakingProcessor) external {
+    function initialize(
+        address _safeMultisig,
+        address _safeSameAddressMultisig,
+        address _fallbackHandler,
+        address _l2StakingProcessor
+    ) external {
         if (owner != address(0)) {
             revert AlreadyInitialized();
         }
 
-        if (_l2StakingProcessor == address(0)) {
+        if (_safeMultisig == address(0) || _safeSameAddressMultisig == address(0) ||
+            _fallbackHandler == address(0) || _l2StakingProcessor == address(0))
+        {
             revert ZeroAddress();
         }
+        safeMultisig = _safeMultisig;
+        safeSameAddressMultisig = _safeSameAddressMultisig;
+        fallbackHandler = _fallbackHandler;
         l2StakingProcessor = _l2StakingProcessor;
+
+        owner = msg.sender;
     }
 
     /// @dev Changes contract owner address.
@@ -407,6 +416,7 @@ contract StakingManager is ERC721TokenReceiver {
             revert UnauthorizedAccount(msg.sender);
         }
 
+        // Get OLAS from l2StakingProcessor
         IToken(olas).transferFrom(l2StakingProcessor, address(this), totalAmount);
 
         for (uint256 i = 0; i < stakingProxies.length; ++i) {
@@ -416,7 +426,6 @@ contract StakingManager is ERC721TokenReceiver {
             }
 
             // TODO How many stakes are needed?
-
             uint256 balance = mapStakingProxyBalances[stakingProxies[i]];
             uint256 minStakingDeposit = IStaking(stakingProxies[i]).minStakingDeposit();
             uint256 stakeDeposit = minStakingDeposit * (1 + NUM_AGENT_INSTANCES);
@@ -444,7 +453,6 @@ contract StakingManager is ERC721TokenReceiver {
                 balance -= stakeDeposit;
             }
             mapStakingProxyBalances[stakingProxies[i]] = balance;
-
             emit StakingBalanceUpdated(stakingProxies[i], balance);
         }
 
@@ -493,8 +501,10 @@ contract StakingManager is ERC721TokenReceiver {
         }
 
         // Send OLAS to collector to initiate L1 transfer for all the balances at this time
-        IToken(olas).approve(collector, totalAmount);
-        ICollector(collector).relayStakedTokens(totalAmount);
+        IToken(olas).transfer(l2StakingProcessor, totalAmount);
+        // TODO Check on relays, but the majority of them does not require value
+        // Send tokens to L1 Treasury and not stOLAS, since the redeem finalization is handled by Treasury
+        IBridge(l2StakingProcessor).relayToL1(l1Treasury, totalAmount);
 
         _locked = 1;
     }
