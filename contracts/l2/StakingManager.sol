@@ -485,7 +485,7 @@ contract StakingManager is ERC721TokenReceiver {
         // Traverse all staking proxies
         for (uint256 i = 0; i < stakingProxies.length; ++i) {
             uint256 balance = mapStakingProxyBalances[stakingProxies[i]];
-            if (balance > amounts[i]) {
+            if (balance >= amounts[i]) {
                 balance -= amounts[i];
             } else {
                 // This must never happen
@@ -493,6 +493,7 @@ contract StakingManager is ERC721TokenReceiver {
                     revert();
                 }
 
+                // TODO Calculate how many unstakes needed: check that it's also verified on L1 before sending request
                 uint256 unstakeAmount = _unstake(stakingProxies[i]);
                 balance = balance + unstakeAmount - amounts[i];
             }

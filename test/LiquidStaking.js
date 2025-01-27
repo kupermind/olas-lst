@@ -266,9 +266,6 @@ describe("Liquid Staking", function () {
 
         // Add model to L1
         await depository.createAndActivateStakingModels([gnosisChainId], [stakingTokenAddress], [stakingSupply]);
-
-        // Get staking model Id
-        stakingModelId = await depository.getStakingModelId(gnosisChainId, stakingTokenAddress);
     });
 
     context("Staking", function () {
@@ -287,11 +284,11 @@ describe("Liquid Staking", function () {
 
             // Stake OLAS on L1
             console.log("User deposits OLAS for stOLAS");
-            await depository.deposit(stakingModelId, olasAmount, bridgePayload);
+            await depository.deposit(olasAmount, [gnosisChainId], [[stakingTokenInstance.address]], [bridgePayload], [0]);
             let stBalance = await st.balanceOf(deployer.address);
             console.log("User stOLAS balance now:", stBalance.toString());
             let stTotalAssets = await st.totalAssets();
-            console.log("stOLAS total assets:", stTotalAssets);
+            console.log("stOLAS total assets:", stTotalAssets.toString());
 
             let veBalance = await ve.getVotes(lock.address);
             console.log("Protocol current veOLAS balance:", veBalance.toString());
