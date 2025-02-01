@@ -31,6 +31,14 @@ interface ILock {
     function increaseLock(uint256 olasAmount) external;
 }
 
+interface IST {
+    function topUpReserveBalance(uint256 amount) external;
+
+    function fundDepository(uint256 amount) external;
+
+    function reserveBalance() external view returns (uint256);
+}
+
 interface ITreasury {
     /// @dev Processes OLAS amount supplied and mints corresponding amount of stOLAS.
     /// @param account Account address.
@@ -103,6 +111,7 @@ contract Depository {
     uint256 public constant MAX_LOCK_FACTOR = 10_000;
 
     address public immutable olas;
+    address public immutable st;
     address public immutable ve;
     address public immutable lock;
 
@@ -121,8 +130,9 @@ contract Depository {
     uint256[] public setStakingModelIds;
 
     // TODO change to initialize in prod
-    constructor(address _olas, address _ve, address _treasury, address _lock, uint256 _lockFactor) {
+    constructor(address _olas, address _st, address _ve, address _treasury, address _lock, uint256 _lockFactor) {
         olas = _olas;
+        st = _st;
         ve = _ve;
         treasury = _treasury;
         lock = _lock;
@@ -406,8 +416,12 @@ contract Depository {
 
         // TODO Check array lengths
 
-        // Remainder is all funds available on Depository
-        uint256 remainder = IToken(olas).balanceOf(address(this));
+        uint256 reserveBalance = IST(st).reserveBalance();
+        // Remainder is stake amount plus reserve balance
+        uint256 remainder = stakeAmount + reserveBalance;
+
+        uint256 actualStakeAmount;
+        uint256[] memory totalAmounts = new uint256[](chainIds.length);
 
         // Collect staking contracts and amounts
         for (uint256 i = 0; i < chainIds.length; ++i) {
@@ -418,7 +432,6 @@ contract Depository {
                 break;
             }
 
-            uint256 olasAmount;
             amounts[i] = new uint256[](stakingProxies[i].length);
             // Traverse all (or required) staking proxies
             for (uint256 j = 0; j < stakingProxies[i].length; ++j) {
@@ -436,13 +449,13 @@ contract Depository {
 
                 if (remainder > stakingModel.remainder) {
                     amounts[i][j] = stakingModel.remainder;
-                    olasAmount += stakingModel.remainder;
+                    totalAmounts[i] += stakingModel.remainder;
                     remainder -= stakingModel.remainder;
                     // Update staking model remainder
                     mapStakingModels[stakingModelId].remainder = 0;
                 } else {
                     amounts[i][j] = remainder;
-                    olasAmount += remainder;
+                    totalAmounts[i] += remainder;
                     // Update staking model remainder
                     mapStakingModels[stakingModelId].remainder -= uint96(remainder);
                     remainder = 0;
@@ -450,22 +463,39 @@ contract Depository {
                 }
             }
 
-            // Transfer OLAS via the bridge
-            address depositProcessor = mapChainIdDepositProcessors[chainIds[i]];
+            // Increase actual stake amount
+            actualStakeAmount += totalAmounts[i];
+        }
 
-            // Approve OLAS for depositProcessor
-            IToken(olas).transfer(depositProcessor, olasAmount);
-
-            // Transfer OLAS to its corresponding Staker on L2
-            IDepositProcessor(depositProcessor).sendMessageBatch{value: values[i]}(stakingProxies[i], amounts[i],
-                bridgePayloads[i], olasAmount, STAKE);
+        if (stakeAmount > actualStakeAmount) {
+            remainder = stakeAmount - actualStakeAmount;
+            IToken(olas).approve(st, remainder);
+            IST(st).topUpReserveBalance(remainder);
+        } else {
+            remainder = actualStakeAmount - stakeAmount;
+            IST(st).fundDepository(remainder);
         }
 
         // Calculates stAmount and mints stOLAS
         stAmount = ITreasury(treasury).processAndMintStToken(msg.sender, stakeAmount);
 
+        // Traverse chain Ids to transfer staking amounts
+        for (uint256 i = 0; i < chainIds.length; ++i) {
+            // Transfer OLAS via the bridge
+            address depositProcessor = mapChainIdDepositProcessors[chainIds[i]];
+
+            // Approve OLAS for depositProcessor
+            IToken(olas).transfer(depositProcessor, totalAmounts[i]);
+
+            // Transfer OLAS to its corresponding Staker on L2
+            IDepositProcessor(depositProcessor).sendMessageBatch{value: values[i]}(stakingProxies[i], amounts[i],
+                bridgePayloads[i], totalAmounts[i], STAKE);
+        }
+
         emit Deposit(msg.sender, stakeAmount, stAmount, chainIds, stakingProxies, amounts);
     }
+
+
 
     /// @dev Calculates amounts and initiates cross-chain unstake request from specified models.
     /// @param unstakeAmount Total amount to unstake.
