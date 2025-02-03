@@ -13,7 +13,7 @@ interface IDepository {
     /// @param bridgePayloads Bridge payloads corresponding to each chain Id.
     /// @param values Value amounts for each bridge interaction, if applicable.
     /// @return amounts Corresponding OLAS amounts for each staking proxy.
-    function processUnstake(uint256 unstakeAmount, uint256[] memory chainIds, address[][] memory stakingProxies,
+    function unstake(uint256 unstakeAmount, uint256[] memory chainIds, address[][] memory stakingProxies,
         bytes[] memory bridgePayloads, uint256[] memory values) external payable returns (uint256[][] memory amounts);
 }
 
@@ -207,7 +207,7 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         if (stakedBalanceBefore > stakedBalanceAfter) {
             uint256 withdrawDiff = stakedBalanceBefore - stakedBalanceAfter;
 
-            IDepository(depository).processUnstake(withdrawDiff, chainIds, stakingProxies, bridgePayloads, values);
+            IDepository(depository).unstake(withdrawDiff, chainIds, stakingProxies, bridgePayloads, values);
         }
 
         emit WithdrawRequestInitiated(msg.sender, requestId, stAmount, olasAmount, withdrawTime);

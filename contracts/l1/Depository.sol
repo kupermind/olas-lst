@@ -508,43 +508,22 @@ contract Depository {
         emit Deposit(msg.sender, stakeAmount, stAmount, chainIds, stakingProxies, amounts);
     }
 
-    /// @dev Unstakes from specified staking models.
-    /// @notice This allows to deduct reserves from their staked part and get them back as vault part.
-    /// @param unstakeAmount Total amount to unstake.
-    /// @param chainIds Set of chain Ids with staking proxies.
-    /// @param stakingProxies Set of sets of staking proxies corresponding to each chain Id.
-    /// @param bridgePayloads Bridge payloads corresponding to each chain Id.
-    /// @param values Value amounts for each bridge interaction, if applicable.
-    function unstake(
-        uint256 unstakeAmount,
-        uint256[] memory chainIds,
-        address[][] memory stakingProxies,
-        bytes[] memory bridgePayloads,
-        uint256[] memory values
-    ) external payable {
-        // Check for ownership
-        if (msg.sender != owner) {
-            revert OwnerOnly(msg.sender, owner);
-        }
-
-        processUnstake(unstakeAmount, chainIds, stakingProxies, bridgePayloads, values);
-    }
-
     /// @dev Calculates amounts and initiates cross-chain unstake request from specified models.
+    /// @notice This allows to deduct reserves from their staked part and get them back as vault assets.
     /// @param unstakeAmount Total amount to unstake.
     /// @param chainIds Set of chain Ids with staking proxies.
     /// @param stakingProxies Set of sets of staking proxies corresponding to each chain Id.
     /// @param bridgePayloads Bridge payloads corresponding to each chain Id.
     /// @param values Value amounts for each bridge interaction, if applicable.
     /// @return amounts Corresponding OLAS amounts for each staking proxy.
-    function processUnstake(
+    function unstake(
         uint256 unstakeAmount,
         uint256[] memory chainIds,
         address[][] memory stakingProxies,
         bytes[] memory bridgePayloads,
         uint256[] memory values
-    ) public payable returns (uint256[][] memory amounts) {
-        if (msg.sender != address(this) && msg.sender != treasury) {
+    ) external payable returns (uint256[][] memory amounts) {
+        if (msg.sender != owner && msg.sender != treasury) {
             revert UnauthorizedAccount(msg.sender);
         }
 
