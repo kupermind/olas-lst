@@ -230,3 +230,20 @@ State Changes or Fees: If the vault has any mechanisms (like fees or dynamic con
 In summary, while previewRedeem is intended to reflect what you’d receive from a redeem call, it should be considered an estimate. Under normal conditions without complicating factors, they would return the same number, but slight discrepancies may occur in practice.
 
 ```
+
+###  curReserveBalance is not obviously taken into account in the contract
+```
+Issue 1:
+function updateTotalAssets() public
+uint256 curTotalReserves = curStakedBalance + curVaultBalance;
+vs
+curReserveBalance
+
+Issue 2:
+function redeem(uint256 shares, address receiver, address tokenOwner) public override returns (uint256 assets)
+curReserveBalance -= assets;
+vs
+uint256 curTotalReserves = curStakedBalance + curVaultBalance;
+
+Thus TotalReserves not included same time curReserveBalance, same time included.
+```
