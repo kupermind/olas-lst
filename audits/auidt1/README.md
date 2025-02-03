@@ -155,7 +155,6 @@ Main question: stOLAS.previewRedeem(shares) > asset.balanceOf(stOLAS) is this co
 []
 
 ### stOLAS
-
 #### Question. Balance in function redeem
 ```
 curVaultBalance = 0
@@ -177,6 +176,7 @@ else {
         }
     
 ```
+[]
 
 #### Medium/Question. Return value of redeem and redeem vs previewRedee
 ```
@@ -230,6 +230,7 @@ State Changes or Fees: If the vault has any mechanisms (like fees or dynamic con
 In summary, while previewRedeem is intended to reflect what you’d receive from a redeem call, it should be considered an estimate. Under normal conditions without complicating factors, they would return the same number, but slight discrepancies may occur in practice.
 
 ```
+[]
 
 ###  curReserveBalance is not obviously taken into account in the contract
 ```
@@ -247,3 +248,4 @@ uint256 curTotalReserves = curStakedBalance + curVaultBalance;
 
 Thus TotalReserves not included same time curReserveBalance, same time included.
 ```
+[]
