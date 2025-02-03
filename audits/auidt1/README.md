@@ -108,7 +108,7 @@ function processAndMintStToken(address account, uint256 olasAmount) external ret
 ```
 []
 
-### Design auth/control issue. Treasury unstake vs Depository processUnstake
+#### Design auth/control issue. Treasury unstake vs Depository processUnstake
 ```
 owner only -> Treasury.unstake() -> Treasury._unstake() -> IDepository(depository).processUnstake
 vs
@@ -116,20 +116,20 @@ any -> Depository.processUnstake
 ```
 []
 
-### Treasure/stOLAS update stakedBalance after unstake
+#### Treasure/stOLAS update stakedBalance after unstake
 ```
 stakedBalance only changed curStakedBalance += assets; in deposit
 stakedBalance affteced `unstake`?
 ```
 []
 
-### requestToWithdraw non-clear using global variable withdrawAmountRequested
+#### requestToWithdraw non-clear using global variable withdrawAmountRequested
 ```
 Double-check uint256 curWithdrawAmountRequested = withdrawAmountRequested + olasAmount;
 ```
 []
 
-### requestToWithdraw/redeem question. 
+#### requestToWithdraw/redeem question. 
 ```
 No idea how to solve it.
 olasAmount = IST(st).redeem(stAmount, address(this), address(this));
@@ -154,5 +154,79 @@ Main question: stOLAS.previewRedeem(shares) > asset.balanceOf(stOLAS) is this co
 ```
 []
 
+### stOLAS
 
+#### Question. Balance in function redeem
+```
+curVaultBalance = 0
+reserveBalance = 0
+Can they be non-zero in this case?
+else {
+            transferAmount = curVaultBalance;
+            uint256 diff = assets - curVaultBalance;
+            curVaultBalance = 0;
 
+            // Check for overflow, must never happen
+            if (diff > curStakedBalance) {
+                revert Overflow(diff, curStakedBalance);
+            }
+
+            curStakedBalance -= diff;
+            stakedBalance = curStakedBalance;
+            reserveBalance = 0;
+        }
+    
+```
+
+#### Medium/Question. Return value of redeem and redeem vs previewRedee
+```
+Should this computation (*) be wrapped in previewRedeem. Because transferAmount <= assets. 
+By standard
+According to the ERC‑4626 standard, the redeem function is indeed expected to return the actual amount of underlying tokens that have been transferred out of the vault. This return value represents the exact assets that were withdrawn as a result of burning the specified shares. It is intended to provide clarity and consistency so that both users and integrators can reliably determine the outcome of the redemption operation.
+
+(*) if (curVaultBalance > assets) {
+            transferAmount = assets;
+
+            // Reserve balance update
+            if (assets > curReserveBalance) {
+                curReserveBalance = 0;
+                curVaultBalance -= (assets - curReserveBalance);
+            } else {
+                curReserveBalance -= assets;
+            }
+        } else {
+            transferAmount = curVaultBalance;
+            uint256 diff = assets - curVaultBalance;
+            curVaultBalance = 0;
+
+            // Check for overflow, must never happen
+            if (diff > curStakedBalance) {
+                revert Overflow(diff, curStakedBalance);
+            }
+
+            curStakedBalance -= diff;
+            stakedBalance = curStakedBalance;
+            reserveBalance = 0;
+        }
+
+Confirming previewRedeem behavior
+
+In line with ERC4626, previewRedeem should mirror redeem's output. It's designed to simulate, matching expected results in a transaction.
+
+Evaluating discrepancies
+
+previewRedeem and redeem outputs might diverge due to fees or rounding errors. This insight clarifies that previewRedeem simulates outcomes without considering these factors.
+
+Clarifying simulation and precision
+
+EIP-4626 distinguishes previewRedeem from redeem, attributing discrepancies to rounding or fees, while previewRedeem mimics the redemption reverse order, minus fees or slippage.
+
+According to the ERC‑4626 standard, the purpose of the previewRedeem function is to provide a view (or estimate) of the amount of underlying assets you would receive if you redeemed a given number of shares. In an ideal scenario—where there are no fees, rounding errors, or state-dependent factors—the value returned by previewRedeem would match the actual amount transferred by redeem.
+
+However, there are a couple of important nuances:
+
+Rounding Errors: In some implementations, due to integer arithmetic or rounding, there might be minor differences between the previewed value and the actual value received.
+State Changes or Fees: If the vault has any mechanisms (like fees or dynamic conversion rates) that affect the redemption process, the actual value returned by redeem might slightly differ from the preview if those factors change between the preview and the actual redemption transaction.
+In summary, while previewRedeem is intended to reflect what you’d receive from a redeem call, it should be considered an estimate. Under normal conditions without complicating factors, they would return the same number, but slight discrepancies may occur in practice.
+
+```
