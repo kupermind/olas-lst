@@ -75,12 +75,15 @@ error Overflow(uint256 provided, uint256 max);
 /// @param stakingModelId Staking model Id.
 error StakingModelAlreadyExists(uint256 stakingModelId);
 
-/// @dev Account is unauthorized.
+/// @dev Wrong staking model Id provided.
+/// @param stakingModelId Staking model Id.
+error WrongStakingModel(uint256 stakingModelId);
+
+/// @dev Unauthorized account.
 /// @param account Account address.
 error UnauthorizedAccount(address account);
 
-error WrongStakingModel(uint256 stakingModelId);
-
+// StakingModel struct
 struct StakingModel {
     uint96 supply;
     uint96 remainder;
@@ -110,19 +113,26 @@ contract Depository {
     // Max lock factor
     uint256 public constant MAX_LOCK_FACTOR = 10_000;
 
+    // OLAS contract address
     address public immutable olas;
+    // stOLAS contract address
     address public immutable st;
+    // veOLAS contract address
     address public immutable ve;
+    // Lock contract address
     address public immutable lock;
 
+    // Treasury contract address
     address public treasury;
+    // Contract owner address
     address public owner;
 
     // Lock factor in 10_000 value
     uint256 public lockFactor;
-    uint256 internal _nonce;
 
+    // Mapping of staking model Id => staking model
     mapping(uint256 => StakingModel) public mapStakingModels;
+    // Mapping of whitelisted guardian agents
     mapping(address => bool) public mapGuardianAgents;
     // Mapping for L2 chain Id => dedicated deposit processors
     mapping(uint256 => address) public mapChainIdDepositProcessors;
@@ -141,6 +151,9 @@ contract Depository {
         owner = msg.sender;
     }
 
+    /// @dev Increases veOLAS lock.
+    /// @param olasAmount OLAS amount to get lock part from.
+    /// @return remainder veOLAS locked amount.
     function _increaseLock(uint256 olasAmount) internal returns (uint256 remainder) {
         // Get treasury veOLAS lock amount
         uint256 lockAmount = (olasAmount * lockFactor) / MAX_LOCK_FACTOR;
@@ -495,7 +508,27 @@ contract Depository {
         emit Deposit(msg.sender, stakeAmount, stAmount, chainIds, stakingProxies, amounts);
     }
 
+    /// @dev Unstakes from specified staking models.
+    /// @notice This allows to deduct reserves from their staked part and get them back as vault part.
+    /// @param unstakeAmount Total amount to unstake.
+    /// @param chainIds Set of chain Ids with staking proxies.
+    /// @param stakingProxies Set of sets of staking proxies corresponding to each chain Id.
+    /// @param bridgePayloads Bridge payloads corresponding to each chain Id.
+    /// @param values Value amounts for each bridge interaction, if applicable.
+    function unstake(
+        uint256 unstakeAmount,
+        uint256[] memory chainIds,
+        address[][] memory stakingProxies,
+        bytes[] memory bridgePayloads,
+        uint256[] memory values
+    ) external payable {
+        // Check for ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
+        }
 
+        processUnstake(unstakeAmount, chainIds, stakingProxies, bridgePayloads, values);
+    }
 
     /// @dev Calculates amounts and initiates cross-chain unstake request from specified models.
     /// @param unstakeAmount Total amount to unstake.
@@ -510,7 +543,11 @@ contract Depository {
         address[][] memory stakingProxies,
         bytes[] memory bridgePayloads,
         uint256[] memory values
-    ) external payable returns (uint256[][] memory amounts) {
+    ) public payable returns (uint256[][] memory amounts) {
+        if (msg.sender != address(this) && msg.sender != treasury) {
+            revert UnauthorizedAccount(msg.sender);
+        }
+
         // Allocate arrays of max possible size
         amounts = new uint256[][](chainIds.length);
 
