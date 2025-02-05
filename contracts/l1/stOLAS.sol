@@ -211,6 +211,7 @@ contract stOLAS is ERC4626 {
         }
 
         uint256 curReserveBalance = reserveBalance;
+        // This must never happen
         if (amount > curReserveBalance) {
             revert Overflow(amount, curReserveBalance);
         }

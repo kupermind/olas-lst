@@ -480,7 +480,6 @@ contract StakingManager is ERC721TokenReceiver {
             revert UnauthorizedAccount(msg.sender);
         }
 
-        // TODO Overflow sanity checks? On L1 side as well?
         uint256 totalAmount;
         // Traverse all staking proxies
         for (uint256 i = 0; i < stakingProxies.length; ++i) {
@@ -536,6 +535,7 @@ contract StakingManager is ERC721TokenReceiver {
         _locked = 1;
     }
 
+    // TODO Probably not needed
     function isAbleStake(address stakingProxy) public view returns (bool) {
         // Check for staking instance validity
         if(!IStaking(stakingFactory).verifyInstance(stakingProxy)) {
@@ -566,6 +566,4 @@ contract StakingManager is ERC721TokenReceiver {
 
         return true;
     }
-
-    receive() external payable {}
 }

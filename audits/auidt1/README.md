@@ -152,7 +152,7 @@ uint256 curVaultBalance = asset.balanceOf(address(this));
 curVaultBalance < assets ---> Does this even make sense?
 Main question: stOLAS.previewRedeem(shares) > asset.balanceOf(stOLAS) is this correct from some point of view?
 ```
-[]
+[x] Verified, false positive
 
 ### stOLAS
 #### Question. Balance in function redeem
@@ -176,9 +176,9 @@ else {
         }
     
 ```
-[]
+[x] reserveBalance is part of vaultBalance
 
-#### Medium/Question. Return value of redeem and redeem vs previewRedee
+#### Medium/Question. Return value of redeem and redeem vs previewRedeem
 ```
 Should this computation (*) be wrapped in previewRedeem. Because transferAmount <= assets. 
 By standard
@@ -230,7 +230,7 @@ State Changes or Fees: If the vault has any mechanisms (like fees or dynamic con
 In summary, while previewRedeem is intended to reflect what you’d receive from a redeem call, it should be considered an estimate. Under normal conditions without complicating factors, they would return the same number, but slight discrepancies may occur in practice.
 
 ```
-[]
+[x] Discussed, not an issue
 
 ###  curReserveBalance is not obviously taken into account in the contract
 ```
@@ -248,4 +248,4 @@ uint256 curTotalReserves = curStakedBalance + curVaultBalance;
 
 Thus TotalReserves not included same time curReserveBalance, same time included.
 ```
-[]
+[x] Discussed, not an issue
