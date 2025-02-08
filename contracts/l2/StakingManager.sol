@@ -66,6 +66,11 @@ error WrongStakingInstance(address stakingProxy);
 /// @param requestId Request Id.
 error AlreadyProcessed(uint256 requestId);
 
+/// @dev Service is not evicted.
+/// @param stakingProxy Staking proxy address.
+/// @param serviceId Service Id.
+error ServiceNotEvicted(address stakingProxy, uint256 serviceId);
+
 /// @title StakingManager - Smart contract for OLAS staking management
 contract StakingManager is ERC721TokenReceiver {
     event OwnerUpdated(address indexed owner);
@@ -386,13 +391,6 @@ contract StakingManager is ERC721TokenReceiver {
         emit DeployAndStake(stakingProxy, serviceId, multisig);
     }
 
-    /// @dev Finds the last staked Id service and unstakes it.
-    /// @param stakingProxy Staking proxy address.
-    /// @return unstakeAmount Unstake amount for service termination and unbond.
-    function _unstake(address stakingProxy) internal returns (uint256 unstakeAmount) {
-
-    }
-
     function stake(address[] memory stakingProxies, uint256[] memory amounts, uint256 totalAmount) external virtual {
         // Reentrancy guard
         if (_locked > 1) {
@@ -408,6 +406,7 @@ contract StakingManager is ERC721TokenReceiver {
         // Get OLAS from l2StakingProcessor
         IToken(olas).transferFrom(l2StakingProcessor, address(this), totalAmount);
 
+        // Traverse all staking proxies
         for (uint256 i = 0; i < stakingProxies.length; ++i) {
             // Get current unstaked balance
             uint256 balance = mapStakingProxyBalances[stakingProxies[i]];
@@ -461,9 +460,50 @@ contract StakingManager is ERC721TokenReceiver {
         _locked = 1;
     }
 
-    // TODO Re-stake if services are evicted by any reason
-    function reStake(address stakingProxy, uint256[] memory serviceIds) external {
+    /// @dev Re-stakes if services are evicted for any reason.
+    /// @param stakingProxies Set of staking proxy addresses.
+    /// @param serviceIds Corresponding sets of service Ids for each staking proxy address.
+    function reStake(address[] memory stakingProxies, uint256[][] memory serviceIds) external {
+        // Traverse all staking proxies
+        for (uint256 i = 0; i < stakingProxies.length; ++i) {
+            // Check for zero address
+            if (stakingProxies[i] == address(0)) {
+                revert ZeroAddress();
+            }
 
+            // Get number of stakes services
+            uint256 numServices = serviceIds[i].length;
+            // Check for zero value
+            if (numServices == 0) {
+                revert ZeroValue();
+            }
+
+            uint256 minStakingDeposit = IStaking(stakingProxies[i]).minStakingDeposit();
+            uint256 fullStakingDeposit = minStakingDeposit * (1 + NUM_AGENT_INSTANCES);
+
+            // Calculate total staking deposit
+            uint256 totalStakingDeposit = numServices * fullStakingDeposit;
+
+            // Approve token for the serviceRegistryTokenUtility contract
+            IToken(olas).approve(serviceRegistryTokenUtility, totalStakingDeposit);
+
+            // Traverse all required services
+            for (uint256 j = 0; j < numServices; ++j) {
+                // Check that the service is evicted
+                if (IStaking(stakingProxies[i]).getStakingState(serviceIds[i][j]) != IStaking.StakingState.Evicted) {
+                    revert ServiceNotEvicted(stakingProxies[i], serviceIds[i][j]);
+                }
+
+                // Unstake evicted service
+                IStaking(stakingProxies[i]).unstake(serviceIds[i][j]);
+
+                // Approve service NFT for the staking instance
+                INFToken(serviceRegistry).approve(stakingProxies[i], serviceIds[i][j]);
+
+                // Stake the service
+                IStaking(stakingProxies[i]).stake(serviceIds[i][j]);
+            }
+        }
     }
 
     /// @dev Unstakes, if needed, and withdraws specified amounts from specified staking contracts.

@@ -3,6 +3,12 @@ pragma solidity ^0.8.28;
 
 // Staking interface
 interface IStaking {
+    enum StakingState {
+        Unstaked,
+        Staked,
+        Evicted
+    }
+
     /// @dev Gets service staking token.
     /// @return Service staking token address.
     function stakingToken() external view returns (address);
@@ -37,4 +43,9 @@ interface IStaking {
     /// @param instance Service staking proxy instance.
     /// @return True, if verification is successful.
     function verifyInstance(address instance) external view returns (bool);
+
+    /// @dev Gets the service staking state.
+    /// @param serviceId.
+    /// @return stakingState Staking state of the service.
+    function getStakingState(uint256 serviceId) external view returns (StakingState stakingState);
 }
