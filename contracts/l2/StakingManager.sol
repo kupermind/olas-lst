@@ -437,25 +437,28 @@ contract StakingManager is ERC721TokenReceiver {
                 IToken(olas).approve(serviceRegistryTokenUtility, totalStakeDeposit);
 
                 // Get already existent service or create a new one
-                uint256 lastIdx = mapLastStakedServiceIdxs[stakingProxies[i]];
+                uint256 nextIdx = mapLastStakedServiceIdxs[stakingProxies[i]];
                 uint256 maxIdx = mapStakedServiceIds[stakingProxies[i]].length;
+                if (maxIdx > 0) {
+                    nextIdx++;
+                }
 
                 // Traverse all required stakes
                 for (uint256 j = 0; j < numStakes; ++j) {
                     uint256 serviceId;
-                    if (lastIdx < maxIdx) {
+                    if (nextIdx < maxIdx) {
                         // Deploy and stake already existent service or create a new one first
-                        serviceId = mapStakedServiceIds[stakingProxies[i]][lastIdx];
+                        serviceId = mapStakedServiceIds[stakingProxies[i]][nextIdx];
                         _deployAndStake(stakingProxies[i], serviceId);
                     } else {
                         _createAndStake(stakingProxies[i], minStakingDeposit);
                     }
 
-                    lastIdx++;
+                    nextIdx++;
                 }
 
                 // Update last staked service Id
-                mapLastStakedServiceIdxs[stakingProxies[i]] = lastIdx + 1;
+                mapLastStakedServiceIdxs[stakingProxies[i]] = nextIdx - 1;
 
                 // Update unstaked balance
                 balance -= totalStakeDeposit;
@@ -565,4 +568,7 @@ contract StakingManager is ERC721TokenReceiver {
 
         return true;
     }
+
+    /// @dev Receives native funds for mock Service Registry minimal payments.
+    receive() external payable {}
 }
