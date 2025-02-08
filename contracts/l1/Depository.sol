@@ -432,6 +432,10 @@ contract Depository {
         uint256 reserveBalance = IST(st).reserveBalance();
         // Remainder is stake amount plus reserve balance
         uint256 remainder = stakeAmount + reserveBalance;
+        // Check for zero value
+        if (remainder == 0) {
+            revert ZeroValue();
+        }
 
         uint256 actualStakeAmount;
         uint256[] memory totalAmounts = new uint256[](chainIds.length);

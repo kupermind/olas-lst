@@ -71,7 +71,7 @@ contract StakingManager is ERC721TokenReceiver {
     event OwnerUpdated(address indexed owner);
     event StakingProcessorL2Updated(address indexed l2StakingProcessor);
     event SetGuardianServiceStatuses(address[] guardianServices, bool[] statuses);
-    event StakingBalanceUpdated(address indexed stakingProxy, uint256 balance);
+    event StakingBalanceUpdated(address indexed stakingProxy, uint256 numStakes, uint256 balance);
     event CreateAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig,
         address activityModule);
     event DeployAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig);
@@ -420,40 +420,49 @@ contract StakingManager is ERC721TokenReceiver {
         IToken(olas).transferFrom(l2StakingProcessor, address(this), totalAmount);
 
         for (uint256 i = 0; i < stakingProxies.length; ++i) {
-            // TODO: check that stakingProxy is able to host another service
-            if (!isAbleStake(stakingProxies[i])) {
-                revert();
-            }
-
-            // TODO How many stakes are needed?
+            // Get current unstaked balance
             uint256 balance = mapStakingProxyBalances[stakingProxies[i]];
             uint256 minStakingDeposit = IStaking(stakingProxies[i]).minStakingDeposit();
-            uint256 stakeDeposit = minStakingDeposit * (1 + NUM_AGENT_INSTANCES);
+            uint256 fullStakeDeposit = minStakingDeposit * (1 + NUM_AGENT_INSTANCES);
 
             balance += amounts[i];
+
+            // Calculate number of stakes
+            uint256 numStakes = balance / fullStakeDeposit;
+            uint256 totalStakeDeposit = numStakes * fullStakeDeposit;
+
             // Check if the balance is enough to create another stake
-            if (balance >= stakeDeposit) {
+            if (numStakes > 0) {
                 // Approve token for the serviceRegistryTokenUtility contract
-                IToken(olas).approve(serviceRegistryTokenUtility, stakeDeposit);
+                IToken(olas).approve(serviceRegistryTokenUtility, totalStakeDeposit);
 
                 // Get already existent service or create a new one
-                uint256 lastIdx = mapLastStakedServiceIdxs[stakingProxies[i]] + 1;
-                uint256 serviceId;
-                if (lastIdx < mapStakedServiceIds[stakingProxies[i]].length) {
-                    serviceId = mapStakedServiceIds[stakingProxies[i]][lastIdx];
+                uint256 lastIdx = mapLastStakedServiceIdxs[stakingProxies[i]];
+                uint256 maxIdx = mapStakedServiceIds[stakingProxies[i]].length;
+
+                // Traverse all required stakes
+                for (uint256 j = 0; j < numStakes; ++j) {
+                    uint256 serviceId;
+                    if (lastIdx < maxIdx) {
+                        // Deploy and stake already existent service or create a new one first
+                        serviceId = mapStakedServiceIds[stakingProxies[i]][lastIdx];
+                        _deployAndStake(stakingProxies[i], serviceId);
+                    } else {
+                        _createAndStake(stakingProxies[i], minStakingDeposit);
+                    }
+
+                    lastIdx++;
                 }
 
-                // Deploy and stake already existent service or create a new one first
-                if (serviceId > 0) {
-                    _deployAndStake(stakingProxies[i], serviceId);
-                } else {
-                    _createAndStake(stakingProxies[i], minStakingDeposit);
-                }
+                // Update last staked service Id
+                mapLastStakedServiceIdxs[stakingProxies[i]] = lastIdx + 1;
 
-                balance -= stakeDeposit;
+                // Update unstaked balance
+                balance -= totalStakeDeposit;
+                mapStakingProxyBalances[stakingProxies[i]] = balance;
             }
-            mapStakingProxyBalances[stakingProxies[i]] = balance;
-            emit StakingBalanceUpdated(stakingProxies[i], balance);
+
+            emit StakingBalanceUpdated(stakingProxies[i], numStakes, balance);
         }
 
         _locked = 1;
@@ -519,8 +528,9 @@ contract StakingManager is ERC721TokenReceiver {
         return IStaking(stakingProxy).claim(serviceId);
     }
 
-    // TODO
-    function drain(address token) external {
+    /// @dev Drains specified tokens.
+    /// @param tokens Set of token addresses.
+    function drain(address[] memory tokens) external {
         // Reentrancy guard
         if (_locked > 1) {
             revert ReentrancyGuard();
@@ -532,30 +542,19 @@ contract StakingManager is ERC721TokenReceiver {
             revert OwnerOnly(msg.sender, owner);
         }
 
+        for (uint256 i = 0; i < tokens.length; ++i) {
+            // Get token balance
+            uint256 balance = IToken(tokens[i]).balanceOf(address(this));
+
+            // Check for zero value
+            if (balance == 0) {
+                revert ZeroValue();
+            }
+
+            IToken(tokens[i]).transfer(collector, balance);
+        }
+
         _locked = 1;
-    }
-
-    // TODO Probably not needed
-    function isAbleStake(address stakingProxy) public view returns (bool) {
-        // Check for staking instance validity
-        if(!IStaking(stakingFactory).verifyInstance(stakingProxy)) {
-            revert WrongStakingInstance(stakingProxy);
-        }
-
-        // TODO Check number of staked services
-        //
-
-        // Get other service info for staking
-        uint256 numAgentInstances = IStaking(stakingProxy).numAgentInstances();
-        uint256 threshold = IStaking(stakingProxy).threshold();
-        // Check for number of agent instances that must be equal to one,
-        // since msg.sender is the only service multisig owner
-        if ((numAgentInstances > 0 &&  numAgentInstances != NUM_AGENT_INSTANCES) ||
-            (threshold > 0 && threshold != THRESHOLD)) {
-            revert WrongStakingInstance(stakingProxy);
-        }
-
-        return true;
     }
 
     function isAbleWithdraw(address stakingProxy) public view returns (bool) {
