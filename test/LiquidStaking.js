@@ -27,34 +27,32 @@ describe("Liquid Staking", function () {
     let treasury;
     let collector;
     let beacon;
+    let bridgeRelayer;
     let activityModule;
     let stakingManager;
     let stakingTokenImplementation;
     let stakingTokenInstance;
+    let gnosisDepositProcessorL1;
+    let gnosisStakingProcessorL2;
     let signers;
     let deployer;
     let agent;
-    let agentInstances;
     let bytecodeHash;
-    let stakingModelId;
     const AddressZero = ethers.constants.AddressZero;
     const HashZero = ethers.constants.HashZero;
     const oneDay = 86400;
     const defaultHash = "0x" + "5".repeat(64);
     const regDeposit = ethers.utils.parseEther("500");
-    const regBond = regDeposit;
     const serviceId = 1;
     const agentId = 1;
     const agentIds = [1];
-    const agentParams = [[1, regBond]];
     const threshold = 1;
     const livenessPeriod = 10; // Ten seconds
     const initSupply = "5" + "0".repeat(26);
-    const payload = "0x";
     const livenessRatio = "1" + "0".repeat(16); // 0.01 transaction per second (TPS)
-    maxNumServices = 100;
-    minStakingDeposit = regDeposit;
-    timeForEmissions = oneDay * 30;
+    const maxNumServices = 100;
+    const minStakingDeposit = regDeposit;
+    const timeForEmissions = oneDay * 30;
     let serviceParams = {
         metadataHash: defaultHash,
         maxNumServices,
@@ -85,7 +83,6 @@ describe("Liquid Staking", function () {
         signers = await ethers.getSigners();
         deployer = signers[0];
         agent = signers[0];
-        agentInstances = [signers[2], signers[3], signers[4]];
 
         const ServiceRegistry = await ethers.getContractFactory("ServiceRegistryL2");
         serviceRegistry = await ServiceRegistry.deploy("Service Registry L2", "SERVICE", "https://localhost/service/");
@@ -122,7 +119,7 @@ describe("Liquid Staking", function () {
         await gnosisSafe.deployed();
 
         const GnosisSafeL2 = await ethers.getContractFactory("GnosisSafeL2");
-        gnosisSafeL2 = await GnosisSafe.deploy();
+        gnosisSafeL2 = await GnosisSafeL2.deploy();
         await gnosisSafeL2.deployed();
 
         const GnosisSafeProxyFactory = await ethers.getContractFactory("GnosisSafeProxyFactory");
