@@ -182,10 +182,6 @@ contract ActivityModule {
         _increaseActivity(1);
     }
 
-    function execute(bytes memory) external {
-        _increaseActivity(1);
-    }
-
     function claim() external {
         // Get staking reward
         IStakingManager(stakingManager).claim(stakingProxy, serviceId);
