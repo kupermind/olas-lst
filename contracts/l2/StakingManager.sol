@@ -10,6 +10,7 @@ import "hardhat/console.sol";
 
 interface IActivityModule {
     function initialize(address _multisig, address _stakingProxy, uint256 _serviceId) external;
+    function increaseInitialActivity() external;
 }
 
 interface IBridge {
@@ -360,6 +361,9 @@ contract StakingManager is ERC721TokenReceiver {
         // Stake the service
         _stake(stakingProxy, serviceId);
 
+        // Increase initial module activity
+        IActivityModule(activityModule).increaseInitialActivity();
+
         emit CreateAndStake(stakingProxy, serviceId, multisig, activityModule);
     }
 
@@ -532,8 +536,8 @@ contract StakingManager is ERC721TokenReceiver {
                 balance -= amounts[i];
             } else {
                 // This must never happen
-                if (!isAbleWithdraw(stakingProxies[i])) {
-                    revert();
+                if (mapStakedServiceIds[stakingProxies[i]].length == 0) {
+                    revert ZeroValue();
                 }
 
                 // Calculate how many unstakes are needed
@@ -625,15 +629,6 @@ contract StakingManager is ERC721TokenReceiver {
         }
 
         _locked = 1;
-    }
-
-    function isAbleWithdraw(address stakingProxy) public view returns (bool) {
-        uint256 numServices = mapStakedServiceIds[stakingProxy].length;
-        if (numServices == 0) {
-            revert ZeroValue();
-        }
-
-        return true;
     }
 
     /// @dev Receives native funds for mock Service Registry minimal payments.

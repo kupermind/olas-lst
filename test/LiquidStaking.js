@@ -47,9 +47,9 @@ describe("Liquid Staking", function () {
     const agentId = 1;
     const agentIds = [1];
     const threshold = 1;
-    const livenessPeriod = 10; // Ten seconds
+    const livenessPeriod = oneDay; // 24 hours
     const initSupply = "5" + "0".repeat(26);
-    const livenessRatio = "1" + "0".repeat(16); // 0.01 transaction per second (TPS)
+    const livenessRatio = "11111111111111"; // 1 transaction per 25 hours
     const maxNumServices = 100;
     const minStakingDeposit = regDeposit;
     const timeForEmissions = oneDay * 30;
@@ -228,7 +228,7 @@ describe("Liquid Staking", function () {
         await stakingManager.initialize(gnosisSafeMultisig.address, gnosisSafeSameAddressMultisig.address,
             fallbackHandler.address, gnosisStakingProcessorL2.address);
 
-        const ActivityChecker = await ethers.getContractFactory("MockActivityChecker");
+        const ActivityChecker = await ethers.getContractFactory("ModuleActivityChecker");
         activityChecker = await ActivityChecker.deploy(livenessRatio);
         await activityChecker.deployed();
         serviceParams.activityChecker = activityChecker.address;

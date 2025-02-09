@@ -87,6 +87,11 @@ error ZeroValue();
 /// @dev The contract is already initialized.
 error AlreadyInitialized();
 
+/// @dev Only `manager` has a privilege, but the `sender` was provided.
+/// @param sender Sender address.
+/// @param manager Required sender address as a manager.
+error ManagerOnly(address sender, address manager);
+
 /// @title ActivityModule - Smart contract for multisig activity tracking
 contract ActivityModule {
     event ActivityIncreased(uint256 activityChange);
@@ -115,7 +120,15 @@ contract ActivityModule {
         collector = _collector;
     }
 
+    function _increaseActivity(uint256 activityChange) internal {
+        activityNonce += activityChange;
+
+        emit ActivityIncreased(activityChange);
+    }
+
     function initialize(address _multisig, address _stakingProxy, uint256 _serviceId) external {
+        // TODO reentrancy check?
+
         if (multisig != address(0)) {
             revert AlreadyInitialized();
         }
@@ -136,48 +149,54 @@ contract ActivityModule {
         serviceId = _serviceId;
 
         // Set up address(this) as multisig module
-        uint256 nonce = ISafe(multisig).nonce();
-
-        ISafe.Operation operation = ISafe.Operation.Call;
+        // Get signature for approved hash case
+        bytes32 r = bytes32(uint256(uint160(address(this))));
+        bytes memory signature = abi.encodePacked(r, bytes32(0), uint8(1));
 
         // Encode enable module function call
         bytes memory data = abi.encodeCall(ISafe.enableModule, (address(this)));
-        bytes32 txHash = ISafe(multisig).getTransactionHash(multisig, 0, data, operation, 0, 0, 0, address(0),
-            address(0), nonce);
+
+        // Get multisig nonce
+        uint256 nonce = ISafe(multisig).nonce();
+        // Check for zero value, as only newly created multisig is considered valid
+        if (nonce > 0) {
+            revert AlreadyInitialized();
+        }
+
+        bytes32 txHash = ISafe(multisig).getTransactionHash(multisig, 0, data, ISafe.Operation.Call, 0, 0, 0,
+            address(0),address(0), nonce);
 
         // Approve hash
         ISafe(multisig).approveHash(txHash);
 
-        // Get signature for approved hash case
-        uint8 v = 1;
-        bytes32 r = bytes32(uint256(uint160(address(this))));
-        bytes32 s;
-        bytes memory signature = abi.encodePacked(r, s, v);
-
         // Execute multisig transaction
-        ISafe(multisig).execTransaction(multisig, 0, data, operation, 0, 0, 0, address(0), payable(address(0)), signature);
+        ISafe(multisig).execTransaction(multisig, 0, data, ISafe.Operation.Call, 0, 0, 0, address(0),
+            payable(address(0)), signature);
+    }
+
+    function increaseInitialActivity() external {
+        if (msg.sender != stakingManager) {
+            revert ManagerOnly(msg.sender, stakingManager);
+        }
+
+        _increaseActivity(1);
     }
 
     function execute(bytes memory) external {
-        activityNonce++;
-
-        emit ActivityIncreased(1);
+        _increaseActivity(1);
     }
 
     function claim() external {
-        // TODO What to do for the first action or activity in general?
-        if (activityNonce == 0) {
-            activityNonce = 1;
-        }
-
         // Get staking reward
-        uint256 reward = IStakingManager(stakingManager).claim(stakingProxy, serviceId);
-        if (reward > 0) {
-            activityNonce++;
-        }
+        IStakingManager(stakingManager).claim(stakingProxy, serviceId);
 
+        // Increases activity for the next staking epoch
+        _increaseActivity(1);
+
+        // Get multisig balance
         uint256 balance = IToken(olas).balanceOf(multisig);
 
+        // Check for zero balance
         if (balance == 0) {
             revert ZeroValue();
         }
