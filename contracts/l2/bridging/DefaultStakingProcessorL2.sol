@@ -48,24 +48,14 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
     event StakingRequestExecuted(address[] targets, uint256[] amounts, bytes32 indexed batchHash);
     event StakingRequestQueued(bytes32 indexed queueHash, address[] targets, uint256[] amounts,
         bytes32 indexed batchHash, bytes32 operation, uint256 olasBalance, uint256 paused);
-    event MessagePosted(uint256 indexed sequence, address indexed messageSender, uint256 amount,
-        bytes32 indexed batchHash);
     event MessageReceived(address indexed sender, uint256 chainId, bytes data);
     event Drain(address indexed owner, uint256 amount);
     event StakingProcessorPaused();
     event StakingProcessorUnpaused();
     event Migrated(address indexed sender, address indexed newL2TargetDispenser, uint256 amount);
 
-    // receiveMessage selector (Ethereum chain)
-    bytes4 public constant RECEIVE_MESSAGE = bytes4(keccak256(bytes("receiveMessage(bytes)")));
     // Maximum chain Id as per EVM specs
     uint256 public constant MAX_CHAIN_ID = type(uint64).max / 2 - 36;
-    // Default min gas limit for sending a message to L1
-    // This is safe as the value is practically bigger than observed ones on numerous chains
-    uint256 public constant MIN_GAS_LIMIT = 300_000;
-    // Max gas limit for sending a message to L1
-    // Several bridges consider this value as a maximum gas limit
-    uint256 public constant MAX_GAS_LIMIT = 2_000_000;
     // Stake operation
     bytes32 public constant STAKE = 0x1bcc0f4c3fad314e585165815f94ecca9b96690a26d6417d7876448a9a867a69;
     // Unstake operation
@@ -83,13 +73,10 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
     address public immutable l1DepositProcessor;
     // Deposit processor chain Id
     uint256 public immutable l1SourceChainId;
-    // Nonce for each staking batch
-    uint256 public stakingBatchNonce;
     // Owner address (Timelock or bridge mediator)
     address public owner;
     // Pause switcher
     uint8 public paused;
-    // TODO change to transient bool
     // Reentrancy lock
     uint256 internal _locked;
 
