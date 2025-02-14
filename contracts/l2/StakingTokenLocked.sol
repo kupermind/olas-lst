@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {StakingBase} from "../../lib/autonolas-registries/contracts/staking/StakingBase.sol";
+import {StakingBaseLocked} from "./StakingBaseLocked.sol";
 import {SafeTransferLib} from "../../lib/autonolas-registries/contracts/utils/SafeTransferLib.sol";
 
 // Service Registry Token Utility interface
@@ -42,7 +42,7 @@ error ValueLowerThan(uint256 provided, uint256 expected);
 error UnauthorizedAccount(address account);
 
 /// @title StakingTokenLocked - Smart contract for staking a service with a token stake via a specific stakingManager
-contract StakingTokenLocked is StakingBase {
+contract StakingTokenLocked is StakingBaseLocked {
     // ServiceRegistryTokenUtility address
     address public serviceRegistryTokenUtility;
     // Security token address for staking corresponding to the service deposit token

@@ -343,6 +343,11 @@ contract StakingManager is ERC721TokenReceiver {
         // Stake the service
         IStaking(stakingProxy).stake(serviceId);
 
+        // Get activity module
+
+        // Increase initial module activity
+        //IActivityModule(activityModule).increaseInitialActivity();
+
         // Record last service Id index
         mapLastStakedServiceIdxs[stakingProxy] = mapStakedServiceIds[stakingProxy].length;
         mapStakedServiceIds[stakingProxy].push(serviceId);
@@ -361,7 +366,6 @@ contract StakingManager is ERC721TokenReceiver {
         // Stake the service
         _stake(stakingProxy, serviceId);
 
-        // Increase initial module activity
         IActivityModule(activityModule).increaseInitialActivity();
 
         emit CreateAndStake(stakingProxy, serviceId, multisig, activityModule);
