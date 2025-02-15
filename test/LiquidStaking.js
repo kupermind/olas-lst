@@ -45,8 +45,6 @@ describe("Liquid Staking", function () {
     const regDeposit = ethers.utils.parseEther("500");
     const serviceId = 1;
     const agentId = 1;
-    const agentIds = [1];
-    const threshold = 1;
     const livenessPeriod = oneDay; // 24 hours
     const initSupply = "5" + "0".repeat(26);
     const livenessRatio = "11111111111111"; // 1 transaction per 25 hours
