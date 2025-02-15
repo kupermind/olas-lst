@@ -128,9 +128,6 @@ error UnauthorizedMultisig(address multisig);
 /// @dev The contract is already initialized.
 error AlreadyInitialized();
 
-/// @dev No rewards are available in the contract.
-error NoRewardsAvailable();
-
 /// @dev Maximum number of staking services is reached.
 /// @param maxNumServices Maximum number of staking services.
 error MaxNumServicesReached(uint256 maxNumServices);
@@ -513,13 +510,13 @@ contract StakingTokenLocked is ERC721TokenReceiver {
     /// @dev Stakes the service.
     /// @param serviceId Service Id.
     function stake(uint256 serviceId) external {
+        // Check for stakingManager address
+        if (msg.sender != stakingManager) {
+            revert UnauthorizedAccount(msg.sender);
+        }
+
         // Checkpoint to finalize any unaccounted rewards, if any
         checkpoint();
-
-        // Check if there available rewards
-        if (availableRewards == 0) {
-            revert NoRewardsAvailable();
-        }
 
         // Get service info
         ServiceInfo storage sInfo = mapServiceInfo[serviceId];
@@ -540,11 +537,6 @@ contract StakingTokenLocked is ERC721TokenReceiver {
         // The service must be deployed
         if (service.state != IService.ServiceState.Deployed) {
             revert WrongServiceState(uint256(service.state), serviceId);
-        }
-
-        // Check for stakingManager address
-        if (msg.sender != stakingManager) {
-            revert UnauthorizedAccount(msg.sender);
         }
 
         // Get the service staking token and deposit
