@@ -54,23 +54,17 @@ describe("Liquid Staking", function () {
     const minStakingDeposit = regDeposit;
     const timeForEmissions = oneDay * 30;
     let serviceParams = {
-        metadataHash: defaultHash,
         maxNumServices,
         rewardsPerSecond: "1" + "0".repeat(13),
         minStakingDeposit,
-        minNumStakingPeriods: 1,
-        maxNumInactivityPeriods: 1,
         livenessPeriod,
         timeForEmissions,
-        numAgentInstances: 1,
-        agentIds,
-        threshold,
-        configHash: HashZero,
-        proxyHash: HashZero,
         serviceRegistry: AddressZero,
+        serviceRegistryTokenUtility: AddressZero,
+        stakingToken: AddressZero,
+        stakingManager: AddressZero,
         activityChecker: AddressZero
     };
-    const maxInactivity = serviceParams.maxNumInactivityPeriods * livenessPeriod + 1;
     const apyLimit = ethers.utils.parseEther("3");
     const lockFactor = 100;
     const protocolFactor = 0;
@@ -91,7 +85,8 @@ describe("Liquid Staking", function () {
 
         const ServiceRegistryTokenUtility = await ethers.getContractFactory("ServiceRegistryTokenUtility");
         serviceRegistryTokenUtility = await ServiceRegistryTokenUtility.deploy(serviceRegistry.address);
-        await serviceRegistry.deployed();
+        await serviceRegistryTokenUtility.deployed();
+        serviceParams.serviceRegistryTokenUtility = serviceRegistryTokenUtility.address;
 
         const OperatorWhitelist = await ethers.getContractFactory("OperatorWhitelist");
         operatorWhitelist = await OperatorWhitelist.deploy(serviceRegistry.address);
@@ -105,6 +100,7 @@ describe("Liquid Staking", function () {
         const ERC20Token = await ethers.getContractFactory("ERC20Token");
         olas = await ERC20Token.deploy();
         await olas.deployed();
+        serviceParams.stakingToken = olas.address;
 
         const VE = await ethers.getContractFactory("MockVE");
         ve = await VE.deploy(olas.address);
@@ -139,7 +135,6 @@ describe("Liquid Staking", function () {
         await gnosisSafeProxy.deployed();
         const bytecode = await ethers.provider.getCode(gnosisSafeProxy.address);
         bytecodeHash = ethers.utils.keccak256(bytecode);
-        serviceParams.proxyHash = bytecodeHash;
 
         const GnosisSafeMultisig = await ethers.getContractFactory("GnosisSafeMultisig");
         gnosisSafeMultisig = await GnosisSafeMultisig.deploy(gnosisSafe.address, gnosisSafeProxyFactory.address);
@@ -197,6 +192,7 @@ describe("Liquid Staking", function () {
             stakingFactory.address, safeModuleInitializer.address, gnosisSafeL2.address, beacon.address,
             collector.address, agentId, defaultHash);
         await stakingManager.deployed();
+        serviceParams.stakingManager = stakingManager.address;
 
         // Fund staking manager with native to support staking creation
         await deployer.sendTransaction({to: stakingManager.address, value: ethers.utils.parseEther("1")});
@@ -235,8 +231,7 @@ describe("Liquid Staking", function () {
 
         const StakingTokenLocked = await ethers.getContractFactory("StakingTokenLocked");
         stakingTokenImplementation = await StakingTokenLocked.deploy();
-        const initPayload = stakingTokenImplementation.interface.encodeFunctionData("initialize",
-            [serviceParams, serviceRegistryTokenUtility.address, olas.address, stakingManager.address]);
+        const initPayload = stakingTokenImplementation.interface.encodeFunctionData("initialize", [serviceParams]);
         const tx = await stakingFactory.createStakingInstance(stakingTokenImplementation.address, initPayload);
         const res = await tx.wait();
         // Get staking contract instance address from the event
@@ -301,7 +296,7 @@ describe("Liquid Staking", function () {
 
             // Increase the time for the livenessPeriod
             console.log("Wait for liveness period to pass");
-            await helpers.time.increase(maxInactivity);
+            await helpers.time.increase(livenessPeriod);
 
             // Call the checkpoint
             console.log("Calling checkpoint by agent or manually");
