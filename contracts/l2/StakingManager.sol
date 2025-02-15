@@ -336,7 +336,8 @@ contract StakingManager is ERC721TokenReceiver {
     /// @dev Stakes the already deployed service.
     /// @param stakingProxy Staking proxy address.
     /// @param serviceId Service Id.
-    function _stake(address stakingProxy, uint256 serviceId) internal {
+    /// @param activityModule Activity module address.
+    function _stake(address stakingProxy, uint256 serviceId, address activityModule) internal {
         // Approve service NFT for the staking instance
         INFToken(serviceRegistry).approve(stakingProxy, serviceId);
 
@@ -346,7 +347,7 @@ contract StakingManager is ERC721TokenReceiver {
         // Get activity module
 
         // Increase initial module activity
-        //IActivityModule(activityModule).increaseInitialActivity();
+        IActivityModule(activityModule).increaseInitialActivity();
 
         // Record last service Id index
         mapLastStakedServiceIdxs[stakingProxy] = mapStakedServiceIds[stakingProxy].length;
@@ -364,9 +365,7 @@ contract StakingManager is ERC721TokenReceiver {
         IActivityModule(activityModule).initialize(multisig, stakingProxy, serviceId);
 
         // Stake the service
-        _stake(stakingProxy, serviceId);
-
-        IActivityModule(activityModule).increaseInitialActivity();
+        _stake(stakingProxy, serviceId, activityModule);
 
         emit CreateAndStake(stakingProxy, serviceId, multisig, activityModule);
     }
@@ -381,6 +380,7 @@ contract StakingManager is ERC721TokenReceiver {
         // Activate registration (1 wei as a deposit wrapper)
         IService(serviceManager).activateRegistration{value: 1}(serviceId);
 
+        // Get multisig owners = activityModule
         address[] memory instances = IMultisig(multisig).getOwners();
         // Get agent Ids
         uint32[] memory agentIds = new uint32[](NUM_AGENT_INSTANCES);
@@ -394,7 +394,7 @@ contract StakingManager is ERC721TokenReceiver {
         IService(serviceManager).deploy(serviceId, safeSameAddressMultisig, data);
 
         // Stake the service
-        _stake(stakingProxy, serviceId);
+        _stake(stakingProxy, serviceId, instances[0]);
 
         emit DeployAndStake(stakingProxy, serviceId, multisig);
     }
@@ -468,6 +468,7 @@ contract StakingManager is ERC721TokenReceiver {
         _locked = 1;
     }
 
+    // TODO Probably obsolete
     /// @dev Re-stakes if services are evicted for any reason.
     /// @param stakingProxies Set of staking proxy addresses.
     /// @param serviceIds Corresponding sets of service Ids for each staking proxy address.
@@ -498,7 +499,7 @@ contract StakingManager is ERC721TokenReceiver {
             // Traverse all required services
             for (uint256 j = 0; j < numServices; ++j) {
                 // Check that the service is evicted
-                if (IStaking(stakingProxies[i]).getStakingState(serviceIds[i][j]) != IStaking.StakingState.Evicted) {
+                if (IStaking(stakingProxies[i]).getStakingState(serviceIds[i][j]) != IStaking.StakingState.Unstaked) {
                     revert ServiceNotEvicted(stakingProxies[i], serviceIds[i][j]);
                 }
 

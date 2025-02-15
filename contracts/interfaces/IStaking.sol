@@ -5,8 +5,7 @@ pragma solidity ^0.8.28;
 interface IStaking {
     enum StakingState {
         Unstaked,
-        Staked,
-        Evicted
+        Staked
     }
 
     /// @dev Gets service staking token.
