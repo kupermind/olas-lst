@@ -476,6 +476,8 @@ contract Depository {
                     // Update staking model remainder
                     mapStakingModels[stakingModelId].remainder -= uint96(remainder);
                     remainder = 0;
+                    console.log("!!!!!!! supply", mapStakingModels[stakingModelId].supply);
+                    console.log("remainder", mapStakingModels[stakingModelId].remainder);
                     break;
                 }
             }
@@ -560,8 +562,13 @@ contract Depository {
 
                 StakingModel memory stakingModel = mapStakingModels[stakingModelId];
                 uint256 maxUnstakeAmount = stakingModel.supply - stakingModel.remainder;
+                console.log("supply", stakingModel.supply / 1e18);
+                console.log("unstakeAmount", unstakeAmount / 1e18);
+                console.log("remainder", stakingModel.remainder / 1e18);
+                console.log("maxUnstakeAmount", maxUnstakeAmount / 1e18);
 
                 if (unstakeAmount > maxUnstakeAmount) {
+                    console.log("!!!! I'm here!");
                     amounts[i][j] = maxUnstakeAmount;
                     olasAmount += maxUnstakeAmount;
                     unstakeAmount -= maxUnstakeAmount;
@@ -569,8 +576,9 @@ contract Depository {
                 } else {
                     amounts[i][j] = unstakeAmount;
                     olasAmount += unstakeAmount;
-                    mapStakingModels[stakingModelId].remainder += stakingModel.remainder + uint96(unstakeAmount);
+                    mapStakingModels[stakingModelId].remainder = stakingModel.remainder + uint96(unstakeAmount);
                     unstakeAmount = 0;
+                    console.log("Updated remainder", mapStakingModels[stakingModelId].remainder / 1e18);
                     break;
                 }
             }
@@ -590,6 +598,7 @@ contract Depository {
 
         // Check if accumulated necessary amount of tokens
         if (unstakeAmount > 0) {
+            console.log("still unstakeAmount", unstakeAmount / 1e18);
             // TODO correct with unstakeAmount vs totalAmount
             revert Overflow(unstakeAmount, 0);
         }

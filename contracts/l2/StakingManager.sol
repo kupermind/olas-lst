@@ -344,14 +344,8 @@ contract StakingManager is ERC721TokenReceiver {
         // Stake the service
         IStaking(stakingProxy).stake(serviceId);
 
-        // Get activity module
-
         // Increase initial module activity
         IActivityModule(activityModule).increaseInitialActivity();
-
-        // Record last service Id index
-        mapLastStakedServiceIdxs[stakingProxy] = mapStakedServiceIds[stakingProxy].length;
-        mapStakedServiceIds[stakingProxy].push(serviceId);
     }
     
     /// @dev Creates and deploys a service, and stakes it with a specified staking contract.
@@ -366,6 +360,10 @@ contract StakingManager is ERC721TokenReceiver {
 
         // Stake the service
         _stake(stakingProxy, serviceId, activityModule);
+
+        // Record last service Id index
+        mapLastStakedServiceIdxs[stakingProxy] = mapStakedServiceIds[stakingProxy].length;
+        mapStakedServiceIds[stakingProxy].push(serviceId);
 
         emit CreateAndStake(stakingProxy, serviceId, multisig, activityModule);
     }
@@ -468,7 +466,7 @@ contract StakingManager is ERC721TokenReceiver {
         _locked = 1;
     }
 
-    // TODO Probably obsolete
+    // TODO Probably obsolete - change to only deployed and unstaked services, do call for stake
     /// @dev Re-stakes if services are evicted for any reason.
     /// @param stakingProxies Set of staking proxy addresses.
     /// @param serviceIds Corresponding sets of service Ids for each staking proxy address.
@@ -634,6 +632,21 @@ contract StakingManager is ERC721TokenReceiver {
         }
 
         _locked = 1;
+    }
+
+    function getStakedServiceIds(address stakingProxy) external view returns (uint256[] memory serviceIds) {
+        // Get all service Ids ever created for the staking proxy
+        uint256 allServiceIds = mapStakedServiceIds[stakingProxy];
+
+        // Get last staked service index
+        uint256 lastStakedServiceIdx = mapLastStakedServiceIdxs[stakingProxy];
+
+        // Allocated staked service Ids
+        serviceIds = new uint256[](lastStakedServiceIdx);
+
+        for (uint256 i = 0; i < lastStakedServiceIdx; ++i) {
+            serviceIds[i] = allServiceIds[i];
+        }
     }
 
     /// @dev Receives native funds for mock Service Registry minimal payments.
