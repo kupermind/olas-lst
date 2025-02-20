@@ -432,7 +432,7 @@ contract StakingManager is ERC721TokenReceiver {
                 IToken(olas).approve(serviceRegistryTokenUtility, totalStakingDeposit);
 
                 // Get already existent service or create a new one
-                uint256 nextIdx = mapLastStakedServiceIdxs[stakingProxies[i]] + 1;
+                uint256 nextIdx = mapLastStakedServiceIdxs[stakingProxies[i]];
                 uint256 maxIdx = mapStakedServiceIds[stakingProxies[i]].length;
 
                 // Check for the first service Id to be ever staked
@@ -440,13 +440,12 @@ contract StakingManager is ERC721TokenReceiver {
                     // Insert blanc service Id
                     mapStakedServiceIds[stakingProxies[i]].push(0);
                 }
-//                // Start from the next index if at least one service was already staked
-//                if (maxIdx > 0) {
-//                    nextIdx++;
-//                }
 
                 // Traverse all required stakes
                 for (uint256 j = 0; j < numStakes; ++j) {
+                    // Next index must always be bigger than the last one staked
+                    nextIdx++;
+
                     if (nextIdx < maxIdx) {
                         // Deploy and stake already existent service or create a new one first
                         uint256 serviceId = mapStakedServiceIds[stakingProxies[i]][nextIdx];
@@ -454,12 +453,10 @@ contract StakingManager is ERC721TokenReceiver {
                     } else {
                         _createAndStake(stakingProxies[i], minStakingDeposit);
                     }
-
-                    nextIdx++;
                 }
                 console.log("!!!!!! STAKE NEXT IDX", nextIdx);
                 // Update last staked service Id
-                mapLastStakedServiceIdxs[stakingProxies[i]] = nextIdx - 1;
+                mapLastStakedServiceIdxs[stakingProxies[i]] = nextIdx;
 
                 // Update unstaked balance
                 balance -= totalStakingDeposit;
@@ -585,6 +582,7 @@ contract StakingManager is ERC721TokenReceiver {
                     lastIdx--;
                 }
 
+                console.log("!!!! LAST UNSTAKE SERVICE ID", lastIdx);
                 // Update last staked service Id
                 mapLastStakedServiceIdxs[stakingProxies[i]] = lastIdx;
             }
