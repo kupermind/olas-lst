@@ -432,12 +432,18 @@ contract StakingManager is ERC721TokenReceiver {
                 IToken(olas).approve(serviceRegistryTokenUtility, totalStakingDeposit);
 
                 // Get already existent service or create a new one
-                uint256 nextIdx = mapLastStakedServiceIdxs[stakingProxies[i]];
+                uint256 nextIdx = mapLastStakedServiceIdxs[stakingProxies[i]] + 1;
                 uint256 maxIdx = mapStakedServiceIds[stakingProxies[i]].length;
-                // Start from the next index if at least one service was already staked
-                if (maxIdx > 0) {
-                    nextIdx++;
+
+                // Check for the first service Id to be ever staked
+                if (maxIdx == 0) {
+                    // Insert blanc service Id
+                    mapStakedServiceIds[stakingProxies[i]].push(0);
                 }
+//                // Start from the next index if at least one service was already staked
+//                if (maxIdx > 0) {
+//                    nextIdx++;
+//                }
 
                 // Traverse all required stakes
                 for (uint256 j = 0; j < numStakes; ++j) {
@@ -451,7 +457,7 @@ contract StakingManager is ERC721TokenReceiver {
 
                     nextIdx++;
                 }
-
+                console.log("!!!!!! STAKE NEXT IDX", nextIdx);
                 // Update last staked service Id
                 mapLastStakedServiceIdxs[stakingProxies[i]] = nextIdx - 1;
 
@@ -561,18 +567,22 @@ contract StakingManager is ERC721TokenReceiver {
 
                 // Get the last staked Service Id index
                 uint256 lastIdx = mapLastStakedServiceIdxs[stakingProxies[i]];
+                console.log("!!!!!! UNSTAKE LAST IDX", lastIdx);
+                // This must never happen
+                if (numUnstakes > lastIdx) {
+                    revert Overflow(numUnstakes, lastIdx);
+                }
 
                 // Traverse all required unstakes
                 for (uint256 j = 0; j < numUnstakes; ++j) {
                     uint256 serviceId = mapStakedServiceIds[stakingProxies[i]][lastIdx];
+                    console.log("!!!! UNSTAKE SERVICE ID", serviceId);
                     // Unstake, terminate and unbond the service
                     IStaking(stakingProxies[i]).unstake(serviceId);
                     IService(serviceManager).terminate(serviceId);
                     IService(serviceManager).unbond(serviceId);
 
-                    if (lastIdx > 0) {
-                        lastIdx--;
-                    }
+                    lastIdx--;
                 }
 
                 // Update last staked service Id
@@ -635,17 +645,20 @@ contract StakingManager is ERC721TokenReceiver {
     }
 
     function getStakedServiceIds(address stakingProxy) external view returns (uint256[] memory serviceIds) {
-        // Get all service Ids ever created for the staking proxy
-        uint256 allServiceIds = mapStakedServiceIds[stakingProxy];
-
         // Get last staked service index
         uint256 lastStakedServiceIdx = mapLastStakedServiceIdxs[stakingProxy];
 
-        // Allocated staked service Ids
-        serviceIds = new uint256[](lastStakedServiceIdx);
+        // Check if services for specified staking proxy have been initialized, otherwise no services have been created
+        if (lastStakedServiceIdx > 0) {
+            // Get all service Ids ever created for the staking proxy
+            uint256[] memory allServiceIds = mapStakedServiceIds[stakingProxy];
 
-        for (uint256 i = 0; i < lastStakedServiceIdx; ++i) {
-            serviceIds[i] = allServiceIds[i];
+            // Allocated staked service Ids
+            serviceIds = new uint256[](lastStakedServiceIdx);
+
+            for (uint256 i = 0; i < lastStakedServiceIdx; ++i) {
+                serviceIds[i] = allServiceIds[i];
+            }
         }
     }
 
