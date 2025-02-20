@@ -450,14 +450,12 @@ describe("Liquid Staking", function () {
 
             // Check rewards
             for (let i = 0; i < stakedServiceIds.length; ++i) {
-                const curServiceId = serviceId + i;
-                serviceInfo = await stakingTokenInstance.mapServiceInfo(curServiceId);
-                console.log(`Reward after checkpoint ${curServiceId}:`, serviceInfo.reward.toString());
+                serviceInfo = await stakingTokenInstance.mapServiceInfo(stakedServiceIds[i]);
+                console.log(`Reward after checkpoint ${stakedServiceIds[i]}:`, serviceInfo.reward.toString());
             }
 
             for (let i = 0; i < stakedServiceIds.length; ++i) {
-                const curServiceId = serviceId + i;
-                serviceInfo = await stakingTokenInstance.mapServiceInfo(curServiceId);
+                serviceInfo = await stakingTokenInstance.mapServiceInfo(stakedServiceIds[i]);
                 // Get multisig addresses
                 const multisig = await ethers.getContractAt("GnosisSafe", serviceInfo.multisig);
 
@@ -605,14 +603,12 @@ describe("Liquid Staking", function () {
 
             // Check rewards
             for (let i = 0; i < stakedServiceIds.length; ++i) {
-                const curServiceId = serviceId + i;
-                serviceInfo = await stakingTokenInstance.mapServiceInfo(curServiceId);
-                console.log(`Reward after checkpoint ${curServiceId}:`, serviceInfo.reward.toString());
+                serviceInfo = await stakingTokenInstance.mapServiceInfo(stakedServiceIds[i]);
+                console.log(`Reward after checkpoint ${stakedServiceIds[i]}:`, serviceInfo.reward.toString());
             }
 
             for (let i = 0; i < stakedServiceIds.length; ++i) {
-                const curServiceId = serviceId + i;
-                serviceInfo = await stakingTokenInstance.mapServiceInfo(curServiceId);
+                serviceInfo = await stakingTokenInstance.mapServiceInfo(stakedServiceIds[i]);
                 // Get multisig addresses
                 const multisig = await ethers.getContractAt("GnosisSafe", serviceInfo.multisig);
 
@@ -715,14 +711,12 @@ describe("Liquid Staking", function () {
 
             // Check rewards
             for (let i = 0; i < stakedServiceIds.length; ++i) {
-                const curServiceId = serviceId + i;
-                serviceInfo = await stakingTokenInstance.mapServiceInfo(curServiceId);
-                console.log(`Reward after checkpoint ${curServiceId}:`, serviceInfo.reward.toString());
+                serviceInfo = await stakingTokenInstance.mapServiceInfo(stakedServiceIds[i]);
+                console.log(`Reward after checkpoint ${stakedServiceIds[i]}:`, serviceInfo.reward.toString());
             }
 
             for (let i = 0; i < stakedServiceIds.length; ++i) {
-                const curServiceId = serviceId + i;
-                serviceInfo = await stakingTokenInstance.mapServiceInfo(curServiceId);
+                serviceInfo = await stakingTokenInstance.mapServiceInfo(stakedServiceIds[i]);
                 // Get multisig addresses
                 const multisig = await ethers.getContractAt("GnosisSafe", serviceInfo.multisig);
                 console.log("Multisig address", multisig.address);
