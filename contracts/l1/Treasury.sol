@@ -189,9 +189,11 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
 
         // Get current staked balance
         uint256 stakedBalanceBefore = IST(st).stakedBalance();
+        console.log("stakedBalanceBefore", stakedBalanceBefore);
 
         // Redeem OLAS and burn stOLAS tokens
         olasAmount = IST(st).redeem(stAmount, address(this), address(this));
+        console.log("!!! CALCULATED OLAS amount:", olasAmount);
 
         // Mint request tokens
         _mint(msg.sender, requestId, olasAmount, "");
@@ -202,10 +204,12 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
 
         // Get updated staked balance
         uint256 stakedBalanceAfter = IST(st).stakedBalance();
+        console.log("stakedBalanceAfter", stakedBalanceAfter);
 
         // If withdraw amount is bigger than the current one, need to unstake
         if (stakedBalanceBefore > stakedBalanceAfter) {
             uint256 withdrawDiff = stakedBalanceBefore - stakedBalanceAfter;
+            console.log("withdrawDiff", withdrawDiff);
 
             IDepository(depository).unstake(withdrawDiff, chainIds, stakingProxies, bridgePayloads, values);
         }

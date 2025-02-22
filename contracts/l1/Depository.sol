@@ -417,12 +417,13 @@ contract Depository {
         if (stakeAmount > type(uint96).max) {
             revert Overflow(stakeAmount, uint256(type(uint96).max));
         }
-
         // Get OLAS from sender
         IToken(olas).transferFrom(msg.sender, address(this), stakeAmount);
 
         // Lock OLAS for veOLAS
         stakeAmount = _increaseLock(stakeAmount);
+
+        console.log("!!! STAKE AMOUNT AFTER LOCK", stakeAmount);
 
         // Allocate arrays of max possible size
         amounts = new uint256[][](chainIds.length);
@@ -464,12 +465,15 @@ contract Depository {
                     revert WrongStakingModel(stakingModelId);
                 }
 
+                console.log("Staking model reminder", stakingModel.remainder);
+
                 if (remainder > stakingModel.remainder) {
                     amounts[i][j] = stakingModel.remainder;
                     totalAmounts[i] += stakingModel.remainder;
                     remainder -= stakingModel.remainder;
                     // Update staking model remainder
                     mapStakingModels[stakingModelId].remainder = 0;
+                    console.log("!!!! LEFTOVER reminder", remainder);
                 } else {
                     amounts[i][j] = remainder;
                     totalAmounts[i] += remainder;
@@ -488,6 +492,7 @@ contract Depository {
 
         if (stakeAmount > actualStakeAmount) {
             remainder = stakeAmount - actualStakeAmount;
+            console.log("!!!! RECALCULATED reminder", remainder);
             IToken(olas).approve(st, remainder);
             IST(st).topUpReserveBalance(remainder);
         } else {
@@ -496,7 +501,7 @@ contract Depository {
         }
 
         // Calculates stAmount and mints stOLAS
-        stAmount = ITreasury(treasury).processAndMintStToken(msg.sender, stakeAmount);
+        stAmount = ITreasury(treasury).processAndMintStToken(msg.sender, actualStakeAmount);
 
         // Traverse chain Ids to transfer staking amounts
         for (uint256 i = 0; i < chainIds.length; ++i) {

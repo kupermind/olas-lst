@@ -279,7 +279,7 @@ describe("Liquid Staking", function () {
             let stBalance = await st.balanceOf(deployer.address);
             console.log("User stOLAS balance now:", stBalance.toString());
             let stTotalAssets = await st.totalAssets();
-            console.log("stOLAS total assets:", stTotalAssets.toString());
+            console.log("OLAS total assets on stOLAS:", stTotalAssets.toString());
 
             let veBalance = await ve.getVotes(lock.address);
             console.log("Protocol current veOLAS balance:", veBalance.toString());
@@ -328,11 +328,11 @@ describe("Liquid Staking", function () {
             console.log("\nL1");
 
             // Update st total assets
-            console.log("Calling stOLAS total assets update by agent or manually");
+            console.log("Calling OLAS total assets on stOLAS update by agent or manually");
             await st.updateTotalAssets();
 
             stTotalAssets = await st.totalAssets();
-            console.log("stOLAS total assets now:", stTotalAssets.toString());
+            console.log("OLAS total assets on stOLAS now:", stTotalAssets.toString());
 
             console.log("User approves stOLAS for treasury:", stBalance.toString());
             await st.approve(treasury.address, stBalance);
@@ -399,7 +399,7 @@ describe("Liquid Staking", function () {
             console.log("Final user stOLAS remainder:", stBalance.toString());
 
             stBalance = await st.totalAssets();
-            console.log("Final stOLAS total assets:", stBalance.toString());
+            console.log("Final OLAS total assets on stOLAS:", stBalance.toString());
 
             // Restore a previous state of blockchain
             snapshot.restore();
@@ -424,7 +424,7 @@ describe("Liquid Staking", function () {
             let stBalance = await st.balanceOf(deployer.address);
             console.log("User stOLAS balance now:", stBalance.toString());
             let stTotalAssets = await st.totalAssets();
-            console.log("stOLAS total assets:", stTotalAssets.toString());
+            console.log("OLAS total assets on stOLAS:", stTotalAssets.toString());
 
             let veBalance = await ve.getVotes(lock.address);
             console.log("Protocol current veOLAS balance:", veBalance.toString());
@@ -481,11 +481,11 @@ describe("Liquid Staking", function () {
             console.log("\nL1");
 
             // Update st total assets
-            console.log("Calling stOLAS total assets update by agent or manually");
+            console.log("Calling OLAS total assets on stOLAS update by agent or manually");
             await st.updateTotalAssets();
 
             stTotalAssets = await st.totalAssets();
-            console.log("stOLAS total assets now:", stTotalAssets.toString());
+            console.log("OLAS total assets on stOLAS now:", stTotalAssets.toString());
 
             console.log("User approves stOLAS for treasury:", stBalance.toString());
             await st.approve(treasury.address, stBalance);
@@ -552,7 +552,7 @@ describe("Liquid Staking", function () {
             console.log("Final user stOLAS remainder:", stBalance.toString());
 
             stBalance = await st.totalAssets();
-            console.log("Final stOLAS total assets:", stBalance.toString());
+            console.log("Final OLAS total assets on stOLAS:", stBalance.toString());
 
             // Restore a previous state of blockchain
             snapshot.restore();
@@ -577,7 +577,7 @@ describe("Liquid Staking", function () {
             let stBalance = await st.balanceOf(deployer.address);
             console.log("User stOLAS balance now:", stBalance.toString());
             let stTotalAssets = await st.totalAssets();
-            console.log("stOLAS total assets:", stTotalAssets.toString());
+            console.log("OLAS total assets on stOLAS:", stTotalAssets.toString());
 
             let veBalance = await ve.getVotes(lock.address);
             console.log("Protocol current veOLAS balance:", veBalance.toString());
@@ -634,11 +634,11 @@ describe("Liquid Staking", function () {
             console.log("\nL1");
 
             // Update st total assets
-            console.log("Calling stOLAS total assets update by agent or manually");
+            console.log("Calling OLAS total assets on stOLAS update by agent or manually");
             await st.updateTotalAssets();
 
             stTotalAssets = await st.totalAssets();
-            console.log("stOLAS total assets now:", stTotalAssets.toString());
+            console.log("OLAS total assets on stOLAS now:", stTotalAssets.toString());
 
             console.log("User approves stOLAS for treasury:", stBalance.toString());
             await st.approve(treasury.address, stBalance);
@@ -671,11 +671,15 @@ describe("Liquid Staking", function () {
             expect(balanceDiff).to.equal(olasWithdrawAmount);
             console.log("User got OLAS:", olasWithdrawAmount.toString());
 
+            console.log("stakedBalance:", await st.stakedBalance());
+            console.log("vaultBalance:", await st.vaultBalance());
+            console.log("reserveBalance:", await st.reserveBalance());
+
             console.log("\nL1 - continue");
 
             // Stake more OLAS on L1
             // Get OLAS amount to stake - want to cover 1 more staked services: 1 * 2 * minStakingDeposit
-            olasAmount = minStakingDeposit.mul(2);
+            olasAmount = minStakingDeposit.mul(3);
             // Approve OLAS for depository
             console.log("User approves OLAS for depository:", olasAmount.toString());
             await olas.approve(depository.address, olasAmount);
@@ -685,10 +689,14 @@ describe("Liquid Staking", function () {
             stBalance = await st.balanceOf(deployer.address);
             console.log("User stOLAS balance now:", stBalance.toString());
             stTotalAssets = await st.totalAssets();
-            console.log("stOLAS total assets:", stTotalAssets.toString());
+            console.log("OLAS total assets on stOLAS:", stTotalAssets.toString());
 
             veBalance = await ve.getVotes(lock.address);
             console.log("Protocol current veOLAS balance:", veBalance.toString());
+
+            console.log("stakedBalance:", await st.stakedBalance());
+            console.log("vaultBalance:", await st.vaultBalance());
+            console.log("reserveBalance:", await st.reserveBalance());
 
             console.log("\nL2");
 
@@ -743,16 +751,21 @@ describe("Liquid Staking", function () {
             console.log("\nL1");
 
             // Update st total assets
-            console.log("Calling stOLAS total assets update by agent or manually");
+            console.log("Calling OLAS total assets on stOLAS update by agent or manually");
             await st.updateTotalAssets();
 
             stTotalAssets = await st.totalAssets();
-            console.log("stOLAS total assets now:", stTotalAssets.toString());
+            console.log("OLAS total assets on stOLAS now:", stTotalAssets.toString());
 
             console.log("User approves stOLAS for treasury:", stBalance.toString());
             await st.approve(treasury.address, stBalance);
 
             console.log("\nL1 - L2 - L1");
+
+            console.log("stOLAS amounts:");
+            console.log("stakedBalance:", await st.stakedBalance());
+            console.log("vaultBalance:", await st.vaultBalance());
+            console.log("reserveBalance:", await st.reserveBalance());
 
             // Request withdraw of all the remaining stOLAS
             stBalance = await st.balanceOf(deployer.address);
@@ -786,7 +799,7 @@ describe("Liquid Staking", function () {
             console.log("Final user stOLAS remainder:", stBalance.toString());
 
             stBalance = await st.totalAssets();
-            console.log("Final stOLAS total assets:", stBalance.toString());
+            console.log("Final OLAS total assets on stOLAS:", stBalance.toString());
 
             // Restore a previous state of blockchain
             snapshot.restore();

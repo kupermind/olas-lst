@@ -420,11 +420,12 @@ contract StakingManager is ERC721TokenReceiver {
 
             // Add amount to current unstaked balance
             balance += amounts[i];
+            console.log("!!!! L2 obtained amount", amounts[i]);
 
             // Calculate number of stakes
             uint256 numStakes = balance / fullStakingDeposit;
             uint256 totalStakingDeposit = numStakes * fullStakingDeposit;
-
+            console.log("!!!!!! NUMBER OF STAKES", numStakes);
             // Check if the balance is enough to create another stake
             if (numStakes > 0) {
                 // Approve token for the serviceRegistryTokenUtility contract
@@ -553,6 +554,7 @@ contract StakingManager is ERC721TokenReceiver {
 
                 // Calculate number of stakes
                 numUnstakes = balanceDiff / fullStakingDeposit;
+                console.log("!!!!!! NUMBER OF UNSTAKES", numUnstakes);
                 // Depending of how much is unstaked, adjust the unstaked balance
                 if (balanceDiff % fullStakingDeposit == 0) {
                     balance = 0;
