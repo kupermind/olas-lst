@@ -68,7 +68,8 @@ describe("Liquid Staking", function () {
     const protocolFactor = 0;
     const chainId = 31337;
     const gnosisChainId = 100;
-    const stakingSupply = ethers.BigNumber.from(serviceParams.rewardsPerSecond).mul(ethers.BigNumber.from(maxNumServices)).mul(timeForEmissions);
+    const stakingRewardsPerEpoch = ethers.BigNumber.from(serviceParams.rewardsPerSecond).mul(ethers.BigNumber.from(maxNumServices)).mul(timeForEmissions);
+    const stakingSupply = (regDeposit.mul(2)).mul(ethers.BigNumber.from(maxNumServices));
     const bridgePayload = "0x";
 
     beforeEach(async function () {
@@ -679,7 +680,7 @@ describe("Liquid Staking", function () {
 
             // Stake more OLAS on L1
             // Get OLAS amount to stake - want to cover 1 more staked services: 1 * 2 * minStakingDeposit
-            olasAmount = minStakingDeposit.mul(3);
+            olasAmount = minStakingDeposit.mul(7);
             // Approve OLAS for depository
             console.log("User approves OLAS for depository:", olasAmount.toString());
             await olas.approve(depository.address, olasAmount);
