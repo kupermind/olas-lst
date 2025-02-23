@@ -347,20 +347,20 @@ describe("Liquid Staking", function () {
             let res = await tx.wait();
             // Get withdraw request Id
             //console.log(res.logs);
-            res = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[6].data);
-            let requestId = ethers.BigNumber.from(res[0]);
-            let olasWithdrawAmount = ethers.BigNumber.from(res[1]);
+            let requestId = ethers.BigNumber.from(res.logs[6].topics[3]);
+            let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[6].data);
+            let olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
             console.log("Withdraw requestId:", requestId.toString());
-            console.log("User is minted ERC1155 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
+            console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
 
             // Finalize withdraw
             console.log("User to finalize withdraw request after withdraw cool down period");
-            console.log("Approve 1155 requestId tokens for treasury");
-            await treasury.setApprovalForAll(treasury.address, true);
+            console.log("Approve 6909 requestId tokens for treasury");
+            await treasury.approve(treasury.address, requestId, await treasury.balanceOf(deployer.address, requestId));
 
             console.log("Finalize withdraw");
             let balanceBefore = await olas.balanceOf(deployer.address);
-            await treasury.finalizeWithdrawRequests([requestId], [olasWithdrawAmount], "0x");
+            await treasury.finalizeWithdrawRequests([requestId], [olasWithdrawAmount]);
             let balanceAfter = await olas.balanceOf(deployer.address);
             let balanceDiff = balanceAfter.sub(balanceBefore);
             expect(balanceDiff).to.equal(olasWithdrawAmount);
@@ -376,11 +376,11 @@ describe("Liquid Staking", function () {
             res = await tx.wait();
             // Get withdraw request Id
             //console.log(res.logs);
-            res = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[6].data);
-            requestId = ethers.BigNumber.from(res[0]);
-            olasWithdrawAmount = ethers.BigNumber.from(res[1]);
+            requestId = ethers.BigNumber.from(res.logs[6].topics[3]);
+            data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[6].data);
+            olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
             console.log("Withdraw requestId:", requestId.toString());
-            console.log("User is minted ERC1155 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
+            console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
             console.log("OLAS is not enough on L1, sending request to L2 to unstake and transfer back to L1");
 
             console.log("\nL1");
@@ -390,7 +390,7 @@ describe("Liquid Staking", function () {
 
             console.log("Finalize withdraw");
             balanceBefore = await olas.balanceOf(deployer.address);
-            await treasury.finalizeWithdrawRequests([requestId], [olasWithdrawAmount], "0x");
+            await treasury.finalizeWithdrawRequests([requestId], [olasWithdrawAmount]);
             balanceAfter = await olas.balanceOf(deployer.address);
             balanceDiff = balanceAfter.sub(balanceBefore);
             expect(balanceDiff).to.equal(olasWithdrawAmount);
@@ -500,20 +500,20 @@ describe("Liquid Staking", function () {
             let res = await tx.wait();
             // Get withdraw request Id
             //console.log(res.logs);
-            res = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[6].data);
-            let requestId = ethers.BigNumber.from(res[0]);
-            let olasWithdrawAmount = ethers.BigNumber.from(res[1]);
+            let requestId = ethers.BigNumber.from(res.logs[6].topics[3]);
+            let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[6].data);
+            let olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
             console.log("Withdraw requestId:", requestId.toString());
-            console.log("User is minted ERC1155 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
+            console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
 
             // Finalize withdraw
             console.log("User to finalize withdraw request after withdraw cool down period");
-            console.log("Approve 1155 requestId tokens for treasury");
-            await treasury.setApprovalForAll(treasury.address, true);
+            console.log("Approve 6909 requestId tokens for treasury");
+            await treasury.approve(treasury.address, requestId, await treasury.balanceOf(deployer.address, requestId));
 
             console.log("Finalize withdraw");
             let balanceBefore = await olas.balanceOf(deployer.address);
-            await treasury.finalizeWithdrawRequests([requestId], [olasWithdrawAmount], "0x");
+            await treasury.finalizeWithdrawRequests([requestId], [olasWithdrawAmount]);
             let balanceAfter = await olas.balanceOf(deployer.address);
             let balanceDiff = balanceAfter.sub(balanceBefore);
             expect(balanceDiff).to.equal(olasWithdrawAmount);
@@ -529,11 +529,11 @@ describe("Liquid Staking", function () {
             res = await tx.wait();
             // Get withdraw request Id
             //console.log(res.logs);
-            res = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[6].data);
-            requestId = ethers.BigNumber.from(res[0]);
-            olasWithdrawAmount = ethers.BigNumber.from(res[1]);
+            requestId = ethers.BigNumber.from(res.logs[6].topics[3]);
+            data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[6].data);
+            olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
             console.log("Withdraw requestId:", requestId.toString());
-            console.log("User is minted ERC1155 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
+            console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
             console.log("OLAS is not enough on L1, sending request to L2 to unstake and transfer back to L1");
 
             console.log("\nL1");
@@ -543,7 +543,7 @@ describe("Liquid Staking", function () {
 
             console.log("Finalize withdraw");
             balanceBefore = await olas.balanceOf(deployer.address);
-            await treasury.finalizeWithdrawRequests([requestId], [olasWithdrawAmount], "0x");
+            await treasury.finalizeWithdrawRequests([requestId], [olasWithdrawAmount]);
             balanceAfter = await olas.balanceOf(deployer.address);
             balanceDiff = balanceAfter.sub(balanceBefore);
             expect(balanceDiff).to.equal(olasWithdrawAmount);
@@ -653,20 +653,21 @@ describe("Liquid Staking", function () {
             let res = await tx.wait();
             // Get withdraw request Id
             //console.log(res.logs);
-            res = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[6].data);
-            let requestId = ethers.BigNumber.from(res[0]);
-            let olasWithdrawAmount = ethers.BigNumber.from(res[1]);
+            let requestId = ethers.BigNumber.from(res.logs[6].topics[3]);
+            let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[6].data);
+            let olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
             console.log("Withdraw requestId:", requestId.toString());
-            console.log("User is minted ERC1155 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
+            console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
 
             // Finalize withdraw
             console.log("User to finalize withdraw request after withdraw cool down period");
-            console.log("Approve 1155 requestId tokens for treasury");
-            await treasury.setApprovalForAll(treasury.address, true);
+            const requestBalance = await treasury.balanceOf(deployer.address, requestId);
+            console.log("Approve 6909 requestId tokens for treasury:", requestBalance.toString());
+            await treasury.approve(treasury.address, requestId, requestBalance);
 
             console.log("Finalize withdraw");
             let balanceBefore = await olas.balanceOf(deployer.address);
-            await treasury.finalizeWithdrawRequests([requestId], [olasWithdrawAmount], "0x");
+            await treasury.finalizeWithdrawRequests([requestId], [olasWithdrawAmount]);
             let balanceAfter = await olas.balanceOf(deployer.address);
             let balanceDiff = balanceAfter.sub(balanceBefore);
             expect(balanceDiff).to.equal(olasWithdrawAmount);
@@ -776,11 +777,11 @@ describe("Liquid Staking", function () {
             res = await tx.wait();
             // Get withdraw request Id
             //console.log(res.logs);
-            res = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[6].data);
-            requestId = ethers.BigNumber.from(res[0]);
-            olasWithdrawAmount = ethers.BigNumber.from(res[1]);
+            requestId = ethers.BigNumber.from(res.logs[6].topics[3]);
+            data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[6].data);
+            olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
             console.log("Withdraw requestId:", requestId.toString());
-            console.log("User is minted ERC1155 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
+            console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
             console.log("OLAS is not enough on L1, sending request to L2 to unstake and transfer back to L1");
 
             console.log("\nL1");
@@ -790,7 +791,7 @@ describe("Liquid Staking", function () {
 
             console.log("Finalize withdraw");
             balanceBefore = await olas.balanceOf(deployer.address);
-            await treasury.finalizeWithdrawRequests([requestId], [olasWithdrawAmount], "0x");
+            await treasury.finalizeWithdrawRequests([requestId], [olasWithdrawAmount]);
             balanceAfter = await olas.balanceOf(deployer.address);
             balanceDiff = balanceAfter.sub(balanceBefore);
             expect(balanceDiff).to.equal(olasWithdrawAmount);
