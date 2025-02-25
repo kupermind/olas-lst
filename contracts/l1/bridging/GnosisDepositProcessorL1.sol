@@ -43,24 +43,23 @@ contract GnosisDepositProcessorL1 is DefaultDepositProcessorL1 {
 
     /// @inheritdoc DefaultDepositProcessorL1
     function _sendMessage(
-        address[] memory targets,
-        uint256[] memory stakingShares,
+        address target,
+        uint256 amount,
         bytes memory,
-        uint256 transferAmount,
         bytes32 batchHash,
         bytes32 operation
     ) internal override returns (uint256 sequence, uint256 leftovers) {
         // Transfer OLAS tokens
-        if (operation == STAKE && transferAmount > 0) {
+        if (operation == STAKE && amount > 0) {
             // Approve tokens for the bridge contract
-            IToken(olas).approve(l1TokenRelayer, transferAmount);
+            IToken(olas).approve(l1TokenRelayer, amount);
 
             // Transfer tokens
-            IBridge(l1TokenRelayer).relayTokens(olas, l2StakingProcessor, transferAmount);
+            IBridge(l1TokenRelayer).relayTokens(olas, l2StakingProcessor, amount);
         }
 
         // Assemble AMB data payload
-        bytes memory data = abi.encodeWithSelector(RECEIVE_MESSAGE, abi.encode(targets, stakingShares, batchHash, operation));
+        bytes memory data = abi.encodeWithSelector(RECEIVE_MESSAGE, abi.encode(target, amount, batchHash, operation));
 
         // Send message to L2
         // In the current configuration, maxGasPerTx is set to 4000000 on Ethereum and 2000000 on Gnosis Chain.

@@ -5,24 +5,12 @@ import {IToken} from "../interfaces/IToken.sol";
 import "hardhat/console.sol";
 
 interface IDepositProcessor {
-    // TODO remove later
-    /// @dev Sends a single message to the L2 side via a corresponding bridge.
+    /// @dev Sends a message to the L2 side via a corresponding bridge.
     /// @param target Staking target addresses.
-    /// @param stakingShare Corresponding staking amount.
+    /// @param amount Corresponding staking amount.
     /// @param bridgePayload Bridge payload necessary (if required) for a specific bridge relayer.
-    /// @param transferAmount Actual OLAS amount to be transferred.
     /// @param operation Funds operation: stake / unstake.
-    function sendMessage(address target, uint256 stakingShare, bytes memory bridgePayload, uint256 transferAmount,
-        bytes32 operation) external payable;
-
-    /// @dev Sends a batch message to the L2 side via a corresponding bridge.
-    /// @param targets Set of staking target addresses.
-    /// @param stakingShares Corresponding set of staking amounts.
-    /// @param bridgePayload Bridge payload necessary (if required) for a specific bridge relayer.
-    /// @param transferAmount Actual total OLAS amount across all the targets to be transferred.
-    /// @param operation Funds operation: stake / unstake.
-    function sendMessageBatch(address[] memory targets, uint256[] memory stakingShares, bytes memory bridgePayload,
-        uint256 transferAmount, bytes32 operation) external payable;
+    function sendMessage(address target, uint256 amount, bytes memory bridgePayload, bytes32 operation) external payable;
 }
 
 interface ILock {
@@ -95,14 +83,16 @@ contract Depository {
     event ImplementationUpdated(address indexed implementation);
     event OwnerUpdated(address indexed owner);
     event TreasuryUpdated(address indexed treasury);
-    event LockFactorUpdated(uint256 lockFactor);
+    event DepositoryParamsUpdated(uint256 lockFactor, uint256 maxStakingLimit);
     event Locked(address indexed account, uint256 olasAmount, uint256 lockAmount, uint256 vaultBalance);
     event SetDepositProcessorChainIds(address[] depositProcessors, uint256[] chainIds);
     event SetGuardianServiceStatuses(address[] guardianServices, bool[] statuses);
     event StakingModelsActivated(uint256[] chainIds, address[] stakingProxies, uint256[] supplies);
     event ChangeModelStatuses(uint256[] modelIds, bool[] statuses);
     event Deposit(address indexed sender, uint256 stakeAmount, uint256 stAmount, uint256[] chainIds,
-        address[][] stakingProxies, uint256[][] amounts);
+        address[] stakingProxies, uint256[] amounts);
+    event Unstake(address indexed sender, uint256 unstakeAmount, uint256[] chainIds, address[] stakingProxies,
+        uint256[] amounts);
 
     // Code position in storage is keccak256("DEPOSITORY_PROXY") = "0x40f951bb727bcaf251807e38aa34e1b3f20d890f9f3286454f4c473c60a21cdc"
     bytes32 public constant DEPOSITORY_PROXY = 0x40f951bb727bcaf251807e38aa34e1b3f20d890f9f3286454f4c473c60a21cdc;
@@ -129,6 +119,8 @@ contract Depository {
 
     // Lock factor in 10_000 value
     uint256 public lockFactor;
+    // Max staking limit per a single staking proxy
+    uint256 public maxStakingLimit;
 
     // Mapping of staking model Id => staking model
     mapping(uint256 => StakingModel) public mapStakingModels;
@@ -140,13 +132,22 @@ contract Depository {
     uint256[] public setStakingModelIds;
 
     // TODO change to initialize in prod
-    constructor(address _olas, address _st, address _ve, address _treasury, address _lock, uint256 _lockFactor) {
+    constructor(
+        address _olas,
+        address _st,
+        address _ve,
+        address _treasury,
+        address _lock,
+        uint256 _lockFactor,
+        uint256 _maxStakingLimit
+    ) {
         olas = _olas;
         st = _st;
         ve = _ve;
         treasury = _treasury;
         lock = _lock;
         lockFactor = _lockFactor;
+        maxStakingLimit = _maxStakingLimit;
 
         owner = msg.sender;
     }
@@ -381,28 +382,30 @@ contract Depository {
         emit ChangeModelStatuses(stakingModelIds, statuses);
     }
 
-    /// @dev Changes lock factor value.
+    /// @dev Changes depository params.
     /// @param newLockFactor New lock factor value.
-    function changeLockFactor(uint256 newLockFactor) external {
+    /// @param newMaxStakingLimit New max staking limit per staking proxy.
+    function changeLockFactor(uint256 newLockFactor, uint256 newMaxStakingLimit) external {
         // Check for ownership
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);
         }
 
         // Check for zero value
-        if (lockFactor == 0) {
+        if (newLockFactor == 0 || newMaxStakingLimit == 0) {
             revert ZeroValue();
         }
 
         lockFactor = newLockFactor;
-        emit LockFactorUpdated(newLockFactor);
+        maxStakingLimit = newMaxStakingLimit;
+        emit DepositoryParamsUpdated(newLockFactor, newMaxStakingLimit);
     }
 
     // TODO: consider taking any amount, just add to the stOLAS balance unused remainder
     /// @dev Calculates amounts and initiates cross-chain stake request for specified models.
     /// @param stakeAmount Total incoming amount to stake.
     /// @param chainIds Set of chain Ids with staking proxies.
-    /// @param stakingProxies Set of sets of staking proxies corresponding to each chain Id.
+    /// @param stakingProxies Set of staking proxies corresponding to each chain Id.
     /// @param bridgePayloads Bridge payloads corresponding to each chain Id.
     /// @param values Value amounts for each bridge interaction, if applicable.
     /// @return stAmount Amount of stOLAS minted for staking.
@@ -410,10 +413,10 @@ contract Depository {
     function deposit(
         uint256 stakeAmount,
         uint256[] memory chainIds,
-        address[][] memory stakingProxies,
+        address[] memory stakingProxies,
         bytes[] memory bridgePayloads,
         uint256[] memory values
-    ) external payable returns (uint256 stAmount, uint256[][] memory amounts) {
+    ) external payable returns (uint256 stAmount, uint256[] memory amounts) {
         if (stakeAmount > type(uint96).max) {
             revert Overflow(stakeAmount, uint256(type(uint96).max));
         }
@@ -424,9 +427,6 @@ contract Depository {
         stakeAmount = _increaseLock(stakeAmount);
 
         console.log("!!! STAKE AMOUNT AFTER LOCK", stakeAmount);
-
-        // Allocate arrays of max possible size
-        amounts = new uint256[][](chainIds.length);
 
         // TODO Check array lengths
 
@@ -439,55 +439,47 @@ contract Depository {
         }
 
         uint256 actualStakeAmount;
-        uint256[] memory totalAmounts = new uint256[](chainIds.length);
+        // Allocate arrays of max possible size
+        amounts = new uint256[](chainIds.length);
 
         // Collect staking contracts and amounts
         for (uint256 i = 0; i < chainIds.length; ++i) {
-            // TODO chain Ids order
-
             // Check if more cycles are needed
             if (remainder == 0) {
                 break;
             }
 
-            amounts[i] = new uint256[](stakingProxies[i].length);
-            // Traverse all (or required) staking proxies
-            for (uint256 j = 0; j < stakingProxies[i].length; ++j) {
-                // TODO stakingProxies order
-                // Push a pair of key defining variables into one key: chainId | stakingProxy
-                // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
-                uint256 stakingModelId = uint256(uint160(stakingProxies[i][j]));
-                stakingModelId |= chainIds[i] << 160;
+            // Push a pair of key defining variables into one key: chainId | stakingProxy
+            // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
+            uint256 stakingModelId = uint256(uint160(stakingProxies[i]));
+            stakingModelId |= chainIds[i] << 160;
 
-                StakingModel memory stakingModel = mapStakingModels[stakingModelId];
-                // Check for model existence and activity
-                if (stakingModel.supply == 0 || !stakingModel.active) {
-                    revert WrongStakingModel(stakingModelId);
-                }
+            StakingModel memory stakingModel = mapStakingModels[stakingModelId];
+            // Check for model existence and activity
+            if (stakingModel.supply == 0 || !stakingModel.active) {
+                revert WrongStakingModel(stakingModelId);
+            }
 
-                console.log("Staking model reminder", stakingModel.remainder);
+            console.log("Staking model reminder", stakingModel.remainder);
 
-                if (remainder > stakingModel.remainder) {
-                    amounts[i][j] = stakingModel.remainder;
-                    totalAmounts[i] += stakingModel.remainder;
-                    remainder -= stakingModel.remainder;
-                    // Update staking model remainder
-                    mapStakingModels[stakingModelId].remainder = 0;
-                    console.log("!!!! LEFTOVER reminder", remainder);
-                } else {
-                    amounts[i][j] = remainder;
-                    totalAmounts[i] += remainder;
-                    // Update staking model remainder
-                    mapStakingModels[stakingModelId].remainder -= uint96(remainder);
-                    remainder = 0;
-                    console.log("!!!!!!! supply", mapStakingModels[stakingModelId].supply);
-                    console.log("remainder", mapStakingModels[stakingModelId].remainder);
-                    break;
-                }
+            if (remainder > stakingModel.remainder) {
+                amounts[i] = stakingModel.remainder;
+                remainder -= stakingModel.remainder;
+                // Update staking model remainder
+                mapStakingModels[stakingModelId].remainder = 0;
+                console.log("!!!! LEFTOVER reminder", remainder);
+            } else {
+                amounts[i] = remainder;
+                // Update staking model remainder
+                mapStakingModels[stakingModelId].remainder -= uint96(remainder);
+                remainder = 0;
+                console.log("!!!!!!! supply", mapStakingModels[stakingModelId].supply);
+                console.log("remainder", mapStakingModels[stakingModelId].remainder);
+                break;
             }
 
             // Increase actual stake amount
-            actualStakeAmount += totalAmounts[i];
+            actualStakeAmount += amounts[i];
         }
 
         if (stakeAmount > actualStakeAmount) {
@@ -509,11 +501,11 @@ contract Depository {
             address depositProcessor = mapChainIdDepositProcessors[chainIds[i]];
 
             // Approve OLAS for depositProcessor
-            IToken(olas).transfer(depositProcessor, totalAmounts[i]);
+            IToken(olas).transfer(depositProcessor, amounts[i]);
 
             // Transfer OLAS to its corresponding Staker on L2
-            IDepositProcessor(depositProcessor).sendMessageBatch{value: values[i]}(stakingProxies[i], amounts[i],
-                bridgePayloads[i], totalAmounts[i], STAKE);
+            IDepositProcessor(depositProcessor).sendMessage{value: values[i]}(stakingProxies[i], amounts[i],
+                bridgePayloads[i], STAKE);
         }
 
         emit Deposit(msg.sender, stakeAmount, stAmount, chainIds, stakingProxies, amounts);
@@ -523,82 +515,67 @@ contract Depository {
     /// @notice This allows to deduct reserves from their staked part and get them back as vault assets.
     /// @param unstakeAmount Total amount to unstake.
     /// @param chainIds Set of chain Ids with staking proxies.
-    /// @param stakingProxies Set of sets of staking proxies corresponding to each chain Id.
+    /// @param stakingProxies Set of staking proxies corresponding to each chain Id.
     /// @param bridgePayloads Bridge payloads corresponding to each chain Id.
     /// @param values Value amounts for each bridge interaction, if applicable.
     /// @return amounts Corresponding OLAS amounts for each staking proxy.
     function unstake(
         uint256 unstakeAmount,
         uint256[] memory chainIds,
-        address[][] memory stakingProxies,
+        address[] memory stakingProxies,
         bytes[] memory bridgePayloads,
         uint256[] memory values
-    ) external payable returns (uint256[][] memory amounts) {
+    ) external payable returns (uint256[] memory amounts) {
         if (msg.sender != owner && msg.sender != treasury) {
             revert UnauthorizedAccount(msg.sender);
         }
 
-        // Allocate arrays of max possible size
-        amounts = new uint256[][](chainIds.length);
-
         // TODO Check array lengths
 
-        uint256 totalAmount;
+        // Allocate arrays of max possible size
+        amounts = new uint256[](chainIds.length);
 
         // Collect staking contracts and amounts
         for (uint256 i = 0; i < chainIds.length; ++i) {
-            // TODO chain Ids order
-
             // Check if more cycles are needed
             if (unstakeAmount == 0) {
                 break;
             }
 
-            uint256 olasAmount;
-            amounts[i] = new uint256[](stakingProxies[i].length);
+            // Push a pair of key defining variables into one key: chainId | stakingProxy
+            // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
+            uint256 stakingModelId = uint256(uint160(stakingProxies[i]));
+            stakingModelId |= chainIds[i] << 160;
 
-            // Traverse all (or required) staking proxies
-            for (uint256 j = 0; j < stakingProxies[i].length; ++j) {
-                // TODO stakingProxies order
-                // Push a pair of key defining variables into one key: chainId | stakingProxy
-                // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
-                uint256 stakingModelId = uint256(uint160(stakingProxies[i][j]));
-                stakingModelId |= chainIds[i] << 160;
+            StakingModel memory stakingModel = mapStakingModels[stakingModelId];
+            uint256 maxUnstakeAmount = stakingModel.supply - stakingModel.remainder;
+            console.log("supply", stakingModel.supply / 1e18);
+            console.log("unstakeAmount", unstakeAmount / 1e18);
+            console.log("remainder", stakingModel.remainder / 1e18);
+            console.log("maxUnstakeAmount", maxUnstakeAmount / 1e18);
 
-                StakingModel memory stakingModel = mapStakingModels[stakingModelId];
-                uint256 maxUnstakeAmount = stakingModel.supply - stakingModel.remainder;
-                console.log("supply", stakingModel.supply / 1e18);
-                console.log("unstakeAmount", unstakeAmount / 1e18);
-                console.log("remainder", stakingModel.remainder / 1e18);
-                console.log("maxUnstakeAmount", maxUnstakeAmount / 1e18);
-
-                if (unstakeAmount > maxUnstakeAmount) {
-                    console.log("!!!! I'm here!");
-                    amounts[i][j] = maxUnstakeAmount;
-                    olasAmount += maxUnstakeAmount;
-                    unstakeAmount -= maxUnstakeAmount;
-                    mapStakingModels[stakingModelId].remainder = stakingModel.supply;
-                } else {
-                    amounts[i][j] = unstakeAmount;
-                    olasAmount += unstakeAmount;
-                    mapStakingModels[stakingModelId].remainder = stakingModel.remainder + uint96(unstakeAmount);
-                    unstakeAmount = 0;
-                    console.log("Updated remainder", mapStakingModels[stakingModelId].remainder / 1e18);
-                    break;
-                }
+            if (unstakeAmount > maxUnstakeAmount) {
+                console.log("!!!! I'm here!");
+                amounts[i] = maxUnstakeAmount;
+                unstakeAmount -= maxUnstakeAmount;
+                mapStakingModels[stakingModelId].remainder = stakingModel.supply;
+            } else {
+                amounts[i] = unstakeAmount;
+                mapStakingModels[stakingModelId].remainder = stakingModel.remainder + uint96(unstakeAmount);
+                unstakeAmount = 0;
+                console.log("Updated remainder", mapStakingModels[stakingModelId].remainder / 1e18);
+                break;
             }
-
-            totalAmount += olasAmount;
 
             // Transfer OLAS via the bridge
             address depositProcessor = mapChainIdDepositProcessors[chainIds[i]];
 
             // Approve OLAS for depositProcessor
-            IToken(olas).approve(depositProcessor, olasAmount);
+            IToken(olas).approve(depositProcessor, amounts[i]);
 
             // Transfer OLAS to its corresponding Staker on L2
-            IDepositProcessor(depositProcessor).sendMessageBatch{value: values[i]}(stakingProxies[i], amounts[i],
-                bridgePayloads[i], olasAmount, UNSTAKE);
+            IDepositProcessor(depositProcessor).sendMessage{value: values[i]}(stakingProxies[i], amounts[i],
+                bridgePayloads[i], UNSTAKE);
         }
 
         // Check if accumulated necessary amount of tokens
@@ -608,7 +585,8 @@ contract Depository {
             revert Overflow(unstakeAmount, 0);
         }
 
-        // TODO event
+        // TODO correct msg.sender
+        emit Unstake(msg.sender, unstakeAmount, chainIds, stakingProxies, amounts);
     }
 
     function getNumStakingModels() external view returns (uint256) {

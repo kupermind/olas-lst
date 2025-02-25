@@ -3,6 +3,7 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-network-helpers");
 const safeContracts = require("@gnosis.pm/safe-contracts");
+const {CallItem} = "hardhat-tracer";
 
 describe("Liquid Staking", function () {
     let serviceRegistry;
@@ -65,6 +66,7 @@ describe("Liquid Staking", function () {
     };
     const apyLimit = ethers.utils.parseEther("3");
     const lockFactor = 100;
+    const maxStakingLimit = ethers.utils.parseEther("20000");
     const protocolFactor = 0;
     const chainId = 31337;
     const gnosisChainId = 100;
@@ -148,7 +150,8 @@ describe("Liquid Staking", function () {
         await lock.deployed();
 
         const Depository = await ethers.getContractFactory("Depository");
-        depository = await Depository.deploy(olas.address, st.address, ve.address, AddressZero, lock.address, lockFactor);
+        depository = await Depository.deploy(olas.address, st.address, ve.address, AddressZero, lock.address,
+            lockFactor, maxStakingLimit);
         await depository.deployed();
 
         const Treasury = await ethers.getContractFactory("Treasury");
@@ -276,7 +279,7 @@ describe("Liquid Staking", function () {
 
             // Stake OLAS on L1
             console.log("User deposits OLAS for stOLAS");
-            await depository.deposit(olasAmount, [gnosisChainId], [[stakingTokenInstance.address]], [bridgePayload], [0]);
+            await depository.deposit(olasAmount, [gnosisChainId], [stakingTokenInstance.address], [bridgePayload], [0]);
             let stBalance = await st.balanceOf(deployer.address);
             console.log("User stOLAS balance now:", stBalance.toString());
             let stTotalAssets = await st.totalAssets();
@@ -342,7 +345,7 @@ describe("Liquid Staking", function () {
             let stAmount = collectorBalance.div(10);
             // Request withdraw
             console.log("User requests withdraw of small amount of stOLAS:", stAmount.toString());
-            let tx = await treasury.requestToWithdraw(stAmount, [gnosisChainId], [[stakingTokenInstance.address]],
+            let tx = await treasury.requestToWithdraw(stAmount, [gnosisChainId], [stakingTokenInstance.address],
                 [bridgePayload], [0]);
             let res = await tx.wait();
             // Get withdraw request Id
@@ -371,7 +374,7 @@ describe("Liquid Staking", function () {
             // Request withdraw of all the remaining stOLAS
             stBalance = await st.balanceOf(deployer.address);
             console.log("User requests withdraw of all remaining stOLAS:", stBalance.toString());
-            tx = await treasury.requestToWithdraw(stBalance, [gnosisChainId], [[stakingTokenInstance.address]],
+            tx = await treasury.requestToWithdraw(stBalance, [gnosisChainId], [stakingTokenInstance.address],
                 [bridgePayload], [0]);
             res = await tx.wait();
             // Get withdraw request Id
@@ -421,7 +424,7 @@ describe("Liquid Staking", function () {
 
             // Stake OLAS on L1
             console.log("User deposits OLAS for stOLAS");
-            await depository.deposit(olasAmount, [gnosisChainId], [[stakingTokenInstance.address]], [bridgePayload], [0]);
+            await depository.deposit(olasAmount, [gnosisChainId], [stakingTokenInstance.address], [bridgePayload], [0]);
             let stBalance = await st.balanceOf(deployer.address);
             console.log("User stOLAS balance now:", stBalance.toString());
             let stTotalAssets = await st.totalAssets();
@@ -495,7 +498,7 @@ describe("Liquid Staking", function () {
             let stAmount = stBalance.div(2);
             // Request withdraw
             console.log("User requests withdraw of half of stOLAS:", stAmount.toString());
-            let tx = await treasury.requestToWithdraw(stAmount, [gnosisChainId], [[stakingTokenInstance.address]],
+            let tx = await treasury.requestToWithdraw(stAmount, [gnosisChainId], [stakingTokenInstance.address],
                 [bridgePayload], [0]);
             let res = await tx.wait();
             // Get withdraw request Id
@@ -524,7 +527,7 @@ describe("Liquid Staking", function () {
             // Request withdraw of all the remaining stOLAS
             stBalance = await st.balanceOf(deployer.address);
             console.log("User requests withdraw of all remaining stOLAS:", stBalance.toString());
-            tx = await treasury.requestToWithdraw(stBalance, [gnosisChainId], [[stakingTokenInstance.address]],
+            tx = await treasury.requestToWithdraw(stBalance, [gnosisChainId], [stakingTokenInstance.address],
                 [bridgePayload], [0]);
             res = await tx.wait();
             // Get withdraw request Id
@@ -574,7 +577,7 @@ describe("Liquid Staking", function () {
 
             // Stake OLAS on L1
             console.log("User deposits OLAS for stOLAS");
-            await depository.deposit(olasAmount, [gnosisChainId], [[stakingTokenInstance.address]], [bridgePayload], [0]);
+            await depository.deposit(olasAmount, [gnosisChainId], [stakingTokenInstance.address], [bridgePayload], [0]);
             let stBalance = await st.balanceOf(deployer.address);
             console.log("User stOLAS balance now:", stBalance.toString());
             let stTotalAssets = await st.totalAssets();
@@ -648,7 +651,7 @@ describe("Liquid Staking", function () {
             let stAmount = stBalance.div(2);
             // Request withdraw
             console.log("User requests withdraw of half of stOLAS:", stAmount.toString());
-            let tx = await treasury.requestToWithdraw(stAmount, [gnosisChainId], [[stakingTokenInstance.address]],
+            let tx = await treasury.requestToWithdraw(stAmount, [gnosisChainId], [stakingTokenInstance.address],
                 [bridgePayload], [0]);
             let res = await tx.wait();
             // Get withdraw request Id
@@ -687,7 +690,7 @@ describe("Liquid Staking", function () {
             await olas.approve(depository.address, olasAmount);
 
             console.log("User deposits OLAS for stOLAS");
-            await depository.deposit(olasAmount, [gnosisChainId], [[stakingTokenInstance.address]], [bridgePayload], [0]);
+            await depository.deposit(olasAmount, [gnosisChainId], [stakingTokenInstance.address], [bridgePayload], [0]);
             stBalance = await st.balanceOf(deployer.address);
             console.log("User stOLAS balance now:", stBalance.toString());
             stTotalAssets = await st.totalAssets();
@@ -772,7 +775,7 @@ describe("Liquid Staking", function () {
             // Request withdraw of all the remaining stOLAS
             stBalance = await st.balanceOf(deployer.address);
             console.log("User requests withdraw of all remaining stOLAS:", stBalance.toString());
-            tx = await treasury.requestToWithdraw(stBalance, [gnosisChainId], [[stakingTokenInstance.address]],
+            tx = await treasury.requestToWithdraw(stBalance, [gnosisChainId], [stakingTokenInstance.address],
                 [bridgePayload], [0]);
             res = await tx.wait();
             // Get withdraw request Id
@@ -814,7 +817,8 @@ describe("Liquid Staking", function () {
             console.log("L1");
 
             // Get OLAS amount to stake - want to cover 19 and 20 full staked services: 2 * 20 * minStakingDeposit - veOLAS lock
-            let olasAmount = minStakingDeposit.mul(40);
+            //let olasAmount = minStakingDeposit.mul(40);
+            let olasAmount = minStakingDeposit.mul(3);
 
             // Approve OLAS for depository
             console.log("User approves OLAS for depository:", olasAmount.toString());
@@ -822,8 +826,9 @@ describe("Liquid Staking", function () {
 
             // Stake OLAS on L1
             console.log("User deposits OLAS for stOLAS");
-            await depository.deposit(olasAmount, [gnosisChainId], [[stakingTokenInstance.address]], [bridgePayload], [0]);
-            await depository.deposit(olasAmount, [gnosisChainId], [[stakingTokenInstance.address]], [bridgePayload], [0]);
+            await depository.deposit(olasAmount, [gnosisChainId], [stakingTokenInstance.address], [bridgePayload], [0]);
+            return;
+            //await depository.deposit(olasAmount, [gnosisChainId], [stakingTokenInstance.address], [bridgePayload], [0]);
             let stBalance = await st.balanceOf(deployer.address);
             console.log("User stOLAS balance now:", stBalance.toString());
             let stTotalAssets = await st.totalAssets();
@@ -897,7 +902,7 @@ describe("Liquid Staking", function () {
             let stAmount = stBalance;
             // Request withdraw
             console.log("User requests withdraw of half of stOLAS:", stAmount.toString());
-            let tx = await treasury.requestToWithdraw(stAmount, [gnosisChainId], [[stakingTokenInstance.address]],
+            let tx = await treasury.requestToWithdraw(stAmount, [gnosisChainId], [stakingTokenInstance.address],
                 [bridgePayload], [0]);
             let res = await tx.wait();
             // Get withdraw request Id
@@ -958,7 +963,7 @@ describe("Liquid Staking", function () {
 
                 // Stake OLAS on L1
                 console.log("User deposits OLAS for stOLAS");
-                await depository.deposit(olasAmount, [gnosisChainId], [[stakingTokenInstance.address]], [bridgePayload], [0]);
+                await depository.deposit(olasAmount, [gnosisChainId], [stakingTokenInstance.address], [bridgePayload], [0]);
                 let stBalance = await st.balanceOf(deployer.address);
                 console.log("User stOLAS balance now:", stBalance.toString());
                 let stTotalAssets = await st.totalAssets();
@@ -1033,7 +1038,7 @@ describe("Liquid Staking", function () {
                 let stAmount = stBalance.div(2);
                 // Request withdraw
                 console.log("User requests withdraw of half of stOLAS:", stAmount.toString());
-                let tx = await treasury.requestToWithdraw(stAmount, [gnosisChainId], [[stakingTokenInstance.address]],
+                let tx = await treasury.requestToWithdraw(stAmount, [gnosisChainId], [stakingTokenInstance.address],
                     [bridgePayload], [0]);
                 let res = await tx.wait();
                 // Get withdraw request Id

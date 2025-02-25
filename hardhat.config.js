@@ -260,7 +260,7 @@ module.exports = {
         ]
     },
     gasReporter: {
-        enabled: true
+        enabled: false
     },
     docgen: {
         path: "./docs",
