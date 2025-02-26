@@ -446,11 +446,6 @@ contract Depository {
 
         // Collect staking contracts and amounts
         for (uint256 i = 0; i < chainIds.length; ++i) {
-            // Check if more cycles are needed
-            if (remainder == 0) {
-                break;
-            }
-
             // Push a pair of key defining variables into one key: chainId | stakingProxy
             // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
             uint256 stakingModelId = uint256(uint160(stakingProxies[i]));
@@ -486,6 +481,7 @@ contract Depository {
 
             console.log("!!!!!!! supply", mapStakingModels[stakingModelId].supply);
             console.log("remainder", mapStakingModels[stakingModelId].remainder);
+            console.log("global remainder", remainder);
             console.log("actualStakeAmount", actualStakeAmount);
 
             // Transfer OLAS via the bridge
@@ -555,10 +551,7 @@ contract Depository {
 
         // Collect staking contracts and amounts
         for (uint256 i = 0; i < chainIds.length; ++i) {
-            // Check if more cycles are needed
-            if (unstakeAmount == 0) {
-                break;
-            }
+            console.log("unstakeAmount", unstakeAmount / 1e18);
 
             // Push a pair of key defining variables into one key: chainId | stakingProxy
             // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
@@ -576,11 +569,10 @@ contract Depository {
             // Adjust unstaking amount to not overflow the max allowed one
             amounts[i] = stakingModel.supply - stakingModel.remainder;
             if (amounts[i] > maxStakingLimit) {
-                amounts[i] -= maxStakingLimit;
+                amounts[i] = maxStakingLimit;
             }
             console.log("supply", stakingModel.supply / 1e18);
-            console.log("unstakeAmount", unstakeAmount / 1e18);
-            console.log("remainder", stakingModel.remainder / 1e18);
+            console.log("staking remainder", stakingModel.remainder / 1e18);
             console.log("maxUnstakeAmount", amounts[i] / 1e18);
 
             if (unstakeAmount > amounts[i]) {

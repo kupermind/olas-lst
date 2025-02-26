@@ -822,16 +822,17 @@ describe("Liquid Staking", function () {
 
             // Approve OLAS for depository
             console.log("User approves OLAS for depository:", olasAmount.toString());
-            await olas.approve(depository.address, olasAmount.mul(20));
+            await olas.approve(depository.address, olasAmount.mul(40));
 
             // Stake OLAS on L1
             console.log("User deposits OLAS for stOLAS");
-            const numStakes = 10;
-            for (let i = 0; i < numStakes; i++) {
-                await depository.deposit(olasAmount, [gnosisChainId], [stakingTokenInstance.address], [bridgePayload], [0]);
-            }
-            return;
-            //await depository.deposit(olasAmount, [gnosisChainId], [stakingTokenInstance.address], [bridgePayload], [0]);
+            const numStakes = 18;
+            let chainIds = new Array(numStakes).fill(gnosisChainId);
+            let stakingInstances = new Array(numStakes).fill(stakingTokenInstance.address);
+            let bridgePayloads = new Array(numStakes).fill(bridgePayload);
+            let values = new Array(numStakes).fill(0);
+            await depository.deposit(olasAmount.mul(numStakes), chainIds, stakingInstances, bridgePayloads, values);
+
             let stBalance = await st.balanceOf(deployer.address);
             console.log("User stOLAS balance now:", stBalance.toString());
             let stTotalAssets = await st.totalAssets();
@@ -902,11 +903,14 @@ describe("Liquid Staking", function () {
             await st.approve(treasury.address, stBalance);
 
             // Full stOLAS withdraw
-            let stAmount = stBalance;
             // Request withdraw
-            console.log("User requests withdraw of half of stOLAS:", stAmount.toString());
-            let tx = await treasury.requestToWithdraw(stAmount, [gnosisChainId], [stakingTokenInstance.address],
-                [bridgePayload], [0]);
+            console.log("User requests full withdraw of stOLAS:", stBalance.toString());
+            const numUnstakes = 100;
+            chainIds = new Array(numUnstakes).fill(gnosisChainId);
+            stakingInstances = new Array(numUnstakes).fill(stakingTokenInstance.address);
+            bridgePayloads = new Array(numUnstakes).fill(bridgePayload);
+            values = new Array(numUnstakes).fill(0);
+            let tx = await treasury.requestToWithdraw(stBalance, chainIds, stakingInstances, bridgePayloads, values, {gasLimit: "10000000"});
             let res = await tx.wait();
             // Get withdraw request Id
             //console.log(res.logs);

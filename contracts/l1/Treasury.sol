@@ -9,12 +9,12 @@ interface IDepository {
     /// @dev Calculates amounts and initiates cross-chain unstake request from specified models.
     /// @param unstakeAmount Total amount to unstake.
     /// @param chainIds Set of chain Ids with staking proxies.
-    /// @param stakingProxies Set of sets of staking proxies corresponding to each chain Id.
+    /// @param stakingProxies Set staking proxies corresponding to each chain Id.
     /// @param bridgePayloads Bridge payloads corresponding to each chain Id.
     /// @param values Value amounts for each bridge interaction, if applicable.
     /// @return amounts Corresponding OLAS amounts for each staking proxy.
-    function unstake(uint256 unstakeAmount, uint256[] memory chainIds, address[][] memory stakingProxies,
-        bytes[] memory bridgePayloads, uint256[] memory values) external payable returns (uint256[][] memory amounts);
+    function unstake(uint256 unstakeAmount, uint256[] memory chainIds, address[] memory stakingProxies,
+        bytes[] memory bridgePayloads, uint256[] memory values) external payable returns (uint256[] memory amounts);
 }
 
 interface IST {
@@ -161,7 +161,7 @@ contract Treasury is ERC6909 {
     ///         to be unstaked from other models.
     /// @param stAmount Provided stAmount to burn in favor of OLAS tokens.
     /// @param chainIds Set of chain Ids with staking proxies.
-    /// @param stakingProxies Set of sets of staking proxies corresponding to each chain Id.
+    /// @param stakingProxies Set of staking proxies corresponding to each chain Id.
     /// @param bridgePayloads Bridge payloads corresponding to each chain Id.
     /// @param values Value amounts for each bridge interaction, if applicable.
     /// @return requestId Withdraw request ERC-1155 token.
@@ -169,7 +169,7 @@ contract Treasury is ERC6909 {
     function requestToWithdraw(
         uint256 stAmount,
         uint256[] memory chainIds,
-        address[][] memory stakingProxies,
+        address[] memory stakingProxies,
         bytes[] memory bridgePayloads,
         uint256[] memory values
     ) external payable returns (uint256 requestId, uint256 olasAmount) {

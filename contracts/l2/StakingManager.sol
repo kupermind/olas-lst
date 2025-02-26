@@ -557,6 +557,9 @@ contract StakingManager is ERC721TokenReceiver {
             uint256 fullStakingDeposit = minStakingDeposit * (1 + NUM_AGENT_INSTANCES);
             // Subtract unstaked balance
             uint256 balanceDiff = amount - balance;
+            console.log("amount", amount);
+            console.log("balance", balance);
+            console.log("balanceDiff", balanceDiff);
 
             // Calculate number of stakes
             numUnstakes = balanceDiff / fullStakingDeposit;
