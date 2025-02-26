@@ -43,7 +43,7 @@ describe("Liquid Staking", function () {
     const HashZero = ethers.constants.HashZero;
     const oneDay = 86400;
     const defaultHash = "0x" + "5".repeat(64);
-    const regDeposit = ethers.utils.parseEther("50");
+    const regDeposit = ethers.utils.parseEther("10000");
     const serviceId = 1;
     const agentId = 1;
     const livenessPeriod = oneDay; // 24 hours
@@ -54,7 +54,7 @@ describe("Liquid Staking", function () {
     const timeForEmissions = oneDay * 30;
     let serviceParams = {
         maxNumServices,
-        rewardsPerSecond: "1" + "0".repeat(12),
+        rewardsPerSecond: "5" + "0".repeat(14),
         minStakingDeposit,
         livenessPeriod,
         timeForEmissions,
@@ -822,11 +822,14 @@ describe("Liquid Staking", function () {
 
             // Approve OLAS for depository
             console.log("User approves OLAS for depository:", olasAmount.toString());
-            await olas.approve(depository.address, olasAmount.mul(2));
+            await olas.approve(depository.address, olasAmount.mul(20));
 
             // Stake OLAS on L1
             console.log("User deposits OLAS for stOLAS");
-            await depository.deposit(olasAmount, [gnosisChainId], [stakingTokenInstance.address], [bridgePayload], [0]);
+            const numStakes = 10;
+            for (let i = 0; i < numStakes; i++) {
+                await depository.deposit(olasAmount, [gnosisChainId], [stakingTokenInstance.address], [bridgePayload], [0]);
+            }
             return;
             //await depository.deposit(olasAmount, [gnosisChainId], [stakingTokenInstance.address], [bridgePayload], [0]);
             let stBalance = await st.balanceOf(deployer.address);

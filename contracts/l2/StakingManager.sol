@@ -407,7 +407,7 @@ contract StakingManager is ERC721TokenReceiver {
         emit DeployAndStake(stakingProxy, serviceId, multisig);
     }
 
-    function stake(address[] memory stakingProxies, uint256[] memory amounts, uint256 totalAmount) external virtual {
+    function stake(address stakingProxy, uint256 amount) external virtual {
         // Reentrancy guard
         if (_locked > 1) {
             revert ReentrancyGuard();
@@ -420,63 +420,60 @@ contract StakingManager is ERC721TokenReceiver {
         }
 
         // Get OLAS from l2StakingProcessor
-        IToken(olas).transferFrom(l2StakingProcessor, address(this), totalAmount);
+        IToken(olas).transferFrom(l2StakingProcessor, address(this), amount);
+        
+        // Get current unstaked balance
+        uint256 balance = mapStakingProxyBalances[stakingProxy];
+        uint256 minStakingDeposit = IStaking(stakingProxy).minStakingDeposit();
+        uint256 fullStakingDeposit = minStakingDeposit * (1 + NUM_AGENT_INSTANCES);
 
-        // Traverse all staking proxies
-        for (uint256 i = 0; i < stakingProxies.length; ++i) {
-            // Get current unstaked balance
-            uint256 balance = mapStakingProxyBalances[stakingProxies[i]];
-            uint256 minStakingDeposit = IStaking(stakingProxies[i]).minStakingDeposit();
-            uint256 fullStakingDeposit = minStakingDeposit * (1 + NUM_AGENT_INSTANCES);
+        // Add amount to current unstaked balance
+        balance += amount;
+        console.log("!!!! L2 obtained amount", amount);
 
-            // Add amount to current unstaked balance
-            balance += amounts[i];
-            console.log("!!!! L2 obtained amount", amounts[i]);
+        // Calculate number of stakes
+        uint256 numStakes = balance / fullStakingDeposit;
+        uint256 totalStakingDeposit = numStakes * fullStakingDeposit;
+        console.log("!!!!!! NUMBER OF STAKES", numStakes);
+        // Check if the balance is enough to create another stake
+        if (numStakes > 0) {
+            // Approve token for the serviceRegistryTokenUtility contract
+            IToken(olas).approve(serviceRegistryTokenUtility, totalStakingDeposit);
 
-            // Calculate number of stakes
-            uint256 numStakes = balance / fullStakingDeposit;
-            uint256 totalStakingDeposit = numStakes * fullStakingDeposit;
-            console.log("!!!!!! NUMBER OF STAKES", numStakes);
-            // Check if the balance is enough to create another stake
-            if (numStakes > 0) {
-                // Approve token for the serviceRegistryTokenUtility contract
-                IToken(olas).approve(serviceRegistryTokenUtility, totalStakingDeposit);
+            // Get already existent service or create a new one
+            uint256 nextIdx = mapLastStakedServiceIdxs[stakingProxy];
+            uint256 maxIdx = mapStakedServiceIds[stakingProxy].length;
 
-                // Get already existent service or create a new one
-                uint256 nextIdx = mapLastStakedServiceIdxs[stakingProxies[i]];
-                uint256 maxIdx = mapStakedServiceIds[stakingProxies[i]].length;
-
-                // Check for the first service Id to be ever staked
-                if (maxIdx == 0) {
-                    // Insert blanc service Id
-                    mapStakedServiceIds[stakingProxies[i]].push(0);
-                }
-
-                // Traverse all required stakes
-                for (uint256 j = 0; j < numStakes; ++j) {
-
-                    // Next index must always be bigger than the last one staked
-                    nextIdx++;
-
-                    if (nextIdx < maxIdx) {
-                        // Deploy and stake already existent service or create a new one first
-                        uint256 serviceId = mapStakedServiceIds[stakingProxies[i]][nextIdx];
-                        _deployAndStake(stakingProxies[i], serviceId);
-                    } else {
-                        _createAndStake(stakingProxies[i], minStakingDeposit);
-                    }
-                }
-                console.log("!!!!!! STAKE NEXT IDX", nextIdx);
-                // Update last staked service Id
-                mapLastStakedServiceIdxs[stakingProxies[i]] = nextIdx;
-
-                // Update unstaked balance
-                balance -= totalStakingDeposit;
-                mapStakingProxyBalances[stakingProxies[i]] = balance;
+            // Check for the first service Id to be ever staked
+            if (maxIdx == 0) {
+                // Insert blanc service Id
+                mapStakedServiceIds[stakingProxy].push(0);
             }
 
-            emit StakingBalanceUpdated(STAKE, stakingProxies[i], numStakes, balance);
+            // Traverse all required stakes
+            for (uint256 i = 0; i < numStakes; ++i) {
+
+                // Next index must always be bigger than the last one staked
+                nextIdx++;
+
+                if (nextIdx < maxIdx) {
+                    // Deploy and stake already existent service or create a new one first
+                    uint256 serviceId = mapStakedServiceIds[stakingProxy][nextIdx];
+                    _deployAndStake(stakingProxy, serviceId);
+                } else {
+                    _createAndStake(stakingProxy, minStakingDeposit);
+                }
+            }
+            console.log("!!!!!! STAKE NEXT IDX", nextIdx);
+            // Update last staked service Id
+            mapLastStakedServiceIdxs[stakingProxy] = nextIdx;
+
+            // Update unstaked balance
+            balance -= totalStakingDeposit;
+            mapStakingProxyBalances[stakingProxy] = balance;
         }
+
+        emit StakingBalanceUpdated(STAKE, stakingProxy, numStakes, balance);
 
         _locked = 1;
     }
@@ -532,7 +529,7 @@ contract StakingManager is ERC721TokenReceiver {
     /// @notice Unstakes services if needed to satisfy withdraw requests.
     ///         Call this to unstake definitely terminated staking contracts - deactivated on L1 and / or ran out of funds.
     ///         The majority of discovered chains does not need any value to process token bridge transfer.
-    function unstake(address[] memory stakingProxies, uint256[] memory amounts) external virtual {
+    function unstake(address stakingProxy, uint256 amount) external virtual {
         // Reentrancy guard
         if (_locked > 1) {
             revert ReentrancyGuard();
@@ -544,74 +541,69 @@ contract StakingManager is ERC721TokenReceiver {
             revert UnauthorizedAccount(msg.sender);
         }
 
-        uint256 totalTransferAmount;
-        // Traverse all staking proxies
-        for (uint256 i = 0; i < stakingProxies.length; ++i) {
-            // Get current unstaked balance
-            uint256 balance = mapStakingProxyBalances[stakingProxies[i]];
-            uint256 numUnstakes;
-            if (balance >= amounts[i]) {
-                balance -= amounts[i];
-            } else {
-                // This must never happen
-                if (mapStakedServiceIds[stakingProxies[i]].length == 0) {
-                    revert ZeroValue();
-                }
-
-                // Calculate how many unstakes are needed
-                uint256 minStakingDeposit = IStaking(stakingProxies[i]).minStakingDeposit();
-                uint256 fullStakingDeposit = minStakingDeposit * (1 + NUM_AGENT_INSTANCES);
-                // Subtract unstaked balance
-                uint256 balanceDiff = amounts[i] - balance;
-
-                // Calculate number of stakes
-                numUnstakes = balanceDiff / fullStakingDeposit;
-                console.log("!!!!!! NUMBER OF UNSTAKES", numUnstakes);
-                // Depending of how much is unstaked, adjust the unstaked balance
-                if (balanceDiff % fullStakingDeposit == 0) {
-                    balance = 0;
-                } else {
-                    numUnstakes++;
-                    balance = numUnstakes * fullStakingDeposit - balanceDiff;
-                }
-
-                // Get the last staked Service Id index
-                uint256 lastIdx = mapLastStakedServiceIdxs[stakingProxies[i]];
-                console.log("!!!!!! UNSTAKE LAST IDX", lastIdx);
-                // This must never happen
-                if (numUnstakes > lastIdx) {
-                    revert Overflow(numUnstakes, lastIdx);
-                }
-
-                // Traverse all required unstakes
-                for (uint256 j = 0; j < numUnstakes; ++j) {
-                    uint256 serviceId = mapStakedServiceIds[stakingProxies[i]][lastIdx];
-                    console.log("!!!! UNSTAKE SERVICE ID", serviceId);
-                    // Unstake, terminate and unbond the service
-                    IStaking(stakingProxies[i]).unstake(serviceId);
-                    IService(serviceManager).terminate(serviceId);
-                    IService(serviceManager).unbond(serviceId);
-
-                    lastIdx--;
-                }
-
-                console.log("!!!! LAST UNSTAKE SERVICE ID", lastIdx);
-                // Update last staked service Id
-                mapLastStakedServiceIdxs[stakingProxies[i]] = lastIdx;
+        // Get current unstaked balance
+        uint256 balance = mapStakingProxyBalances[stakingProxy];
+        uint256 numUnstakes;
+        if (balance >= amount) {
+            balance -= amount;
+        } else {
+            // This must never happen
+            if (mapStakedServiceIds[stakingProxy].length == 0) {
+                revert ZeroValue();
             }
 
-            // Update unstaked balance
-            mapStakingProxyBalances[stakingProxies[i]] = balance;
-            totalTransferAmount += amounts[i];
+            // Calculate how many unstakes are needed
+            uint256 minStakingDeposit = IStaking(stakingProxy).minStakingDeposit();
+            uint256 fullStakingDeposit = minStakingDeposit * (1 + NUM_AGENT_INSTANCES);
+            // Subtract unstaked balance
+            uint256 balanceDiff = amount - balance;
 
-            emit StakingBalanceUpdated(UNSTAKE, stakingProxies[i], numUnstakes, balance);
+            // Calculate number of stakes
+            numUnstakes = balanceDiff / fullStakingDeposit;
+            console.log("!!!!!! NUMBER OF UNSTAKES", numUnstakes);
+            // Depending of how much is unstaked, adjust the unstaked balance
+            if (balanceDiff % fullStakingDeposit == 0) {
+                balance = 0;
+            } else {
+                numUnstakes++;
+                balance = numUnstakes * fullStakingDeposit - balanceDiff;
+            }
+
+            // Get the last staked Service Id index
+            uint256 lastIdx = mapLastStakedServiceIdxs[stakingProxy];
+            console.log("!!!!!! UNSTAKE LAST IDX", lastIdx);
+            // This must never happen
+            if (numUnstakes > lastIdx) {
+                revert Overflow(numUnstakes, lastIdx);
+            }
+
+            // Traverse all required unstakes
+            for (uint256 i = 0; i < numUnstakes; ++i) {
+                uint256 serviceId = mapStakedServiceIds[stakingProxy][lastIdx];
+                console.log("!!!! UNSTAKE SERVICE ID", serviceId);
+                // Unstake, terminate and unbond the service
+                IStaking(stakingProxy).unstake(serviceId);
+                IService(serviceManager).terminate(serviceId);
+                IService(serviceManager).unbond(serviceId);
+
+                lastIdx--;
+            }
+
+            console.log("!!!! LAST UNSTAKE SERVICE ID", lastIdx);
+            // Update last staked service Id
+            mapLastStakedServiceIdxs[stakingProxy] = lastIdx;
+
+            // Update unstaked balance
+            mapStakingProxyBalances[stakingProxy] = balance;
+
+            emit StakingBalanceUpdated(UNSTAKE, stakingProxy, numUnstakes, balance);
         }
 
         // Send OLAS to collector to initiate L1 transfer for all the balances at this time
-        IToken(olas).transfer(l2StakingProcessor, totalTransferAmount);
+        IToken(olas).transfer(l2StakingProcessor, amount);
         // TODO Check on relays, but the majority of them does not require value
         // Send tokens to L1 Treasury and not stOLAS, since the redeem finalization is handled by Treasury
-        IBridge(l2StakingProcessor).relayToL1(l1Treasury, totalTransferAmount);
+        IBridge(l2StakingProcessor).relayToL1(l1Treasury, amount);
 
         _locked = 1;
     }

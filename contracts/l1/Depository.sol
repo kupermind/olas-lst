@@ -430,9 +430,8 @@ contract Depository {
 
         // TODO Check array lengths
 
-        uint256 reserveBalance = IST(st).reserveBalance();
         // Remainder is stake amount plus reserve balance
-        uint256 remainder = stakeAmount + reserveBalance;
+        uint256 remainder = stakeAmount + IST(st).reserveBalance();
         // Check for zero value
         if (remainder == 0) {
             revert ZeroValue();
@@ -441,6 +440,9 @@ contract Depository {
         uint256 actualStakeAmount;
         // Allocate arrays of max possible size
         amounts = new uint256[](chainIds.length);
+
+        // Get max staking limit
+        uint256 curMaxStakingLimit = maxStakingLimit;
 
         // Collect staking contracts and amounts
         for (uint256 i = 0; i < chainIds.length; ++i) {
@@ -462,24 +464,47 @@ contract Depository {
 
             console.log("Staking model reminder", stakingModel.remainder);
 
-            if (remainder > stakingModel.remainder) {
+            // Adjust staking amount to not overflow the max allowed one
+            amounts[i] = remainder;
+            if (amounts[i] > curMaxStakingLimit) {
+                amounts[i] = curMaxStakingLimit;
+            }
+
+            if (amounts[i] > stakingModel.remainder) {
                 amounts[i] = stakingModel.remainder;
-                remainder -= stakingModel.remainder;
+                remainder -= amounts[i];
                 // Update staking model remainder
                 mapStakingModels[stakingModelId].remainder = 0;
-                console.log("!!!! LEFTOVER reminder", remainder);
             } else {
-                amounts[i] = remainder;
                 // Update staking model remainder
-                mapStakingModels[stakingModelId].remainder -= uint96(remainder);
-                remainder = 0;
-                console.log("!!!!!!! supply", mapStakingModels[stakingModelId].supply);
-                console.log("remainder", mapStakingModels[stakingModelId].remainder);
-                break;
+                mapStakingModels[stakingModelId].remainder = stakingModel.remainder - uint96(amounts[i]);
+                remainder -= amounts[i];
             }
 
             // Increase actual stake amount
             actualStakeAmount += amounts[i];
+
+            console.log("!!!!!!! supply", mapStakingModels[stakingModelId].supply);
+            console.log("remainder", mapStakingModels[stakingModelId].remainder);
+            console.log("actualStakeAmount", actualStakeAmount);
+
+            // Transfer OLAS via the bridge
+            address depositProcessor = mapChainIdDepositProcessors[chainIds[i]];
+            // Check for zero address
+            if (depositProcessor == address(0)) {
+                revert ZeroAddress();
+            }
+
+            // Approve OLAS for depositProcessor
+            IToken(olas).transfer(depositProcessor, amounts[i]);
+
+            // Transfer OLAS to its corresponding Staker on L2
+            IDepositProcessor(depositProcessor).sendMessage{value: values[i]}(stakingProxies[i], amounts[i],
+                bridgePayloads[i], STAKE);
+
+            if (remainder == 0) {
+                break;
+            }
         }
 
         if (stakeAmount > actualStakeAmount) {
@@ -494,19 +519,6 @@ contract Depository {
 
         // Calculates stAmount and mints stOLAS
         stAmount = ITreasury(treasury).processAndMintStToken(msg.sender, actualStakeAmount);
-
-        // Traverse chain Ids to transfer staking amounts
-        for (uint256 i = 0; i < chainIds.length; ++i) {
-            // Transfer OLAS via the bridge
-            address depositProcessor = mapChainIdDepositProcessors[chainIds[i]];
-
-            // Approve OLAS for depositProcessor
-            IToken(olas).transfer(depositProcessor, amounts[i]);
-
-            // Transfer OLAS to its corresponding Staker on L2
-            IDepositProcessor(depositProcessor).sendMessage{value: values[i]}(stakingProxies[i], amounts[i],
-                bridgePayloads[i], STAKE);
-        }
 
         emit Deposit(msg.sender, stakeAmount, stAmount, chainIds, stakingProxies, amounts);
     }
@@ -530,6 +542,12 @@ contract Depository {
             revert UnauthorizedAccount(msg.sender);
         }
 
+        // TODO - obsolete as called by Treasury?
+        // Check for zero value
+        if (unstakeAmount == 0) {
+            revert ZeroValue();
+        }
+
         // TODO Check array lengths
 
         // Allocate arrays of max possible size
@@ -548,27 +566,39 @@ contract Depository {
             stakingModelId |= chainIds[i] << 160;
 
             StakingModel memory stakingModel = mapStakingModels[stakingModelId];
-            uint256 maxUnstakeAmount = stakingModel.supply - stakingModel.remainder;
+            // Check for model existence and activity
+            if (stakingModel.supply == 0) {
+                revert WrongStakingModel(stakingModelId);
+            }
+
+            console.log("Staking model reminder", stakingModel.remainder);
+
+            // Adjust unstaking amount to not overflow the max allowed one
+            amounts[i] = stakingModel.supply - stakingModel.remainder;
+            if (amounts[i] > maxStakingLimit) {
+                amounts[i] -= maxStakingLimit;
+            }
             console.log("supply", stakingModel.supply / 1e18);
             console.log("unstakeAmount", unstakeAmount / 1e18);
             console.log("remainder", stakingModel.remainder / 1e18);
-            console.log("maxUnstakeAmount", maxUnstakeAmount / 1e18);
+            console.log("maxUnstakeAmount", amounts[i] / 1e18);
 
-            if (unstakeAmount > maxUnstakeAmount) {
-                console.log("!!!! I'm here!");
-                amounts[i] = maxUnstakeAmount;
-                unstakeAmount -= maxUnstakeAmount;
-                mapStakingModels[stakingModelId].remainder = stakingModel.supply;
+            if (unstakeAmount > amounts[i]) {
+                // Remainder resulting value is limited by stakingModel.supply
+                mapStakingModels[stakingModelId].remainder += uint96(amounts[i]);
+                unstakeAmount -= amounts[i];
             } else {
                 amounts[i] = unstakeAmount;
                 mapStakingModels[stakingModelId].remainder = stakingModel.remainder + uint96(unstakeAmount);
                 unstakeAmount = 0;
-                console.log("Updated remainder", mapStakingModels[stakingModelId].remainder / 1e18);
-                break;
             }
 
             // Transfer OLAS via the bridge
             address depositProcessor = mapChainIdDepositProcessors[chainIds[i]];
+            // Check for zero address
+            if (depositProcessor == address(0)) {
+                revert ZeroAddress();
+            }
 
             // Approve OLAS for depositProcessor
             IToken(olas).approve(depositProcessor, amounts[i]);
@@ -576,6 +606,11 @@ contract Depository {
             // Transfer OLAS to its corresponding Staker on L2
             IDepositProcessor(depositProcessor).sendMessage{value: values[i]}(stakingProxies[i], amounts[i],
                 bridgePayloads[i], UNSTAKE);
+
+            console.log("Updated remainder", mapStakingModels[stakingModelId].remainder / 1e18);
+            if (unstakeAmount == 0) {
+                break;
+            }
         }
 
         // Check if accumulated necessary amount of tokens
