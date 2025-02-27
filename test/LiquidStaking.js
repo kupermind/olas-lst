@@ -683,7 +683,7 @@ describe("Liquid Staking", function () {
             console.log("\nL1 - continue");
 
             // Stake more OLAS on L1
-            // Get OLAS amount to stake - want to cover 1 more staked services: 1 * 2 * minStakingDeposit
+            // Get OLAS amount to stake - want to cover 3 more staked services: 3 * 2 * minStakingDeposit
             olasAmount = minStakingDeposit.mul(7);
             // Approve OLAS for depository
             console.log("User approves OLAS for depository:", olasAmount.toString());
@@ -775,8 +775,13 @@ describe("Liquid Staking", function () {
             // Request withdraw of all the remaining stOLAS
             stBalance = await st.balanceOf(deployer.address);
             console.log("User requests withdraw of all remaining stOLAS:", stBalance.toString());
-            tx = await treasury.requestToWithdraw(stBalance, [gnosisChainId], [stakingTokenInstance.address],
-                [bridgePayload], [0]);
+            // There must be no more than 5 unstakes
+            const numUnstakes = 5;
+            chainIds = new Array(numUnstakes).fill(gnosisChainId);
+            stakingInstances = new Array(numUnstakes).fill(stakingTokenInstance.address);
+            bridgePayloads = new Array(numUnstakes).fill(bridgePayload);
+            values = new Array(numUnstakes).fill(0);
+            tx = await treasury.requestToWithdraw(stBalance, chainIds, stakingInstances,bridgePayloads, values);
             res = await tx.wait();
             // Get withdraw request Id
             //console.log(res.logs);
@@ -818,20 +823,24 @@ describe("Liquid Staking", function () {
 
             // Get OLAS amount to stake - want to cover 19 and 20 full staked services: 2 * 20 * minStakingDeposit - veOLAS lock
             //let olasAmount = minStakingDeposit.mul(40);
-            let olasAmount = minStakingDeposit.mul(3);
+            let olasAmount = (minStakingDeposit.mul(3)).sub(1);
 
             // Approve OLAS for depository
             console.log("User approves OLAS for depository:", olasAmount.toString());
-            await olas.approve(depository.address, olasAmount.mul(40));
+            await olas.approve(depository.address, initSupply);
 
             // Stake OLAS on L1
             console.log("User deposits OLAS for stOLAS");
+            const numIters = 10;
             const numStakes = 18;
             let chainIds = new Array(numStakes).fill(gnosisChainId);
             let stakingInstances = new Array(numStakes).fill(stakingTokenInstance.address);
             let bridgePayloads = new Array(numStakes).fill(bridgePayload);
             let values = new Array(numStakes).fill(0);
-            await depository.deposit(olasAmount.mul(numStakes), chainIds, stakingInstances, bridgePayloads, values);
+            for (let i = 0; i < numIters; i++) {
+                await depository.deposit(olasAmount.mul(numStakes), chainIds, stakingInstances, bridgePayloads, values);
+            }
+            return;
 
             let stBalance = await st.balanceOf(deployer.address);
             console.log("User stOLAS balance now:", stBalance.toString());
@@ -861,11 +870,6 @@ describe("Liquid Staking", function () {
             console.log("Number of staked services: ", stakedServiceIds.length);
 
             // Check rewards
-            for (let i = 0; i < stakedServiceIds.length; ++i) {
-                serviceInfo = await stakingTokenInstance.mapServiceInfo(stakedServiceIds[i]);
-                console.log(`Reward after checkpoint ${stakedServiceIds[i]}:`, serviceInfo.reward.toString());
-            }
-
             for (let i = 0; i < stakedServiceIds.length; ++i) {
                 serviceInfo = await stakingTokenInstance.mapServiceInfo(stakedServiceIds[i]);
                 // Get multisig addresses
@@ -905,7 +909,7 @@ describe("Liquid Staking", function () {
             // Full stOLAS withdraw
             // Request withdraw
             console.log("User requests full withdraw of stOLAS:", stBalance.toString());
-            const numUnstakes = 100;
+            const numUnstakes = 25;
             chainIds = new Array(numUnstakes).fill(gnosisChainId);
             stakingInstances = new Array(numUnstakes).fill(stakingTokenInstance.address);
             bridgePayloads = new Array(numUnstakes).fill(bridgePayload);

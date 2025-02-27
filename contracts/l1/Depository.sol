@@ -22,7 +22,7 @@ interface ILock {
 interface IST {
     function topUpReserveBalance(uint256 amount) external;
 
-    function fundDepository(uint256 amount) external;
+    function fundDepository() external;
 
     function reserveBalance() external view returns (uint256);
 }
@@ -431,7 +431,14 @@ contract Depository {
         // TODO Check array lengths
 
         // Remainder is stake amount plus reserve balance
-        uint256 remainder = stakeAmount + IST(st).reserveBalance();
+        uint256 remainder = IST(st).reserveBalance();
+        // Pull OLAS reserve balance from stOLAS
+        if (remainder > 0) {
+            IST(st).fundDepository();
+        }
+
+        // Add requested stake amount
+        remainder += stakeAmount;
         // Check for zero value
         if (remainder == 0) {
             revert ZeroValue();
@@ -457,6 +464,10 @@ contract Depository {
                 revert WrongStakingModel(stakingModelId);
             }
 
+            // Skip potential zero funds models
+            if (stakingModel.remainder == 0) {
+                continue;
+            }
             console.log("Staking model reminder", stakingModel.remainder);
 
             // Adjust staking amount to not overflow the max allowed one
@@ -503,18 +514,16 @@ contract Depository {
             }
         }
 
+        // If there are OLAS leftovers, transfer (back) to stOLAS
         if (stakeAmount > actualStakeAmount) {
             remainder = stakeAmount - actualStakeAmount;
             console.log("!!!! RECALCULATED reminder", remainder);
             IToken(olas).approve(st, remainder);
             IST(st).topUpReserveBalance(remainder);
-        } else {
-            remainder = actualStakeAmount - stakeAmount;
-            IST(st).fundDepository(remainder);
         }
 
         // Calculates stAmount and mints stOLAS
-        stAmount = ITreasury(treasury).processAndMintStToken(msg.sender, actualStakeAmount);
+        stAmount = ITreasury(treasury).processAndMintStToken(msg.sender, stakeAmount);
 
         emit Deposit(msg.sender, stakeAmount, stAmount, chainIds, stakingProxies, amounts);
     }

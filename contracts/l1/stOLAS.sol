@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
-
+import "hardhat/console.sol";
 import {ERC20, ERC4626} from  "../../lib/solmate/src/tokens/ERC4626.sol";
 import {IToken} from "../l2/ActivityModule.sol";
 
@@ -36,6 +36,8 @@ contract stOLAS is ERC4626 {
     uint256 public reserveBalance;
     // Total OLAS reserves that include staked and vault balance
     uint256 public totalReserves;
+    // Top-up reserve balance in on-going deposit
+    uint256 public transient topUpBalance;
 
     // Owner address
     address public owner;
@@ -93,7 +95,9 @@ contract stOLAS is ERC4626 {
         uint256 curStakedBalance = stakedBalance;
 
         if (assets > 0) {
-            curStakedBalance += assets;
+            // topUpBalance is subtracted as it is passed as part of the assets value and already deposited
+            // and accounted in vaultBalance via topUpReserveBalance() function call
+            curStakedBalance = curStakedBalance + assets - topUpBalance;
             stakedBalance = curStakedBalance;
         }
 
@@ -170,9 +174,10 @@ contract stOLAS is ERC4626 {
 
             curStakedBalance -= diff;
             stakedBalance = curStakedBalance;
-            reserveBalance = 0;
+            curReserveBalance = 0;
         }
 
+        reserveBalance = curReserveBalance;
         uint256 curTotalReserves = curStakedBalance + curVaultBalance;
         totalReserves = curTotalReserves;
         vaultBalance = curVaultBalance;
@@ -199,28 +204,24 @@ contract stOLAS is ERC4626 {
         }
 
         asset.transferFrom(msg.sender, address(this), amount);
+        topUpBalance = amount;
         reserveBalance += amount;
-        totalReserves += amount;
 
         // TODO event or Transfer event is enough?
     }
 
-    function fundDepository(uint256 amount) external {
+    function fundDepository() external {
         if (msg.sender != depository) {
             revert();
         }
 
         uint256 curReserveBalance = reserveBalance;
-        // This must never happen
-        if (amount > curReserveBalance) {
-            revert Overflow(amount, curReserveBalance);
-        }
-
-        curReserveBalance -= amount;
-        reserveBalance = curReserveBalance;
-        totalReserves -= amount;
-
-        asset.transfer(msg.sender, amount);
+        reserveBalance = 0;
+        totalReserves -= curReserveBalance;
+console.log("curReserveBalance", curReserveBalance);
+console.log("vaultBalance", vaultBalance);
+console.log("OLAS balance", asset.balanceOf(address(this)));
+        asset.transfer(msg.sender, curReserveBalance);
 
         // TODO event or Transfer event is enough?
     }
