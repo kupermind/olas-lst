@@ -523,7 +523,10 @@ contract Depository {
         }
 
         // Calculates stAmount and mints stOLAS
-        stAmount = ITreasury(treasury).processAndMintStToken(msg.sender, stakeAmount);
+        // If stakeAmount is zero, stakes are performed from reserves
+        if (stakeAmount > 0) {
+            stAmount = ITreasury(treasury).processAndMintStToken(msg.sender, stakeAmount);
+        }
 
         emit Deposit(msg.sender, stakeAmount, stAmount, chainIds, stakingProxies, amounts);
     }

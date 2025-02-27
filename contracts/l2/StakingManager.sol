@@ -544,6 +544,8 @@ contract StakingManager is ERC721TokenReceiver {
         // Get current unstaked balance
         uint256 balance = mapStakingProxyBalances[stakingProxy];
         uint256 numUnstakes;
+        console.log("amount", amount / 1e18);
+        console.log("balance", balance / 1e18);
         if (balance >= amount) {
             balance -= amount;
         } else {
@@ -557,20 +559,19 @@ contract StakingManager is ERC721TokenReceiver {
             uint256 fullStakingDeposit = minStakingDeposit * (1 + NUM_AGENT_INSTANCES);
             // Subtract unstaked balance
             uint256 balanceDiff = amount - balance;
-            console.log("amount", amount);
-            console.log("balance", balance);
             console.log("balanceDiff", balanceDiff);
 
             // Calculate number of stakes
             numUnstakes = balanceDiff / fullStakingDeposit;
-            console.log("!!!!!! NUMBER OF UNSTAKES", numUnstakes);
             // Depending of how much is unstaked, adjust the unstaked balance
             if (balanceDiff % fullStakingDeposit == 0) {
                 balance = 0;
             } else {
+                console.log("!!!!!! DO UNSTAKE");
                 numUnstakes++;
                 balance = numUnstakes * fullStakingDeposit - balanceDiff;
             }
+            console.log("!!!!!! NUMBER OF UNSTAKES", numUnstakes);
 
             // Get the last staked Service Id index
             uint256 lastIdx = mapLastStakedServiceIdxs[stakingProxy];
@@ -596,12 +597,14 @@ contract StakingManager is ERC721TokenReceiver {
             // Update last staked service Id
             mapLastStakedServiceIdxs[stakingProxy] = lastIdx;
 
-            // Update unstaked balance
-            mapStakingProxyBalances[stakingProxy] = balance;
-
             emit StakingBalanceUpdated(UNSTAKE, stakingProxy, numUnstakes, balance);
         }
 
+        // Update staking balance
+        mapStakingProxyBalances[stakingProxy] = balance;
+
+console.log("amount to send to L1", amount);
+console.log("Token balance on L2", IToken(olas).balanceOf(address(this)));
         // Send OLAS to collector to initiate L1 transfer for all the balances at this time
         IToken(olas).transfer(l2StakingProcessor, amount);
         // TODO Check on relays, but the majority of them does not require value
