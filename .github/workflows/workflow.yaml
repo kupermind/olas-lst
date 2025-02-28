@@ -31,7 +31,7 @@ jobs:
       - name: Run ESLint
         run: ./node_modules/.bin/eslint . --ext .js,.jsx,.ts,.tsx
       - name: Run solhint
-        run: ./node_modules/.bin/solhint contracts/interfaces/*.sol contracts/l1/*.sol contracts/l2/*.sol contracts/test/*.sol
+        run: ./node_modules/.bin/solhint 'contracts/**/*.sol'
 
       # Compile the code and run tests and deploy script(s)
       - name: Compile the code

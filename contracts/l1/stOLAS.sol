@@ -37,7 +37,7 @@ contract stOLAS is ERC4626 {
     // Total OLAS reserves that include staked and vault balance
     uint256 public totalReserves;
     // Top-up reserve balance in on-going deposit
-    uint256 public transient topUpBalance;
+    uint256 transient topUpBalance;
 
     // Owner address
     address public owner;
