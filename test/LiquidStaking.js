@@ -2,8 +2,6 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const helpers = require("@nomicfoundation/hardhat-network-helpers");
-const safeContracts = require("@gnosis.pm/safe-contracts");
-const {CallItem} = "hardhat-tracer";
 
 describe("Liquid Staking", function () {
     let serviceRegistry;
@@ -318,8 +316,8 @@ describe("Liquid Staking", function () {
             // Claim rewards
             console.log("Calling claim by agent or manually");
             await activityModuleProxy.claim();
-            const multisigBalance = await olas.balanceOf(serviceInfo.multisig);
-            console.log("Multisig balance after claim:", multisigBalance.toString());
+            //const multisigBalance = await olas.balanceOf(serviceInfo.multisig);
+            //console.log("Multisig balance after claim:", multisigBalance.toString());
 
             // Check collector balance
             const collectorBalance = await olas.balanceOf(collector.address);
@@ -470,7 +468,7 @@ describe("Liquid Staking", function () {
                 // Claim rewards
                 //console.log("Calling claim by agent or manually");
                 await activityModuleProxy.claim();
-                const multisigBalance = await olas.balanceOf(serviceInfo.multisig);
+                //const multisigBalance = await olas.balanceOf(serviceInfo.multisig);
                 //console.log("Multisig balance after claim:", multisigBalance.toString());
             }
 
@@ -617,7 +615,7 @@ describe("Liquid Staking", function () {
                 // Claim rewards
                 //console.log("Calling claim by agent or manually");
                 await activityModuleProxy.claim();
-                const multisigBalance = await olas.balanceOf(serviceInfo.multisig);
+                //const multisigBalance = await olas.balanceOf(serviceInfo.multisig);
                 //console.log("Multisig balance after claim:", multisigBalance.toString());
             }
 
@@ -729,7 +727,7 @@ describe("Liquid Staking", function () {
                 // Claim rewards
                 //console.log("Calling claim by agent or manually");
                 await activityModuleProxy.claim();
-                const multisigBalance = await olas.balanceOf(serviceInfo.multisig);
+                //const multisigBalance = await olas.balanceOf(serviceInfo.multisig);
                 //console.log("Multisig balance after claim:", multisigBalance.toString());
             }
 
@@ -765,10 +763,10 @@ describe("Liquid Staking", function () {
             console.log("User requests withdraw of all remaining stOLAS:", stBalance.toString());
             // There must be no more than 5 unstakes
             const numUnstakes = 5;
-            chainIds = new Array(numUnstakes).fill(gnosisChainId);
-            stakingInstances = new Array(numUnstakes).fill(stakingTokenInstance.address);
-            bridgePayloads = new Array(numUnstakes).fill(bridgePayload);
-            values = new Array(numUnstakes).fill(0);
+            let chainIds = new Array(numUnstakes).fill(gnosisChainId);
+            let stakingInstances = new Array(numUnstakes).fill(stakingTokenInstance.address);
+            let bridgePayloads = new Array(numUnstakes).fill(bridgePayload);
+            let values = new Array(numUnstakes).fill(0);
             tx = await treasury.requestToWithdraw(stBalance, chainIds, stakingInstances,bridgePayloads, values);
             res = await tx.wait();
             // Get withdraw request Id
@@ -869,7 +867,7 @@ describe("Liquid Staking", function () {
                 // Claim rewards
                 //console.log("Calling claim by agent or manually");
                 await activityModuleProxy.claim();
-                const multisigBalance = await olas.balanceOf(serviceInfo.multisig);
+                //const multisigBalance = await olas.balanceOf(serviceInfo.multisig);
                 //console.log("Multisig balance after claim:", multisigBalance.toString());
             }
 
@@ -1019,7 +1017,7 @@ describe("Liquid Staking", function () {
                     // Claim rewards
                     //console.log("Calling claim by agent or manually");
                     await activityModuleProxy.claim();
-                    const multisigBalance = await olas.balanceOf(serviceInfo.multisig);
+                    //const multisigBalance = await olas.balanceOf(serviceInfo.multisig);
                     //console.log("Multisig balance after claim:", multisigBalance.toString());
                 }
 
@@ -1081,10 +1079,10 @@ describe("Liquid Staking", function () {
                 console.log("reserveBalance:", await st.reserveBalance());
             }
 
-            stBalance = await st.balanceOf(deployer.address);
+            let stBalance = await st.balanceOf(deployer.address);
             console.log("Full stake user stOLAS remainder:", stBalance.toString());
 
-            const stBalanceAssets = await st.totalAssets();
+            let stBalanceAssets = await st.totalAssets();
             console.log("Full stake OLAS total assets on stOLAS:", stBalanceAssets.toString());
 
             // Unstake all in numIters iterations or less
@@ -1133,8 +1131,8 @@ describe("Liquid Staking", function () {
             stBalance = await st.balanceOf(deployer.address);
             console.log("Final user stOLAS remainder:", stBalance.toString());
 
-            stBalanceTotalAssets = await st.totalAssets();
-            console.log("Final OLAS total assets on stOLAS:", stBalanceTotalAssets.toString());
+            stBalanceAssets = await st.totalAssets();
+            console.log("Final OLAS total assets on stOLAS:", stBalanceAssets.toString());
 
             // Check sync of staked balances on both chains
             let stakedBalanceL1 = await st.stakedBalance();
