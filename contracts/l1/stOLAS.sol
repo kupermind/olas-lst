@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
-import "hardhat/console.sol";
+
 import {ERC20, ERC4626} from  "../../lib/solmate/src/tokens/ERC4626.sol";
 import {IToken} from "../l2/ActivityModule.sol";
 
@@ -218,9 +218,6 @@ contract stOLAS is ERC4626 {
         uint256 curReserveBalance = reserveBalance;
         reserveBalance = 0;
         totalReserves -= curReserveBalance;
-console.log("curReserveBalance", curReserveBalance);
-console.log("vaultBalance", vaultBalance);
-console.log("OLAS balance", asset.balanceOf(address(this)));
         asset.transfer(msg.sender, curReserveBalance);
 
         // TODO event or Transfer event is enough?

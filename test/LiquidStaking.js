@@ -455,7 +455,7 @@ describe("Liquid Staking", function () {
             // Check rewards
             for (let i = 0; i < stakedServiceIds.length; ++i) {
                 serviceInfo = await stakingTokenInstance.mapServiceInfo(stakedServiceIds[i]);
-                console.log(`Reward after checkpoint ${stakedServiceIds[i]}:`, serviceInfo.reward.toString());
+                //console.log(`Reward after checkpoint ${stakedServiceIds[i]}:`, serviceInfo.reward.toString());
             }
 
             for (let i = 0; i < stakedServiceIds.length; ++i) {
@@ -468,10 +468,10 @@ describe("Liquid Staking", function () {
                 const activityModuleProxy = await ethers.getContractAt("ActivityModule", owners[0]);
 
                 // Claim rewards
-                console.log("Calling claim by agent or manually");
+                //console.log("Calling claim by agent or manually");
                 await activityModuleProxy.claim();
                 const multisigBalance = await olas.balanceOf(serviceInfo.multisig);
-                console.log("Multisig balance after claim:", multisigBalance.toString());
+                //console.log("Multisig balance after claim:", multisigBalance.toString());
             }
 
             // Check collector balance
@@ -605,12 +605,6 @@ describe("Liquid Staking", function () {
             let stakedServiceIds = await stakingManager.getStakedServiceIds(stakingTokenInstance.address);
             console.log("Number of staked services: ", stakedServiceIds.length);
 
-            // Check rewards
-            for (let i = 0; i < stakedServiceIds.length; ++i) {
-                serviceInfo = await stakingTokenInstance.mapServiceInfo(stakedServiceIds[i]);
-                console.log(`Reward after checkpoint ${stakedServiceIds[i]}:`, serviceInfo.reward.toString());
-            }
-
             for (let i = 0; i < stakedServiceIds.length; ++i) {
                 serviceInfo = await stakingTokenInstance.mapServiceInfo(stakedServiceIds[i]);
                 // Get multisig addresses
@@ -621,10 +615,10 @@ describe("Liquid Staking", function () {
                 const activityModuleProxy = await ethers.getContractAt("ActivityModule", owners[0]);
 
                 // Claim rewards
-                console.log("Calling claim by agent or manually");
+                //console.log("Calling claim by agent or manually");
                 await activityModuleProxy.claim();
                 const multisigBalance = await olas.balanceOf(serviceInfo.multisig);
-                console.log("Multisig balance after claim:", multisigBalance.toString());
+                //console.log("Multisig balance after claim:", multisigBalance.toString());
             }
 
             // Check collector balance
@@ -722,27 +716,21 @@ describe("Liquid Staking", function () {
             stakedServiceIds = await stakingManager.getStakedServiceIds(stakingTokenInstance.address);
             console.log("Number of staked services: ", stakedServiceIds.length);
 
-            // Check rewards
-            for (let i = 0; i < stakedServiceIds.length; ++i) {
-                serviceInfo = await stakingTokenInstance.mapServiceInfo(stakedServiceIds[i]);
-                console.log(`Reward after checkpoint ${stakedServiceIds[i]}:`, serviceInfo.reward.toString());
-            }
-
             for (let i = 0; i < stakedServiceIds.length; ++i) {
                 serviceInfo = await stakingTokenInstance.mapServiceInfo(stakedServiceIds[i]);
                 // Get multisig addresses
                 const multisig = await ethers.getContractAt("GnosisSafe", serviceInfo.multisig);
-                console.log("Multisig address", multisig.address);
+                //console.log("Multisig address", multisig.address);
 
                 // Get activity module proxy address
                 const owners = await multisig.getOwners();
                 const activityModuleProxy = await ethers.getContractAt("ActivityModule", owners[0]);
 
                 // Claim rewards
-                console.log("Calling claim by agent or manually");
+                //console.log("Calling claim by agent or manually");
                 await activityModuleProxy.claim();
                 const multisigBalance = await olas.balanceOf(serviceInfo.multisig);
-                console.log("Multisig balance after claim:", multisigBalance.toString());
+                //console.log("Multisig balance after claim:", multisigBalance.toString());
             }
 
             // Check collector balance
@@ -879,10 +867,10 @@ describe("Liquid Staking", function () {
                 const activityModuleProxy = await ethers.getContractAt("ActivityModule", owners[0]);
 
                 // Claim rewards
-                console.log("Calling claim by agent or manually");
+                //console.log("Calling claim by agent or manually");
                 await activityModuleProxy.claim();
                 const multisigBalance = await olas.balanceOf(serviceInfo.multisig);
-                console.log("Multisig balance after claim:", multisigBalance.toString());
+                //console.log("Multisig balance after claim:", multisigBalance.toString());
             }
 
             // Check collector balance
@@ -1145,8 +1133,16 @@ describe("Liquid Staking", function () {
             stBalance = await st.balanceOf(deployer.address);
             console.log("Final user stOLAS remainder:", stBalance.toString());
 
-            stBalance = await st.totalAssets();
-            console.log("Final OLAS total assets on stOLAS:", stBalance.toString());
+            stBalanceTotalAssets = await st.totalAssets();
+            console.log("Final OLAS total assets on stOLAS:", stBalanceTotalAssets.toString());
+
+            // Check sync of staked balances on both chains
+            let stakedBalanceL1 = await st.stakedBalance();
+            let stakedServiceIds = await stakingManager.getStakedServiceIds(stakingTokenInstance.address);
+            let stakedBalanceL2 = minStakingDeposit.mul(2).mul(stakedServiceIds.length);
+            let stakeBalanceRemainder = await stakingManager.mapStakingProxyBalances(stakingTokenInstance.address);
+            stakedBalanceL2 = stakedBalanceL2.add(stakeBalanceRemainder);
+            expect(stakedBalanceL1).to.equal(stakedBalanceL2);
 
             // Restore a previous state of blockchain
             snapshot.restore();

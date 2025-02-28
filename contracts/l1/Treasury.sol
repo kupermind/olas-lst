@@ -3,7 +3,6 @@ pragma solidity ^0.8.28;
 
 import {ERC6909} from "../../lib/solmate/src/tokens/ERC6909.sol";
 import {IToken} from "../interfaces/IToken.sol";
-import "hardhat/console.sol";
 
 interface IDepository {
     /// @dev Calculates amounts and initiates cross-chain unstake request from specified models.
@@ -189,16 +188,12 @@ contract Treasury is ERC6909 {
 
         // Get current staked balance
         uint256 stakedBalanceBefore = IST(st).stakedBalance();
-        console.log("stakedBalanceBefore", stakedBalanceBefore);
 
         // Redeem OLAS and burn stOLAS tokens
         olasAmount = IST(st).redeem(stAmount, address(this), address(this));
-        console.log("!!! CALCULATED OLAS amount:", olasAmount);
 
         // Mint request tokens
         _mint(msg.sender, requestId, olasAmount);
-        console.log("Withdraw requestId", requestId);
-        console.log("Withdraw requestId amount", olasAmount);
 
         // Update total withdraw amount requested
         uint256 curWithdrawAmountRequested = withdrawAmountRequested + olasAmount;
@@ -206,12 +201,10 @@ contract Treasury is ERC6909 {
 
         // Get updated staked balance
         uint256 stakedBalanceAfter = IST(st).stakedBalance();
-        console.log("stakedBalanceAfter", stakedBalanceAfter);
 
         // If withdraw amount is bigger than the current one, need to unstake
         if (stakedBalanceBefore > stakedBalanceAfter) {
             uint256 withdrawDiff = stakedBalanceBefore - stakedBalanceAfter;
-            console.log("withdrawDiff", withdrawDiff);
 
             IDepository(depository).unstake(withdrawDiff, chainIds, stakingProxies, bridgePayloads, values);
         }

@@ -2,7 +2,6 @@
 pragma solidity ^0.8.28;
 
 import {IToken} from "../interfaces/IToken.sol";
-import "hardhat/console.sol";
 
 interface IDepositProcessor {
     /// @dev Sends a message to the L2 side via a corresponding bridge.
@@ -426,8 +425,6 @@ contract Depository {
         // Lock OLAS for veOLAS
         stakeAmount = _increaseLock(stakeAmount);
 
-        console.log("!!! STAKE AMOUNT AFTER LOCK", stakeAmount);
-
         // TODO Check array lengths
 
         // Remainder is stake amount plus reserve balance
@@ -468,7 +465,6 @@ contract Depository {
             if (stakingModel.remainder == 0) {
                 continue;
             }
-            console.log("Staking model reminder", stakingModel.remainder);
 
             // Adjust staking amount to not overflow the max allowed one
             amounts[i] = remainder;
@@ -489,11 +485,6 @@ contract Depository {
 
             // Increase actual stake amount
             actualStakeAmount += amounts[i];
-
-            console.log("!!!!!!! supply", mapStakingModels[stakingModelId].supply);
-            console.log("remainder", mapStakingModels[stakingModelId].remainder);
-            console.log("global remainder", remainder);
-            console.log("actualStakeAmount", actualStakeAmount);
 
             // Transfer OLAS via the bridge
             address depositProcessor = mapChainIdDepositProcessors[chainIds[i]];
@@ -517,7 +508,6 @@ contract Depository {
         // If there are OLAS leftovers, transfer (back) to stOLAS
         if (stakeAmount > actualStakeAmount) {
             remainder = stakeAmount - actualStakeAmount;
-            console.log("!!!! RECALCULATED reminder", remainder);
             IToken(olas).approve(st, remainder);
             IST(st).topUpReserveBalance(remainder);
         }
@@ -563,8 +553,6 @@ contract Depository {
 
         // Collect staking contracts and amounts
         for (uint256 i = 0; i < chainIds.length; ++i) {
-            console.log("unstakeAmount", unstakeAmount / 1e18);
-
             // Push a pair of key defining variables into one key: chainId | stakingProxy
             // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
             uint256 stakingModelId = uint256(uint160(stakingProxies[i]));
@@ -576,16 +564,11 @@ contract Depository {
                 revert WrongStakingModel(stakingModelId);
             }
 
-            console.log("Staking model reminder", stakingModel.remainder);
-
             // Adjust unstaking amount to not overflow the max allowed one
             amounts[i] = stakingModel.supply - stakingModel.remainder;
             if (amounts[i] > maxStakingLimit) {
                 amounts[i] = maxStakingLimit;
             }
-            console.log("supply", stakingModel.supply / 1e18);
-            console.log("staking remainder", stakingModel.remainder / 1e18);
-            console.log("maxUnstakeAmount", amounts[i] / 1e18);
 
             if (unstakeAmount > amounts[i]) {
                 // Remainder resulting value is limited by stakingModel.supply
@@ -611,7 +594,6 @@ contract Depository {
             IDepositProcessor(depositProcessor).sendMessage{value: values[i]}(stakingProxies[i], amounts[i],
                 bridgePayloads[i], UNSTAKE);
 
-            console.log("Updated remainder", mapStakingModels[stakingModelId].remainder / 1e18);
             if (unstakeAmount == 0) {
                 break;
             }
@@ -619,7 +601,6 @@ contract Depository {
 
         // Check if accumulated necessary amount of tokens
         if (unstakeAmount > 0) {
-            console.log("still unstakeAmount", unstakeAmount / 1e18);
             // TODO correct with unstakeAmount vs totalAmount
             revert Overflow(unstakeAmount, 0);
         }

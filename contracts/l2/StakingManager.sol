@@ -6,7 +6,6 @@ import {ActivityModuleProxy} from "./proxies/ActivityModuleProxy.sol";
 import {IService} from "../interfaces/IService.sol";
 import {IStaking} from "../interfaces/IStaking.sol";
 import {IToken, INFToken} from "../interfaces/IToken.sol";
-import "hardhat/console.sol";
 
 interface IActivityModule {
     function initialize(address _multisig, address _stakingProxy, uint256 _serviceId) external;
@@ -418,12 +417,10 @@ contract StakingManager is ERC721TokenReceiver {
 
         // Add amount to current unstaked balance
         balance += amount;
-        console.log("!!!! L2 obtained amount", amount);
 
         // Calculate number of stakes
         uint256 numStakes = balance / fullStakingDeposit;
         uint256 totalStakingDeposit = numStakes * fullStakingDeposit;
-        console.log("!!!!!! NUMBER OF STAKES", numStakes);
         // Check if the balance is enough to create another stake
         if (numStakes > 0) {
             // Approve token for the serviceRegistryTokenUtility contract
@@ -453,7 +450,6 @@ contract StakingManager is ERC721TokenReceiver {
                     _createAndStake(stakingProxy, minStakingDeposit);
                 }
             }
-            console.log("!!!!!! STAKE NEXT IDX", nextIdx);
             // Update last staked service Id
             mapLastStakedServiceIdxs[stakingProxy] = nextIdx;
 
@@ -534,8 +530,6 @@ contract StakingManager is ERC721TokenReceiver {
         // Get current unstaked balance
         uint256 balance = mapStakingProxyBalances[stakingProxy];
         uint256 numUnstakes;
-        console.log("amount", amount / 1e18);
-        console.log("balance", balance / 1e18);
         if (balance >= amount) {
             balance -= amount;
         } else {
@@ -549,7 +543,6 @@ contract StakingManager is ERC721TokenReceiver {
             uint256 fullStakingDeposit = minStakingDeposit * (1 + NUM_AGENT_INSTANCES);
             // Subtract unstaked balance
             uint256 balanceDiff = amount - balance;
-            console.log("balanceDiff", balanceDiff);
 
             // Calculate number of stakes
             numUnstakes = balanceDiff / fullStakingDeposit;
@@ -557,15 +550,12 @@ contract StakingManager is ERC721TokenReceiver {
             if (balanceDiff % fullStakingDeposit == 0) {
                 balance = 0;
             } else {
-                console.log("!!!!!! DO UNSTAKE");
                 numUnstakes++;
                 balance = numUnstakes * fullStakingDeposit - balanceDiff;
             }
-            console.log("!!!!!! NUMBER OF UNSTAKES", numUnstakes);
 
             // Get the last staked Service Id index
             uint256 lastIdx = mapLastStakedServiceIdxs[stakingProxy];
-            console.log("!!!!!! UNSTAKE LAST IDX", lastIdx);
             // This must never happen
             if (numUnstakes > lastIdx) {
                 revert Overflow(numUnstakes, lastIdx);
@@ -574,7 +564,6 @@ contract StakingManager is ERC721TokenReceiver {
             // Traverse all required unstakes
             for (uint256 i = 0; i < numUnstakes; ++i) {
                 uint256 serviceId = mapStakedServiceIds[stakingProxy][lastIdx];
-                console.log("!!!! UNSTAKE SERVICE ID", serviceId);
                 // Unstake, terminate and unbond the service
                 IStaking(stakingProxy).unstake(serviceId);
                 IService(serviceManager).terminate(serviceId);
@@ -583,7 +572,6 @@ contract StakingManager is ERC721TokenReceiver {
                 lastIdx--;
             }
 
-            console.log("!!!! LAST UNSTAKE SERVICE ID", lastIdx);
             // Update last staked service Id
             mapLastStakedServiceIdxs[stakingProxy] = lastIdx;
 
@@ -593,8 +581,6 @@ contract StakingManager is ERC721TokenReceiver {
         // Update staking balance
         mapStakingProxyBalances[stakingProxy] = balance;
 
-console.log("amount to send to L1", amount);
-console.log("Token balance on L2", IToken(olas).balanceOf(address(this)));
         // Send OLAS to collector to initiate L1 transfer for all the balances at this time
         IToken(olas).transfer(l2StakingProcessor, amount);
         // TODO Check on relays, but the majority of them does not require value
