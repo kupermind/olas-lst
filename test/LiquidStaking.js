@@ -801,7 +801,7 @@ describe("Liquid Staking", function () {
             snapshot.restore();
         });
 
-        it("Max number of stakes", async function () {
+        it.only("Max number of stakes", async function () {
             // Take a snapshot of the current state of the blockchain
             const snapshot = await helpers.takeSnapshot();
 

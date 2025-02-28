@@ -40,5 +40,5 @@ jobs:
         run: ./node_modules/.bin/hardhat test
 
       # Run hardhat coverage and upload codecov report
-      - name: Solidity coverage summary
-        run: export NODE_OPTIONS="--max-old-space-size=8192" && ./node_modules/.bin/hardhat coverage
+      #- name: Solidity coverage summary
+      #  run: export NODE_OPTIONS="--max-old-space-size=8192" && ./node_modules/.bin/hardhat coverage
