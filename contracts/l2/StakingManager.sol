@@ -299,33 +299,24 @@ contract StakingManager is ERC721TokenReceiver {
         // Set agent instances as [msg.sender]
         address[] memory instances = new address[](NUM_AGENT_INSTANCES);
 
-        uint256 initialGas = gasleft();
         // Create activity module proxy
         ActivityModuleProxy activityModuleProxy = new ActivityModuleProxy(beacon);
         // Assign address as agent instance
         activityModule = address(activityModuleProxy);
         instances[0] = activityModule;
-        console.log("!!!!! GAS USED CreateAndDeploy:", initialGas - gasleft());
-        initialGas = gasleft();
 
         // Create a service owned by this contract
         serviceId = IService(serviceManager).create(address(this), token, configHash, agentIds,
             agentParams, uint32(THRESHOLD));
-        console.log("!!!!! GAS USED Create Service:", initialGas - gasleft());
-        initialGas = gasleft();
 
         // Record activity module
         mapServiceIdActivityModules[serviceId] = instances[0];
 
         // Activate registration (1 wei as a deposit wrapper)
         IService(serviceManager).activateRegistration{value: 1}(serviceId);
-        console.log("!!!!! GAS USED Activate:", initialGas - gasleft());
-        initialGas = gasleft();
 
         // Register msg.sender as an agent instance (numAgentInstances wei as a bond wrapper)
         IService(serviceManager).registerAgents{value: NUM_AGENT_INSTANCES}(serviceId, instances, agentIds);
-        console.log("!!!!! GAS USED Register:", initialGas - gasleft());
-        initialGas = gasleft();
 
         // Prepare Safe multisig data
         uint256 localNonce = _nonce;
@@ -337,8 +328,6 @@ contract StakingManager is ERC721TokenReceiver {
 
         // Deploy the service
         multisig = IService(serviceManager).deploy(serviceId, safeMultisig, data);
-        console.log("!!!!! GAS USED Create Multisig:", initialGas - gasleft());
-        initialGas = gasleft();
 
         // Update the nonce
         _nonce = localNonce + 1;
@@ -470,8 +459,9 @@ contract StakingManager is ERC721TokenReceiver {
 
             // Update unstaked balance
             balance -= totalStakingDeposit;
-            mapStakingProxyBalances[stakingProxy] = balance;
         }
+
+        mapStakingProxyBalances[stakingProxy] = balance;
 
         emit StakingBalanceUpdated(STAKE, stakingProxy, numStakes, balance);
 

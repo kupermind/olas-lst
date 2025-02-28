@@ -983,6 +983,7 @@ describe("Liquid Staking", function () {
                 // Stake OLAS on L1
                 console.log("User deposits OLAS for stOLAS");
                 await depository.deposit(olasAmount.mul(numStakes), chainIds, stakingInstances, bridgePayloads, values);
+
                 let stBalance = await st.balanceOf(deployer.address);
                 console.log("User stOLAS balance now:", stBalance.toString());
                 let stTotalAssets = await st.totalAssets();
@@ -1009,6 +1010,13 @@ describe("Liquid Staking", function () {
 
                 let stakedServiceIds = await stakingManager.getStakedServiceIds(stakingTokenInstance.address);
                 console.log("Number of staked services: ", stakedServiceIds.length);
+
+                // Check sync of staked balances on both chains
+                let stakedBalanceL1 = await st.stakedBalance();
+                let stakedBalanceL2 = minStakingDeposit.mul(2).mul(stakedServiceIds.length);
+                let stakeBalanceRemainder = await stakingManager.mapStakingProxyBalances(stakingTokenInstance.address);
+                stakedBalanceL2 = stakedBalanceL2.add(stakeBalanceRemainder);
+                expect(stakedBalanceL1).to.equal(stakedBalanceL2);
 
                 // Check rewards and claim
                 for (let i = 0; i < stakedServiceIds.length; ++i) {
@@ -1088,11 +1096,9 @@ describe("Liquid Staking", function () {
             stBalance = await st.balanceOf(deployer.address);
             console.log("Full stake user stOLAS remainder:", stBalance.toString());
 
-            stBalance = await st.totalAssets();
-            console.log("Full stake OLAS total assets on stOLAS:", stBalance.toString());
+            const stBalanceAssets = await st.totalAssets();
+            console.log("Full stake OLAS total assets on stOLAS:", stBalanceAssets.toString());
 
-            // Get stOLAS amount
-            stBalance = await st.balanceOf(deployer.address);
             // Unstake all in 10 iterations or less
             let numIter = 10;
             let stAmount = stBalance.div(numIter);
@@ -1134,7 +1140,7 @@ describe("Liquid Staking", function () {
                 console.log("vaultBalance:", await st.vaultBalance());
                 console.log("reserveBalance:", await st.reserveBalance());
 
-                if (numIter == 8) break;
+                //if (i == 8) break;
             }
 
             stBalance = await st.balanceOf(deployer.address);
