@@ -93,4 +93,8 @@ interface IBridgeErrors {
     /// @dev Account address is incorrect.
     /// @param account Account address.
     error WrongAccount(address account);
+
+    /// @dev Operation not found.
+    /// @param operation Funds operation type.
+    error OperationNotFound(bytes32 operation);
 }

@@ -78,7 +78,7 @@ What will happen after this time. Deposit will it be able to work?
 Think again about the conditions unlock and the cycle after it.
 We can't increase the lock time - it's already maximum. We can unlock only after the maximum lock time. There's some problem with the logic here, what will happen after 4 years.
 ```
-[]
+[x] Withdraw is possible only after the full unlock, and for that one the lock factor needs to be set to zero
 
 #### Remove mock function. 
 ```
