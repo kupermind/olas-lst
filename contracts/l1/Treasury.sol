@@ -17,12 +17,6 @@ interface IDepository {
 }
 
 interface IST {
-    /// @dev Deposits OLAS in exchange for stOLAS tokens.
-    /// @param assets OLAS amount.
-    /// @param receiver Receiver account address.
-    /// @return shares stOLAS amount.
-    function deposit(uint256 assets, address receiver) external returns (uint256 shares);
-
     /// @dev Redeems OLAS in exchange for stOLAS tokens.
     /// @param shares stOLAS amount.
     /// @param receiver Receiver account address.
@@ -144,16 +138,6 @@ contract Treasury is ERC6909 {
         emit OwnerUpdated(newOwner);
     }
 
-    function processAndMintStToken(address account, uint256 olasAmount) external returns (uint256 stAmount) {
-        // Check for depository access
-        if (msg.sender != depository) {
-            revert DepositoryOnly(msg.sender, depository);
-        }
-
-        // mint stOLAS
-        stAmount = IST(st).deposit(olasAmount, account);
-    }
-
     // TODO Move high level part to depository?
     /// @dev Requests withdraw of OLAS in exchange of provided stOLAS.
     /// @notice Vault reserves are used first. If there is a lack of OLAS reserves, the backup amount is requested
@@ -196,8 +180,7 @@ contract Treasury is ERC6909 {
         _mint(msg.sender, requestId, olasAmount);
 
         // Update total withdraw amount requested
-        uint256 curWithdrawAmountRequested = withdrawAmountRequested + olasAmount;
-        withdrawAmountRequested = curWithdrawAmountRequested;
+        withdrawAmountRequested += olasAmount;
 
         // Get updated staked balance
         uint256 stakedBalanceAfter = IST(st).stakedBalance();

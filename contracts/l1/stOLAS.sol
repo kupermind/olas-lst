@@ -12,7 +12,12 @@ error OwnerOnly(address sender, address owner);
 /// @dev Only `treasury` has a privilege, but the `sender` was provided.
 /// @param sender Sender address.
 /// @param treasury Required sender address as a treasury.
-error TreasuryOnly(address sender, address treasury);
+error DepositoryOnly(address sender, address treasury);
+
+/// @dev Only `depository` has a privilege, but the `sender` was provided.
+/// @param sender Sender address.
+/// @param depository Required sender address as a depository.
+error TreasuryOnly(address sender, address depository);
 
 /// @dev Provided zero address.
 error ZeroAddress();
@@ -87,8 +92,8 @@ contract stOLAS is ERC4626 {
     /// @param receiver Receiver account address.
     /// @return shares stOLAS amount.
     function deposit(uint256 assets, address receiver) public override returns (uint256 shares) {
-        if (msg.sender != treasury) {
-            revert TreasuryOnly(msg.sender, treasury);
+        if (msg.sender != depository) {
+            revert DepositoryOnly(msg.sender, depository);
         }
 
         // Update total assets
@@ -216,9 +221,11 @@ contract stOLAS is ERC4626 {
         }
 
         uint256 curReserveBalance = reserveBalance;
-        reserveBalance = 0;
-        totalReserves -= curReserveBalance;
-        asset.transfer(msg.sender, curReserveBalance);
+        if (curReserveBalance > 0) {
+            reserveBalance = 0;
+            totalReserves -= curReserveBalance;
+            asset.transfer(msg.sender, curReserveBalance);
+        }
 
         // TODO event or Transfer event is enough?
     }

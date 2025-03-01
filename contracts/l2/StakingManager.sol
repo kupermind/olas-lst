@@ -75,7 +75,6 @@ error ServiceNotEvicted(address stakingProxy, uint256 serviceId);
 contract StakingManager is ERC721TokenReceiver {
     event OwnerUpdated(address indexed owner);
     event StakingProcessorL2Updated(address indexed l2StakingProcessor);
-    event SetGuardianServiceStatuses(address[] guardianServices, bool[] statuses);
     event StakingBalanceUpdated(bytes32 indexed operation, address indexed stakingProxy, uint256 numStakes,
         uint256 balance);
     event CreateAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig,
@@ -135,7 +134,6 @@ contract StakingManager is ERC721TokenReceiver {
     // Reentrancy lock
     uint256 internal _locked = 1;
 
-    mapping(address => bool) public mapGuardianAgents;
     mapping(uint256 => bool) public mapDeposits;
     mapping(address => uint256) public balanceOf;
     mapping(address => uint256) public mapStakingProxyBalances;
@@ -249,33 +247,6 @@ contract StakingManager is ERC721TokenReceiver {
 
         l2StakingProcessor = newStakingProcessorL2;
         emit StakingProcessorL2Updated(newStakingProcessorL2);
-    }
-
-    /// @dev Sets guardian service multisig statues.
-    /// @param guardianServices Guardian service multisig addresses.
-    /// @param statuses Corresponding whitelisting statues.
-    function setGuardianServiceStatuses(address[] memory guardianServices, bool[] memory statuses) external {
-        // Check for ownership
-        if (msg.sender != owner) {
-            revert OwnerOnly(msg.sender, owner);
-        }
-
-        // Check for array lengths
-        if (guardianServices.length == 0 || guardianServices.length != statuses.length) {
-            revert WrongArrayLength(guardianServices.length, statuses.length);
-        }
-
-        // Traverse all guardian service multisigs and statuses
-        for (uint256 i = 0; i < guardianServices.length; ++i) {
-            // Check for zero addresses
-            if (guardianServices[i] == address(0)) {
-                revert ZeroAddress();
-            }
-
-            mapGuardianAgents[guardianServices[i]] = statuses[i];
-        }
-
-        emit SetGuardianServiceStatuses(guardianServices, statuses);
     }
 
     /// @dev Creates and deploys a service.

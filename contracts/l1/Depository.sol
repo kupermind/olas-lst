@@ -19,6 +19,12 @@ interface ILock {
 }
 
 interface IST {
+    /// @dev Deposits OLAS in exchange for stOLAS tokens.
+    /// @param assets OLAS amount.
+    /// @param receiver Receiver account address.
+    /// @return shares stOLAS amount.
+    function deposit(uint256 assets, address receiver) external returns (uint256 shares);
+
     function topUpReserveBalance(uint256 amount) external;
 
     function fundDepository() external;
@@ -85,7 +91,6 @@ contract Depository {
     event DepositoryParamsUpdated(uint256 lockFactor, uint256 maxStakingLimit);
     event Locked(address indexed account, uint256 olasAmount, uint256 lockAmount, uint256 vaultBalance);
     event SetDepositProcessorChainIds(address[] depositProcessors, uint256[] chainIds);
-    event SetGuardianServiceStatuses(address[] guardianServices, bool[] statuses);
     event StakingModelsActivated(uint256[] chainIds, address[] stakingProxies, uint256[] supplies);
     event ChangeModelStatuses(uint256[] modelIds, bool[] statuses);
     event Deposit(address indexed sender, uint256 stakeAmount, uint256 stAmount, uint256[] chainIds,
@@ -123,8 +128,6 @@ contract Depository {
 
     // Mapping of staking model Id => staking model
     mapping(uint256 => StakingModel) public mapStakingModels;
-    // Mapping of whitelisted guardian agents
-    mapping(address => bool) public mapGuardianAgents;
     // Mapping for L2 chain Id => dedicated deposit processors
     mapping(uint256 => address) public mapChainIdDepositProcessors;
     // Set of staking model Ids
@@ -231,33 +234,6 @@ contract Depository {
 
         treasury = newTreasury;
         emit TreasuryUpdated(newTreasury);
-    }
-
-    /// @dev Sets guardian service multisig statues.
-    /// @param guardianServices Guardian service multisig addresses.
-    /// @param statuses Corresponding whitelisting statues.
-    function setGuardianServiceStatuses(address[] memory guardianServices, bool[] memory statuses) external {
-        // Check for ownership
-        if (msg.sender != owner) {
-            revert OwnerOnly(msg.sender, owner);
-        }
-
-        // Check for array lengths
-        if (guardianServices.length == 0 || guardianServices.length != statuses.length) {
-            revert WrongArrayLength(guardianServices.length, statuses.length);
-        }
-
-        // Traverse all guardian service multisigs and statuses
-        for (uint256 i = 0; i < guardianServices.length; ++i) {
-            // Check for zero addresses
-            if (guardianServices[i] == address(0)) {
-                revert ZeroAddress();
-            }
-
-            mapGuardianAgents[guardianServices[i]] = statuses[i];
-        }
-
-        emit SetGuardianServiceStatuses(guardianServices, statuses);
     }
 
     /// @dev Sets deposit processor contracts addresses and L2 chain Ids.
@@ -515,7 +491,7 @@ contract Depository {
         // Calculates stAmount and mints stOLAS
         // If stakeAmount is zero, stakes are performed from reserves
         if (stakeAmount > 0) {
-            stAmount = ITreasury(treasury).processAndMintStToken(msg.sender, stakeAmount);
+            stAmount = IST(st).deposit(stakeAmount, msg.sender);
         }
 
         emit Deposit(msg.sender, stakeAmount, stAmount, chainIds, stakingProxies, amounts);

@@ -27,42 +27,28 @@ contract LockProxy {
 
     /// @dev LockProxy constructor.
     /// @param implementation veOLAS lock implementation address.
-    constructor(address implementation) {
+    /// @param lockData veOLAS lock initialization data.
+    constructor(address implementation, bytes memory lockData) {
         // Check for the zero address, since the delegatecall works even with the zero one
         if (implementation == address(0)) {
             revert ZeroImplementationAddress();
+        }
+
+        // Check for the zero data
+        if (lockData.length == 0) {
+            revert ZeroLockData();
         }
 
         // Store the lock implementation address
         assembly {
             sstore(LOCK_PROXY, implementation)
         }
+        // Initialize proxy tokenomics storage
+        (bool success, ) = implementation.delegatecall(lockData);
+        if (!success) {
+            revert InitializationFailed();
+        }
     }
-
-//    /// @dev LockProxy constructor.
-//    /// @param implementation veOLAS lock implementation address.
-//    /// @param lockData veOLAS lock initialization data.
-//    constructor(address implementation) {
-//        // Check for the zero address, since the delegatecall works even with the zero one
-//        if (implementation == address(0)) {
-//            revert ZeroImplementationAddress();
-//        }
-//
-//        // Check for the zero data
-//        if (lockData.length == 0) {
-//            revert ZeroLockData();
-//        }
-//
-//        // Store the lock implementation address
-//        assembly {
-//            sstore(LOCK_PROXY, implementation)
-//        }
-//        // Initialize proxy tokenomics storage
-//        (bool success, ) = implementation.delegatecall(lockData);
-//        if (!success) {
-//            revert InitializationFailed();
-//        }
-//    }
 
     /// @dev Delegatecall to all the incoming data.
     fallback() external {

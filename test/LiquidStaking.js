@@ -101,6 +101,9 @@ describe("Liquid Staking", function () {
         await olas.deployed();
         serviceParams.stakingToken = olas.address;
 
+        // Mint tokens to the deployer
+        await olas.mint(deployer.address, initSupply);
+
         const VE = await ethers.getContractFactory("MockVE");
         ve = await VE.deploy(olas.address);
         await ve.deployed();
@@ -147,6 +150,18 @@ describe("Liquid Staking", function () {
         lock = await Lock.deploy(olas.address, ve.address);
         await lock.deployed();
 
+        const LockProxy = await ethers.getContractFactory("LockProxy");
+        let initPayload = lock.interface.encodeFunctionData("initialize", []);
+        const lockProxy = await LockProxy.deploy(lock.address, initPayload);
+        await lockProxy.deployed();
+        lock = await ethers.getContractAt("Lock", lockProxy.address);
+
+        // Approve initial lock
+        await olas.approve(lock.address, ethers.utils.parseEther("1"));
+        // Set governor and create first lock
+        // Governor address is irrelevant for testing
+        await lock.setGovernorAndCreateFirstLock(deployer.address);
+
         const Depository = await ethers.getContractFactory("Depository");
         depository = await Depository.deploy(olas.address, st.address, ve.address, AddressZero, lock.address,
             lockFactor, maxStakingLimit);
@@ -159,9 +174,6 @@ describe("Liquid Staking", function () {
         // Change managers for stOLAS
         // Only Treasury contract can mint OLAS
         await st.changeManagers(treasury.address, depository.address);
-
-        // Initialize lock
-        await lock.initialize(treasury.address, deployer.address);
 
         // Change treasury address in depository
         await depository.changeTreasury(treasury.address);
@@ -231,7 +243,9 @@ describe("Liquid Staking", function () {
 
         const StakingTokenLocked = await ethers.getContractFactory("StakingTokenLocked");
         stakingTokenImplementation = await StakingTokenLocked.deploy();
-        const initPayload = stakingTokenImplementation.interface.encodeFunctionData("initialize", [serviceParams]);
+        await stakingTokenImplementation.deployed();
+
+        initPayload = stakingTokenImplementation.interface.encodeFunctionData("initialize", [serviceParams]);
         const tx = await stakingFactory.createStakingInstance(stakingTokenImplementation.address, initPayload);
         const res = await tx.wait();
         // Get staking contract instance address from the event
@@ -246,16 +260,9 @@ describe("Liquid Staking", function () {
         await serviceRegistry.changeMultisigPermission(gnosisSafeMultisig.address, true);
         await serviceRegistry.changeMultisigPermission(gnosisSafeSameAddressMultisig.address, true);
 
-        // Mint tokens to the deployer
-        await olas.mint(deployer.address, initSupply);
-
         // Fund the staking contract
         await olas.approve(stakingTokenAddress, stakingSupply);
         await stakingTokenInstance.deposit(stakingSupply);
-
-        // Add agent as a guardian on L1 and L2
-        await depository.setGuardianServiceStatuses([agent.address], [true]);
-        await stakingManager.setGuardianServiceStatuses([agent.address], [true]);
 
         // Add model to L1
         await depository.createAndActivateStakingModels([gnosisChainId], [stakingTokenAddress], [stakingSupply]);
@@ -801,7 +808,7 @@ describe("Liquid Staking", function () {
             snapshot.restore();
         });
 
-        it.only("Max number of stakes", async function () {
+        it("Max number of stakes", async function () {
             // Take a snapshot of the current state of the blockchain
             const snapshot = await helpers.takeSnapshot();
 

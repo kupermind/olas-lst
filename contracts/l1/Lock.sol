@@ -74,16 +74,17 @@ error ZeroAddress();
 /// @param owner Required sender address as an owner.
 error OwnerOnly(address sender, address owner);
 
-/// @dev Only `treasury` has a privilege, but the `sender` was provided.
-/// @param sender Sender address.
-/// @param treasury Required treasury address.
-error TreasuryOnly(address sender, address treasury);
-
 /// @dev The contract is already initialized.
 error AlreadyInitialized();
 
 /// @title Lock - Smart contract for veOLAS related lock and voting functions
 contract Lock {
+    event ImplementationUpdated(address indexed implementation);
+    event OwnerUpdated(address indexed owner);
+    event OlasGovernorUpdated(address indexed olasGovernor);
+
+    // Code position in storage is keccak256("LOCK_PROXY") = "0xba0510ba4ac8fe0cfe7be4f1ee5a33bd685e39302141a027f3ed976559b2fa17"
+    bytes32 public constant LOCK_PROXY = 0xba0510ba4ac8fe0cfe7be4f1ee5a33bd685e39302141a027f3ed976559b2fa17;
     // Maximum veOLAS lock time (4 years)
     uint256 public constant MAX_LOCK_TIME = 4 * 365 * 1 days;
 
@@ -92,8 +93,6 @@ contract Lock {
     // OLAS address
     address public immutable olas;
 
-    // Treasury address
-    address public treasury;
     // OLAS olasGovernor address
     address public olasGovernor;
     // Owner address
@@ -113,36 +112,94 @@ contract Lock {
     }
 
     /// @dev Lock initializer.
-    /// @param _treasury Treasury address.
-    /// @param _olasGovernor OLAS governor address.
-    function initialize(address _treasury, address _olasGovernor) external{
+    function initialize() external{
         // Check for already initialized
         if (owner != address(0)) {
             revert AlreadyInitialized();
         }
 
-        // Check for zero addresses
-        if (_treasury == address(0) || _olasGovernor == address(0)) {
-            revert ZeroAddress();
-        }
-
         owner = msg.sender;
-        treasury = _treasury;
-        olasGovernor = _olasGovernor;
     }
 
-    function createFirstLock(uint256 olasAmount) external {
+    /// @dev Changes depository implementation contract address.
+    /// @param newImplementation New implementation contract address.
+    function changeImplementation(address newImplementation) external {
         // Check for ownership
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);
         }
 
-        // Get OLAS from owner
+        // Check for zero address
+        if (newImplementation == address(0)) {
+            revert ZeroAddress();
+        }
+
+        // Store depository implementation address
+        assembly {
+            sstore(LOCK_PROXY, newImplementation)
+        }
+
+        emit ImplementationUpdated(newImplementation);
+    }
+
+    /// @dev Changes contract owner address.
+    /// @param newOwner Address of a new owner.
+    function changeOwner(address newOwner) external {
+        // Check for ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
+        }
+
+        // Check for zero address
+        if (newOwner == address(0)) {
+            revert ZeroAddress();
+        }
+
+        owner = newOwner;
+        emit OwnerUpdated(newOwner);
+    }
+    
+    /// @dev Changes OLAS governor address.
+    /// @param newOlasGovernor New OLAS governor address.
+    function changeGovernor(address newOlasGovernor) external{
+        // Check for ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
+        }
+
+        // Check for zero address
+        if (newOlasGovernor == address(0)) {
+            revert ZeroAddress();
+        }
+        
+        olasGovernor = newOlasGovernor;
+        emit OlasGovernorUpdated(newOlasGovernor);
+    }
+
+    /// @dev Sets OLAS governor address and creates first veOLAS lock.
+    /// @param _olasGovernor OLAS governor address.
+    function setGovernorAndCreateFirstLock(address _olasGovernor) external {
+        // Check for ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
+        }
+
+        // Check for zero address
+        if (_olasGovernor == address(0)) {
+            revert ZeroAddress();
+        }
+
+        // Deposit starting OLAS amount
+        uint256 olasAmount = 1 ether;
+        // Get OLAS from initializer
         IToken(olas).transferFrom(msg.sender, address(this), olasAmount);
         // Approve OLAS for veOLAS
         IToken(olas).approve(ve, olasAmount);
         // Create lock
         IVEOLAS(ve).createLock(olasAmount, MAX_LOCK_TIME);
+
+        olasGovernor = _olasGovernor;
+        emit OlasGovernorUpdated(_olasGovernor);
     }
 
     // TODO lock full balance and make this ownerless?
@@ -172,7 +229,7 @@ contract Lock {
 
         // TODO For testing purposes now
         // Transfer OLAS
-        IToken(olas).transfer(treasury, amount);
+        IToken(olas).transfer(account, amount);
     }
 
     /// @dev Create a new proposal to change the protocol / contract parameters.
