@@ -133,25 +133,11 @@ contract Depository {
     // Set of staking model Ids
     uint256[] public setStakingModelIds;
 
-    // TODO change to initialize in prod
-    constructor(
-        address _olas,
-        address _st,
-        address _ve,
-        address _treasury,
-        address _lock,
-        uint256 _lockFactor,
-        uint256 _maxStakingLimit
-    ) {
+    constructor(address _olas, address _st, address _ve, address _lock) {
         olas = _olas;
         st = _st;
         ve = _ve;
-        treasury = _treasury;
         lock = _lock;
-        lockFactor = _lockFactor;
-        maxStakingLimit = _maxStakingLimit;
-
-        owner = msg.sender;
     }
 
     /// @dev Increases veOLAS lock.
@@ -172,11 +158,14 @@ contract Depository {
     }
 
     /// @dev Depository initializer.
-    function initialize() external{
+    function initialize(uint256 _lockFactor, uint256 _maxStakingLimit) external{
         // Check for already initialized
         if (owner != address(0)) {
             revert AlreadyInitialized();
         }
+
+        lockFactor = _lockFactor;
+        maxStakingLimit = _maxStakingLimit;
 
         owner = msg.sender;
     }

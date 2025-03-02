@@ -61,17 +61,12 @@ contract Treasury is ERC6909 {
 
     // Code position in storage is keccak256("TREASURY_PROXY") = "0x9b3195704d7d8da1c9110d90b2bf37e7d1d93753debd922cc1f20df74288b870"
     bytes32 public constant TREASURY_PROXY = 0x9b3195704d7d8da1c9110d90b2bf37e7d1d93753debd922cc1f20df74288b870;
-    // Max lock factor
-    uint256 public constant MAX_LOCK_FACTOR = 10_000;
 
     address public immutable olas;
     address public immutable st;
-    address public immutable lock;
     // Depository address
     address public immutable depository;
 
-    // Lock factor in 10_000 value
-    uint256 public lockFactor;
     // Total withdraw amount requested
     uint256 public withdrawAmountRequested;
     // Withdraw time delay
@@ -81,13 +76,10 @@ contract Treasury is ERC6909 {
     // Contract owner
     address public owner;
 
-    // TODO change to initialize in prod
     constructor(address _olas, address _st, address _depository) {
         olas = _olas;
         st = _st;
         depository = _depository;
-
-        owner = msg.sender;
     }
 
     /// @dev Treasury initializer.

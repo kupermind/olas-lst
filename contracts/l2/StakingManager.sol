@@ -207,6 +207,7 @@ contract StakingManager is ERC721TokenReceiver {
         {
             revert ZeroAddress();
         }
+
         safeMultisig = _safeMultisig;
         safeSameAddressMultisig = _safeSameAddressMultisig;
         fallbackHandler = _fallbackHandler;

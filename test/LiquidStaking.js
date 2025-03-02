@@ -163,13 +163,24 @@ describe("Liquid Staking", function () {
         await lock.setGovernorAndCreateFirstLock(deployer.address);
 
         const Depository = await ethers.getContractFactory("Depository");
-        depository = await Depository.deploy(olas.address, st.address, ve.address, AddressZero, lock.address,
-            lockFactor, maxStakingLimit);
+        depository = await Depository.deploy(olas.address, st.address, ve.address, lock.address);
         await depository.deployed();
+
+        const DepositoryProxy = await ethers.getContractFactory("DepositoryProxy");
+        initPayload = depository.interface.encodeFunctionData("initialize", [lockFactor, maxStakingLimit]);
+        const depositoryProxy = await DepositoryProxy.deploy(depository.address, initPayload);
+        await depositoryProxy.deployed();
+        depository = await ethers.getContractAt("Depository", depositoryProxy.address);
 
         const Treasury = await ethers.getContractFactory("Treasury");
         treasury = await Treasury.deploy(olas.address, st.address, depository.address);
         await treasury.deployed();
+
+        const TreasuryProxy = await ethers.getContractFactory("TreasuryProxy");
+        initPayload = treasury.interface.encodeFunctionData("initialize", []);
+        const treasuryProxy = await TreasuryProxy.deploy(treasury.address, initPayload);
+        await treasuryProxy.deployed();
+        treasury = await ethers.getContractAt("Treasury", treasuryProxy.address);
 
         // Change managers for stOLAS
         // Only Treasury contract can mint OLAS
@@ -244,6 +255,9 @@ describe("Liquid Staking", function () {
         const StakingTokenLocked = await ethers.getContractFactory("StakingTokenLocked");
         stakingTokenImplementation = await StakingTokenLocked.deploy();
         await stakingTokenImplementation.deployed();
+
+        // Whitelist implementation
+        await stakingVerifier.setImplementationsStatuses([stakingTokenImplementation.address], [true], true);
 
         initPayload = stakingTokenImplementation.interface.encodeFunctionData("initialize", [serviceParams]);
         const tx = await stakingFactory.createStakingInstance(stakingTokenImplementation.address, initPayload);
