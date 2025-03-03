@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import {Implementation, OwnerOnly, ZeroAddress} from "../Implementation.sol";
 import {Treasury} from "./Treasury.sol";
 
 interface IGovernor {
@@ -66,25 +67,13 @@ interface IVEOLAS {
     function mapLockedBalances(address account) external returns (LockedBalance memory);
 }
 
-/// @dev Zero address.
-error ZeroAddress();
-
-/// @dev Only `owner` has a privilege, but the `sender` was provided.
-/// @param sender Sender address.
-/// @param owner Required sender address as an owner.
-error OwnerOnly(address sender, address owner);
-
 /// @dev The contract is already initialized.
 error AlreadyInitialized();
 
 /// @title Lock - Smart contract for veOLAS related lock and voting functions
-contract Lock {
-    event ImplementationUpdated(address indexed implementation);
-    event OwnerUpdated(address indexed owner);
+contract Lock is Implementation {
     event OlasGovernorUpdated(address indexed olasGovernor);
 
-    // Code position in storage is keccak256("LOCK_PROXY") = "0xba0510ba4ac8fe0cfe7be4f1ee5a33bd685e39302141a027f3ed976559b2fa17"
-    bytes32 public constant LOCK_PROXY = 0xba0510ba4ac8fe0cfe7be4f1ee5a33bd685e39302141a027f3ed976559b2fa17;
     // Maximum veOLAS lock time (4 years)
     uint256 public constant MAX_LOCK_TIME = 4 * 365 * 1 days;
 
@@ -95,8 +84,6 @@ contract Lock {
 
     // OLAS olasGovernor address
     address public olasGovernor;
-    // Owner address
-    address public owner;
 
     /// @dev Lock constructor.
     /// @param _olas OLAS address.
@@ -119,44 +106,6 @@ contract Lock {
         }
 
         owner = msg.sender;
-    }
-
-    /// @dev Changes depository implementation contract address.
-    /// @param newImplementation New implementation contract address.
-    function changeImplementation(address newImplementation) external {
-        // Check for ownership
-        if (msg.sender != owner) {
-            revert OwnerOnly(msg.sender, owner);
-        }
-
-        // Check for zero address
-        if (newImplementation == address(0)) {
-            revert ZeroAddress();
-        }
-
-        // Store depository implementation address
-        assembly {
-            sstore(LOCK_PROXY, newImplementation)
-        }
-
-        emit ImplementationUpdated(newImplementation);
-    }
-
-    /// @dev Changes contract owner address.
-    /// @param newOwner Address of a new owner.
-    function changeOwner(address newOwner) external {
-        // Check for ownership
-        if (msg.sender != owner) {
-            revert OwnerOnly(msg.sender, owner);
-        }
-
-        // Check for zero address
-        if (newOwner == address(0)) {
-            revert ZeroAddress();
-        }
-
-        owner = newOwner;
-        emit OwnerUpdated(newOwner);
     }
     
     /// @dev Changes OLAS governor address.

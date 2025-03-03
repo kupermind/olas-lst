@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import {Implementation, OwnerOnly, ZeroAddress} from "../Implementation.sol";
 import {IToken} from "../interfaces/IToken.sol";
 
 interface IDepositProcessor {
@@ -40,14 +41,6 @@ interface ITreasury {
     function processAndMintStToken(address account, uint256 olasAmount) external returns (uint256);
 }
 
-/// @dev Only `owner` has a privilege, but the `sender` was provided.
-/// @param sender Sender address.
-/// @param owner Required sender address as an owner.
-error OwnerOnly(address sender, address owner);
-
-/// @dev Zero address.
-error ZeroAddress();
-
 /// @dev Zero value.
 error ZeroValue();
 
@@ -84,9 +77,7 @@ struct StakingModel {
 }
 
 /// @title Depository - Smart contract for the stOLAS Depository.
-contract Depository {
-    event ImplementationUpdated(address indexed implementation);
-    event OwnerUpdated(address indexed owner);
+contract Depository is Implementation {
     event TreasuryUpdated(address indexed treasury);
     event DepositoryParamsUpdated(uint256 lockFactor, uint256 maxStakingLimit);
     event Locked(address indexed account, uint256 olasAmount, uint256 lockAmount, uint256 vaultBalance);
@@ -98,8 +89,6 @@ contract Depository {
     event Unstake(address indexed sender, uint256 unstakeAmount, uint256[] chainIds, address[] stakingProxies,
         uint256[] amounts);
 
-    // Code position in storage is keccak256("DEPOSITORY_PROXY") = "0x40f951bb727bcaf251807e38aa34e1b3f20d890f9f3286454f4c473c60a21cdc"
-    bytes32 public constant DEPOSITORY_PROXY = 0x40f951bb727bcaf251807e38aa34e1b3f20d890f9f3286454f4c473c60a21cdc;
     // Stake operation
     bytes32 public constant STAKE = 0x1bcc0f4c3fad314e585165815f94ecca9b96690a26d6417d7876448a9a867a69;
     // Unstake operation
@@ -118,8 +107,6 @@ contract Depository {
 
     // Treasury contract address
     address public treasury;
-    // Contract owner address
-    address public owner;
 
     // Lock factor in 10_000 value
     uint256 public lockFactor;
@@ -168,44 +155,6 @@ contract Depository {
         maxStakingLimit = _maxStakingLimit;
 
         owner = msg.sender;
-    }
-
-    /// @dev Changes depository implementation contract address.
-    /// @param newImplementation New implementation contract address.
-    function changeImplementation(address newImplementation) external {
-        // Check for ownership
-        if (msg.sender != owner) {
-            revert OwnerOnly(msg.sender, owner);
-        }
-
-        // Check for zero address
-        if (newImplementation == address(0)) {
-            revert ZeroAddress();
-        }
-
-        // Store depository implementation address
-        assembly {
-            sstore(DEPOSITORY_PROXY, newImplementation)
-        }
-
-        emit ImplementationUpdated(newImplementation);
-    }
-
-    /// @dev Changes contract owner address.
-    /// @param newOwner Address of a new owner.
-    function changeOwner(address newOwner) external {
-        // Check for ownership
-        if (msg.sender != owner) {
-            revert OwnerOnly(msg.sender, owner);
-        }
-
-        // Check for zero address
-        if (newOwner == address(0)) {
-            revert ZeroAddress();
-        }
-
-        owner = newOwner;
-        emit OwnerUpdated(newOwner);
     }
 
     /// @dev Changes Treasury contract address.

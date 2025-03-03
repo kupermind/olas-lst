@@ -2,7 +2,8 @@
 pragma solidity ^0.8.28;
 
 import {ERC721TokenReceiver} from "../../lib/autonolas-registries/lib/solmate/src/tokens/ERC721.sol";
-import {ActivityModuleProxy} from "./proxies/ActivityModuleProxy.sol";
+import {BeaconProxy} from "../BeaconProxy.sol";
+import {Implementation, OwnerOnly, ZeroAddress} from "../Implementation.sol";
 import {IService} from "../interfaces/IService.sol";
 import {IStaking} from "../interfaces/IStaking.sol";
 import {IToken, INFToken} from "../interfaces/IToken.sol";
@@ -26,14 +27,6 @@ interface IMultisig {
 interface ICollector {
     function relayStakedTokens(uint256 amount) external payable;
 }
-
-/// @dev Only `owner` has a privilege, but the `sender` was provided.
-/// @param sender Sender address.
-/// @param owner Required sender address as an owner.
-error OwnerOnly(address sender, address owner);
-
-/// @dev Zero address.
-error ZeroAddress();
 
 /// @dev Zero value.
 error ZeroValue();
@@ -72,8 +65,7 @@ error AlreadyProcessed(uint256 requestId);
 error ServiceNotEvicted(address stakingProxy, uint256 serviceId);
 
 /// @title StakingManager - Smart contract for OLAS staking management
-contract StakingManager is ERC721TokenReceiver {
-    event OwnerUpdated(address indexed owner);
+contract StakingManager is Implementation, ERC721TokenReceiver {
     event StakingProcessorL2Updated(address indexed l2StakingProcessor);
     event StakingBalanceUpdated(bytes32 indexed operation, address indexed stakingProxy, uint256 numStakes,
         uint256 balance);
@@ -125,8 +117,6 @@ contract StakingManager is ERC721TokenReceiver {
     address public fallbackHandler;
     // L2 staking processor address
     address public l2StakingProcessor;
-    // Owner address
-    address public owner;
 
     // Nonce
     uint256 internal _nonce;
@@ -195,42 +185,21 @@ contract StakingManager is ERC721TokenReceiver {
     function initialize(
         address _safeMultisig,
         address _safeSameAddressMultisig,
-        address _fallbackHandler,
-        address _l2StakingProcessor
+        address _fallbackHandler
     ) external {
         if (owner != address(0)) {
             revert AlreadyInitialized();
         }
 
-        if (_safeMultisig == address(0) || _safeSameAddressMultisig == address(0) ||
-            _fallbackHandler == address(0) || _l2StakingProcessor == address(0))
-        {
+        if (_safeMultisig == address(0) || _safeSameAddressMultisig == address(0) || _fallbackHandler == address(0)) {
             revert ZeroAddress();
         }
 
         safeMultisig = _safeMultisig;
         safeSameAddressMultisig = _safeSameAddressMultisig;
         fallbackHandler = _fallbackHandler;
-        l2StakingProcessor = _l2StakingProcessor;
 
         owner = msg.sender;
-    }
-
-    /// @dev Changes contract owner address.
-    /// @param newOwner Address of a new owner.
-    function changeOwner(address newOwner) external {
-        // Check for ownership
-        if (msg.sender != owner) {
-            revert OwnerOnly(msg.sender, owner);
-        }
-
-        // Check for the zero address
-        if (newOwner == address(0)) {
-            revert ZeroAddress();
-        }
-
-        owner = newOwner;
-        emit OwnerUpdated(newOwner);
     }
 
     /// @dev Changes token relayer address.
@@ -271,7 +240,7 @@ contract StakingManager is ERC721TokenReceiver {
         address[] memory instances = new address[](NUM_AGENT_INSTANCES);
 
         // Create activity module proxy
-        ActivityModuleProxy activityModuleProxy = new ActivityModuleProxy(beacon);
+        BeaconProxy activityModuleProxy = new BeaconProxy(beacon);
         // Assign address as agent instance
         activityModule = address(activityModuleProxy);
         instances[0] = activityModule;

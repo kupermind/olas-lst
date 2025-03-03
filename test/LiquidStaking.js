@@ -150,7 +150,7 @@ describe("Liquid Staking", function () {
         lock = await Lock.deploy(olas.address, ve.address);
         await lock.deployed();
 
-        const LockProxy = await ethers.getContractFactory("LockProxy");
+        const LockProxy = await ethers.getContractFactory("Proxy");
         let initPayload = lock.interface.encodeFunctionData("initialize", []);
         const lockProxy = await LockProxy.deploy(lock.address, initPayload);
         await lockProxy.deployed();
@@ -166,7 +166,7 @@ describe("Liquid Staking", function () {
         depository = await Depository.deploy(olas.address, st.address, ve.address, lock.address);
         await depository.deployed();
 
-        const DepositoryProxy = await ethers.getContractFactory("DepositoryProxy");
+        const DepositoryProxy = await ethers.getContractFactory("Proxy");
         initPayload = depository.interface.encodeFunctionData("initialize", [lockFactor, maxStakingLimit]);
         const depositoryProxy = await DepositoryProxy.deploy(depository.address, initPayload);
         await depositoryProxy.deployed();
@@ -176,7 +176,7 @@ describe("Liquid Staking", function () {
         treasury = await Treasury.deploy(olas.address, st.address, depository.address);
         await treasury.deployed();
 
-        const TreasuryProxy = await ethers.getContractFactory("TreasuryProxy");
+        const TreasuryProxy = await ethers.getContractFactory("Proxy");
         initPayload = treasury.interface.encodeFunctionData("initialize", []);
         const treasuryProxy = await TreasuryProxy.deploy(treasury.address, initPayload);
         await treasuryProxy.deployed();
@@ -202,6 +202,12 @@ describe("Liquid Staking", function () {
         collector = await Collector.deploy(olas.address, st.address);
         await collector.deployed();
 
+        const CollectorProxy = await ethers.getContractFactory("Proxy");
+        initPayload = collector.interface.encodeFunctionData("initialize", []);
+        const collectorProxy = await CollectorProxy.deploy(collector.address, initPayload);
+        await collectorProxy.deployed();
+        collector = await ethers.getContractAt("Collector", collectorProxy.address);
+
         const ActivityModule = await ethers.getContractFactory("ActivityModule");
         activityModule = await ActivityModule.deploy(olas.address, collector.address);
         await activityModule.deployed();
@@ -215,6 +221,14 @@ describe("Liquid Staking", function () {
             stakingFactory.address, safeModuleInitializer.address, gnosisSafeL2.address, beacon.address,
             collector.address, agentId, defaultHash);
         await stakingManager.deployed();
+
+        // Initialize stakingManager
+        const StakingManagerProxy = await ethers.getContractFactory("Proxy");
+        initPayload = stakingManager.interface.encodeFunctionData("initialize", [gnosisSafeMultisig.address,
+            gnosisSafeSameAddressMultisig.address, fallbackHandler.address]);
+        const stakingManagerProxy = await StakingManagerProxy.deploy(stakingManager.address, initPayload);
+        await stakingManagerProxy.deployed();
+        stakingManager = await ethers.getContractAt("StakingManager", stakingManagerProxy.address);
         serviceParams.stakingManager = stakingManager.address;
 
         // Fund staking manager with native to support staking creation
@@ -234,18 +248,17 @@ describe("Liquid Staking", function () {
             bridgeRelayer.address, bridgeRelayer.address, gnosisDepositProcessorL1.address, chainId);
         await gnosisStakingProcessorL2.deployed();
 
-        // Initialize collector address
-        await collector.initialize(gnosisStakingProcessorL2.address, protocolFactor);
+        // changeStakingProcessorL2 for collector
+        await collector.changeStakingProcessorL2(gnosisStakingProcessorL2.address);
+
+        // changeStakingProcessorL2 for stakingManager
+        await stakingManager.changeStakingProcessorL2(gnosisStakingProcessorL2.address);
 
         // Set the gnosisStakingProcessorL2 address in gnosisDepositProcessorL1
         await gnosisDepositProcessorL1.setL2StakingProcessor(gnosisStakingProcessorL2.address);
 
         // Whitelist deposit processors
         await depository.setDepositProcessorChainIds([gnosisDepositProcessorL1.address], [gnosisChainId]);
-
-        // Set rest of contracts in stakingManager
-        await stakingManager.initialize(gnosisSafeMultisig.address, gnosisSafeSameAddressMultisig.address,
-            fallbackHandler.address, gnosisStakingProcessorL2.address);
 
         const ActivityChecker = await ethers.getContractFactory("ModuleActivityChecker");
         activityChecker = await ActivityChecker.deploy(livenessRatio);
