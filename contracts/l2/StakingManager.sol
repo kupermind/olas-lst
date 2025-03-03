@@ -405,53 +405,6 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         _locked = 1;
     }
 
-    // TODO Probably obsolete - change to only deployed and unstaked services, do call for stake
-    /// @dev Re-stakes if services are evicted for any reason.
-    /// @param stakingProxies Set of staking proxy addresses.
-    /// @param serviceIds Corresponding sets of service Ids for each staking proxy address.
-    function reStake(address[] memory stakingProxies, uint256[][] memory serviceIds) external {
-        // Traverse all staking proxies
-        for (uint256 i = 0; i < stakingProxies.length; ++i) {
-            // Check for zero address
-            if (stakingProxies[i] == address(0)) {
-                revert ZeroAddress();
-            }
-
-            // Get number of stakes services
-            uint256 numServices = serviceIds[i].length;
-            // Check for zero value
-            if (numServices == 0) {
-                revert ZeroValue();
-            }
-
-            uint256 minStakingDeposit = IStaking(stakingProxies[i]).minStakingDeposit();
-            uint256 fullStakingDeposit = minStakingDeposit * (1 + NUM_AGENT_INSTANCES);
-
-            // Calculate total staking deposit
-            uint256 totalStakingDeposit = numServices * fullStakingDeposit;
-
-            // Approve token for the serviceRegistryTokenUtility contract
-            IToken(olas).approve(serviceRegistryTokenUtility, totalStakingDeposit);
-
-            // Traverse all required services
-            for (uint256 j = 0; j < numServices; ++j) {
-                // Check that the service is evicted
-                if (IStaking(stakingProxies[i]).getStakingState(serviceIds[i][j]) != IStaking.StakingState.Unstaked) {
-                    revert ServiceNotEvicted(stakingProxies[i], serviceIds[i][j]);
-                }
-
-                // Unstake evicted service
-                IStaking(stakingProxies[i]).unstake(serviceIds[i][j]);
-
-                // Approve service NFT for the staking instance
-                INFToken(serviceRegistry).approve(stakingProxies[i], serviceIds[i][j]);
-
-                // Stake the service
-                IStaking(stakingProxies[i]).stake(serviceIds[i][j]);
-            }
-        }
-    }
-
     /// @dev Unstakes, if needed, and withdraws specified amounts from specified staking contracts.
     /// @notice Unstakes services if needed to satisfy withdraw requests.
     ///         Call this to unstake definitely terminated staking contracts - deactivated on L1 and / or ran out of funds.
