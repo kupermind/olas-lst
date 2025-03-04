@@ -120,10 +120,9 @@ contract Depository is Implementation {
     // Set of staking model Ids
     uint256[] public setStakingModelIds;
 
-    constructor(address _olas, address _st, address _ve, address _lock) {
+    constructor(address _olas, address _st, address _lock) {
         olas = _olas;
         st = _st;
-        ve = _ve;
         lock = _lock;
     }
 

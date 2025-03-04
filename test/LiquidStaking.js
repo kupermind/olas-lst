@@ -156,14 +156,14 @@ describe("Liquid Staking", function () {
         await lockProxy.deployed();
         lock = await ethers.getContractAt("Lock", lockProxy.address);
 
-        // Approve initial lock
-        await olas.approve(lock.address, ethers.utils.parseEther("1"));
+        // Transfer initial lock
+        await olas.transfer(lock.address, ethers.utils.parseEther("1"));
         // Set governor and create first lock
         // Governor address is irrelevant for testing
         await lock.setGovernorAndCreateFirstLock(deployer.address);
 
         const Depository = await ethers.getContractFactory("Depository");
-        depository = await Depository.deploy(olas.address, st.address, ve.address, lock.address);
+        depository = await Depository.deploy(olas.address, st.address, lock.address);
         await depository.deployed();
 
         const DepositoryProxy = await ethers.getContractFactory("Proxy");

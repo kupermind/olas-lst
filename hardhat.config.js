@@ -252,7 +252,7 @@ module.exports = {
                 settings: {
                     optimizer: {
                         enabled: true,
-                        runs: 750,
+                        runs: 1000000,
                     },
                     evmVersion: "cancun"
                 },
@@ -260,7 +260,7 @@ module.exports = {
         ]
     },
     gasReporter: {
-        enabled: false
+        enabled: true
     },
     docgen: {
         path: "./docs",
