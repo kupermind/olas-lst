@@ -1,42 +1,20 @@
-/*global describe, context, beforeEach, it*/
+/*global hre, process*/
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const fs = require("fs");
 
 const main = async () => {
-    let serviceRegistry;
-    let serviceRegistryTokenUtility;
-    let operatorWhitelist;
-    let serviceManager;
     let olas;
     let ve;
     let st;
-    let gnosisSafe;
-    let gnosisSafeL2;
-    let gnosisSafeProxyFactory;
-    let safeModuleInitializer;
-    let fallbackHandler;
-    let gnosisSafeMultisig;
-    let gnosisSafeSameAddressMultisig;
-    let activityChecker;
-    let stakingFactory;
-    let stakingVerifier;
     let lock;
     let depository;
     let treasury;
     let collector;
     let beacon;
-    let bridgeRelayer;
-    let activityModule;
-    let stakingManager;
-    let stakingTokenImplementation;
-    let stakingTokenInstance;
     let gnosisDepositProcessorL1;
     let gnosisStakingProcessorL2;
-    let signers;
     let deployer;
-    let agent;
-    let bytecodeHash;
     const AddressZero = ethers.constants.AddressZero;
     const HashZero = ethers.constants.HashZero;
     const initSupply = "5" + "0".repeat(26);

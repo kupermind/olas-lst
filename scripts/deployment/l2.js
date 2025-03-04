@@ -1,6 +1,7 @@
-/*global describe, context, beforeEach, it*/
+/*global hre, process*/
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
+const fs = require("fs");
 
 const main = async () => {
     let serviceRegistry;
@@ -68,11 +69,15 @@ const main = async () => {
     const stakingSupply = (regDeposit.mul(2)).mul(ethers.BigNumber.from(maxNumServices));
     const bridgePayload = "0x";
 
+    const globalsFile = "scripts/deployment/globals_gnosis_chiado.json";
+    const dataFromJSON = fs.readFileSync(globalsFile, "utf8");
+    let parsedData = JSON.parse(dataFromJSON);
+
     signers = await ethers.getSigners();
     deployer = signers[0];
     agent = signers[0];
 
-    const serviceRegistry = await ethers.getContractAt("ServiceRegistryL2", parsedData.serviceRegistryAddress);
+    serviceRegistry = await ethers.getContractAt("ServiceRegistryL2", parsedData.serviceRegistryAddress);
     serviceParams.serviceRegistry = serviceRegistry.address;
 
     const ServiceRegistryTokenUtility = await ethers.getContractFactory("ServiceRegistryTokenUtility");
@@ -89,19 +94,8 @@ const main = async () => {
         operatorWhitelist.address);
     await serviceManager.deployed();
 
-    const olas = await ethers.getContractAt("ERC20Token", parsedData.olasAddress);
+    olas = await ethers.getContractAt("ERC20Token", parsedData.olasAddress);
     serviceParams.stakingToken = olas.address;
-
-    // Mint tokens to the deployer
-    await olas.mint(deployer.address, initSupply);
-
-    const VE = await ethers.getContractFactory("MockVE");
-    ve = await VE.deploy(olas.address);
-    await ve.deployed();
-
-    const SToken = await ethers.getContractFactory("stOLAS");
-    st = await SToken.deploy(olas.address);
-    await st.deployed();
 
     const GnosisSafe = await ethers.getContractFactory("GnosisSafe");
     gnosisSafe = await GnosisSafe.deploy();
