@@ -4,55 +4,32 @@ const { ethers } = require("hardhat");
 const fs = require("fs");
 
 const main = async () => {
-    let serviceRegistry;
-    let serviceRegistryTokenUtility;
-    let operatorWhitelist;
-    let serviceManager;
     let olas;
-    let ve;
-    let st;
-    let gnosisSafe;
-    let gnosisSafeL2;
-    let gnosisSafeProxyFactory;
-    let safeModuleInitializer;
-    let fallbackHandler;
-    let gnosisSafeMultisig;
-    let gnosisSafeSameAddressMultisig;
     let activityChecker;
     let stakingFactory;
     let stakingVerifier;
-    let lock;
-    let depository;
-    let treasury;
     let collector;
     let beacon;
-    let bridgeRelayer;
     let activityModule;
     let stakingManager;
     let stakingTokenImplementation;
     let stakingTokenInstance;
-    let gnosisDepositProcessorL1;
     let gnosisStakingProcessorL2;
-    let signers;
     let deployer;
-    let agent;
-    let bytecodeHash;
     const AddressZero = ethers.constants.AddressZero;
     const HashZero = ethers.constants.HashZero;
     const oneDay = 86400;
     const defaultHash = "0x" + "5".repeat(64);
     const regDeposit = ethers.utils.parseEther("10000");
-    const serviceId = 1;
     const agentId = 1;
     const livenessPeriod = oneDay; // 24 hours
-    const initSupply = "5" + "0".repeat(26);
     const livenessRatio = "11111111111111"; // 1 transaction per 25 hours
-    const maxNumServices = 100;
+    const maxNumServices = 20;
     const minStakingDeposit = regDeposit;
     const timeForEmissions = oneDay * 30;
     let serviceParams = {
         maxNumServices,
-        rewardsPerSecond: "5" + "0".repeat(14),
+        rewardsPerSecond: "951293759512937",
         minStakingDeposit,
         livenessPeriod,
         timeForEmissions,
@@ -62,222 +39,220 @@ const main = async () => {
         stakingManager: AddressZero,
         activityChecker: AddressZero
     };
-    const apyLimit = ethers.utils.parseEther("3");
-    const lockFactor = 100;
-    const maxStakingLimit = ethers.utils.parseEther("20000");
     const gnosisChainId = 100;
     const stakingSupply = (regDeposit.mul(2)).mul(ethers.BigNumber.from(maxNumServices));
-    const bridgePayload = "0x";
 
     const globalsFile = "scripts/deployment/globals_gnosis_chiado.json";
     const dataFromJSON = fs.readFileSync(globalsFile, "utf8");
     let parsedData = JSON.parse(dataFromJSON);
 
-    signers = await ethers.getSigners();
-    deployer = signers[0];
-    agent = signers[0];
+    // Setting up providers and wallets
+    const networkURL = parsedData.networkURL;
+    const provider = new ethers.providers.JsonRpcProvider(networkURL);
+    await provider.getBlockNumber().then((result) => {
+        console.log("Current block number chiado: " + result);
+    });
 
-    serviceRegistry = await ethers.getContractAt("ServiceRegistryL2", parsedData.serviceRegistryAddress);
-    serviceParams.serviceRegistry = serviceRegistry.address;
-
-    const ServiceRegistryTokenUtility = await ethers.getContractFactory("ServiceRegistryTokenUtility");
-    serviceRegistryTokenUtility = await ServiceRegistryTokenUtility.deploy(serviceRegistry.address);
-    await serviceRegistryTokenUtility.deployed();
-    serviceParams.serviceRegistryTokenUtility = serviceRegistryTokenUtility.address;
-
-    const OperatorWhitelist = await ethers.getContractFactory("OperatorWhitelist");
-    operatorWhitelist = await OperatorWhitelist.deploy(serviceRegistry.address);
-    await operatorWhitelist.deployed();
-
-    const ServiceManagerToken = await ethers.getContractFactory("ServiceManagerToken");
-    serviceManager = await ServiceManagerToken.deploy(serviceRegistry.address, serviceRegistryTokenUtility.address,
-        operatorWhitelist.address);
-    await serviceManager.deployed();
-
-    olas = await ethers.getContractAt("ERC20Token", parsedData.olasAddress);
-    serviceParams.stakingToken = olas.address;
-
-    const GnosisSafe = await ethers.getContractFactory("GnosisSafe");
-    gnosisSafe = await GnosisSafe.deploy();
-    await gnosisSafe.deployed();
-
-    const GnosisSafeL2 = await ethers.getContractFactory("GnosisSafeL2");
-    gnosisSafeL2 = await GnosisSafeL2.deploy();
-    await gnosisSafeL2.deployed();
-
-    const GnosisSafeProxyFactory = await ethers.getContractFactory("GnosisSafeProxyFactory");
-    gnosisSafeProxyFactory = await GnosisSafeProxyFactory.deploy();
-    await gnosisSafeProxyFactory.deployed();
-
-    const SafeToL2Setup = await ethers.getContractFactory("SafeToL2Setup");
-    safeModuleInitializer = await SafeToL2Setup.deploy();
-    await safeModuleInitializer.deployed();
-
-    const FallbackHandler = await ethers.getContractFactory("DefaultCallbackHandler");
-    fallbackHandler = await FallbackHandler.deploy();
-    await fallbackHandler.deployed();
-
-    const GnosisSafeProxy = await ethers.getContractFactory("GnosisSafeProxy");
-    const gnosisSafeProxy = await GnosisSafeProxy.deploy(gnosisSafe.address);
-    await gnosisSafeProxy.deployed();
-    const bytecode = await ethers.provider.getCode(gnosisSafeProxy.address);
-    bytecodeHash = ethers.utils.keccak256(bytecode);
-
-    const GnosisSafeMultisig = await ethers.getContractFactory("GnosisSafeMultisig");
-    gnosisSafeMultisig = await GnosisSafeMultisig.deploy(gnosisSafe.address, gnosisSafeProxyFactory.address);
-    await gnosisSafeMultisig.deployed();
-
-    const GnosisSafeSameAddressMultisig = await ethers.getContractFactory("GnosisSafeSameAddressMultisig");
-    gnosisSafeSameAddressMultisig = await GnosisSafeSameAddressMultisig.deploy(bytecodeHash);
-    await gnosisSafeSameAddressMultisig.deployed();
-
-    const Lock = await ethers.getContractFactory("Lock");
-    lock = await Lock.deploy(olas.address, ve.address);
-    await lock.deployed();
-
-    const LockProxy = await ethers.getContractFactory("Proxy");
-    let initPayload = lock.interface.encodeFunctionData("initialize", []);
-    const lockProxy = await LockProxy.deploy(lock.address, initPayload);
-    await lockProxy.deployed();
-    lock = await ethers.getContractAt("Lock", lockProxy.address);
-
-    // Approve initial lock
-    await olas.approve(lock.address, ethers.utils.parseEther("1"));
-    // Set governor and create first lock
-    // Governor address is irrelevant for testing
-    await lock.setGovernorAndCreateFirstLock(deployer.address);
-
-    const Depository = await ethers.getContractFactory("Depository");
-    depository = await Depository.deploy(olas.address, st.address, ve.address, lock.address);
-    await depository.deployed();
-
-    const DepositoryProxy = await ethers.getContractFactory("Proxy");
-    initPayload = depository.interface.encodeFunctionData("initialize", [lockFactor, maxStakingLimit]);
-    const depositoryProxy = await DepositoryProxy.deploy(depository.address, initPayload);
-    await depositoryProxy.deployed();
-    depository = await ethers.getContractAt("Depository", depositoryProxy.address);
-
-    const Treasury = await ethers.getContractFactory("Treasury");
-    treasury = await Treasury.deploy(olas.address, st.address, depository.address);
-    await treasury.deployed();
-
-    const TreasuryProxy = await ethers.getContractFactory("Proxy");
-    initPayload = treasury.interface.encodeFunctionData("initialize", []);
-    const treasuryProxy = await TreasuryProxy.deploy(treasury.address, initPayload);
-    await treasuryProxy.deployed();
-    treasury = await ethers.getContractAt("Treasury", treasuryProxy.address);
-
-    // Change managers for stOLAS
-    // Only Treasury contract can mint OLAS
-    await st.changeManagers(treasury.address, depository.address);
-
-    // Change treasury address in depository
-    await depository.changeTreasury(treasury.address);
-
-    const StakingVerifier = await ethers.getContractFactory("StakingVerifier");
-    stakingVerifier = await StakingVerifier.deploy(olas.address, serviceRegistry.address,
-        serviceRegistryTokenUtility.address, minStakingDeposit, timeForEmissions, maxNumServices, apyLimit);
-    await stakingVerifier.deployed();
-
-    const StakingFactory = await ethers.getContractFactory("StakingFactory");
-    stakingFactory = await StakingFactory.deploy(stakingVerifier.address);
-    await stakingFactory.deployed();
+    // Get the EOA
+    const account = ethers.utils.HDNode.fromMnemonic(process.env.TESTNET_MNEMONIC).derivePath("m/44'/60'/0'/0/0");
+    deployer = new ethers.Wallet(account, provider);
+    console.log("Deployer address:", deployer.address);
 
     const Collector = await ethers.getContractFactory("Collector");
-    collector = await Collector.deploy(olas.address, st.address);
+    collector = await Collector.deploy(parsedData.olasAddress, parsedData.stOLASAddress);
     await collector.deployed();
 
+    // Wait for half a minute for the transaction completion
+    await new Promise(r => setTimeout(r, 30000));
+
+    await hre.run("verify:verify", {
+        address: collector.address,
+        constructorArguments: [parsedData.olasAddress, parsedData.stOLASAddress],
+    });
+    parsedData.collectorAddress = collector.address;
+    fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
+
     const CollectorProxy = await ethers.getContractFactory("Proxy");
-    initPayload = collector.interface.encodeFunctionData("initialize", []);
-    const collectorProxy = await CollectorProxy.deploy(collector.address, initPayload);
+    let initPayload = collector.interface.encodeFunctionData("initialize", []);
+    const collectorProxy = await CollectorProxy.deploy(parsedData.collectorAddress, initPayload);
     await collectorProxy.deployed();
-    collector = await ethers.getContractAt("Collector", collectorProxy.address);
+
+    // Wait for half a minute for the transaction completion
+    await new Promise(r => setTimeout(r, 30000));
+
+    await hre.run("verify:verify", {
+        address: collectorProxy.address,
+        constructorArguments: [collector.address, initPayload],
+    });
+    parsedData.collectorProxyAddress = collectorProxy.address;
+    fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
+    collector = await ethers.getContractAt("Collector", parsedData.collectorProxyAddress);
+
 
     const ActivityModule = await ethers.getContractFactory("ActivityModule");
-    activityModule = await ActivityModule.deploy(olas.address, collector.address);
+    activityModule = await ActivityModule.deploy(parsedData.olasAddress, parsedData.collectorProxyAddress);
     await activityModule.deployed();
 
+    // Wait for half a minute for the transaction completion
+    await new Promise(r => setTimeout(r, 30000));
+
+    await hre.run("verify:verify", {
+        address: activityModule.address,
+        constructorArguments: [parsedData.olasAddress, parsedData.collectorProxyAddress],
+    });
+    parsedData.activityModuleAddress = activityModule.address;
+    fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
+
+
     const Beacon = await ethers.getContractFactory("Beacon");
-    beacon = await Beacon.deploy(activityModule.address);
+    beacon = await Beacon.deploy(parsedData.activityModuleAddress);
     await beacon.deployed();
 
+    // Wait for half a minute for the transaction completion
+    await new Promise(r => setTimeout(r, 30000));
+
+    await hre.run("verify:verify", {
+        address: beacon.address,
+        constructorArguments: [parsedData.activityModuleAddress],
+    });
+    parsedData.beaconAddress = beacon.address;
+    fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
+
+
     const StakingManager = await ethers.getContractFactory("StakingManager");
-    stakingManager = await StakingManager.deploy(olas.address, treasury.address, serviceManager.address,
-        stakingFactory.address, safeModuleInitializer.address, gnosisSafeL2.address, beacon.address,
-        collector.address, agentId, defaultHash);
+    stakingManager = await StakingManager.deploy(parsedData.olasAddress, parsedData.treasuryProxyAddress,
+        parsedData.serviceManagerTokenAddress, parsedData.stakingFactoryAddress, parsedData.safeToL2SetupAddress,
+        parsedData.gnosisSafeL2Address, parsedData.beaconAddress, parsedData.collectorProxyAddress, agentId, defaultHash);
     await stakingManager.deployed();
+
+    // Wait for half a minute for the transaction completion
+    await new Promise(r => setTimeout(r, 30000));
+
+    await hre.run("verify:verify", {
+        address: stakingManager.address,
+        constructorArguments: [parsedData.olasAddress, parsedData.treasuryProxyAddress, parsedData.serviceManagerTokenAddress,
+            parsedData.stakingFactoryAddress, parsedData.safeToL2SetupAddress, parsedData.gnosisSafeL2Address,
+            parsedData.beaconAddress, parsedData.collectorProxyAddress, agentId, defaultHash],
+    });
+    parsedData.stakingManagerAddress = stakingManager.address;
+    fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
 
     // Initialize stakingManager
     const StakingManagerProxy = await ethers.getContractFactory("Proxy");
-    initPayload = stakingManager.interface.encodeFunctionData("initialize", [gnosisSafeMultisig.address,
-        gnosisSafeSameAddressMultisig.address, fallbackHandler.address]);
-    const stakingManagerProxy = await StakingManagerProxy.deploy(stakingManager.address, initPayload);
+    initPayload = stakingManager.interface.encodeFunctionData("initialize", [parsedData.gnosisSafeMultisigImplementationAddress,
+        parsedData.gnosisSafeSameAddressMultisigImplementationAddress, parsedData.fallbackHandlerAddress]);
+    const stakingManagerProxy = await StakingManagerProxy.deploy(parsedData.stakingManagerAddress, initPayload);
     await stakingManagerProxy.deployed();
-    stakingManager = await ethers.getContractAt("StakingManager", stakingManagerProxy.address);
-    serviceParams.stakingManager = stakingManager.address;
+
+    // Wait for half a minute for the transaction completion
+    await new Promise(r => setTimeout(r, 30000));
+
+    await hre.run("verify:verify", {
+        address: stakingManagerProxy.address,
+        constructorArguments: [parsedData.stakingManagerAddress, initPayload],
+    });
+    parsedData.stakingManagerProxyAddress = stakingManagerProxy.address;
+    fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
+    stakingManager = await ethers.getContractAt("StakingManager", parsedData.stakingManagerProxyAddress);
+
 
     // Fund staking manager with native to support staking creation
-    await deployer.sendTransaction({to: stakingManager.address, value: ethers.utils.parseEther("1")});
+    await deployer.sendTransaction({to: stakingManager.address, value: ethers.utils.parseEther("0.000001")});
 
-    const BridgeRelayer = await ethers.getContractFactory("BridgeRelayer");
-    bridgeRelayer = await BridgeRelayer.deploy(olas.address);
-    await bridgeRelayer.deployed();
-
-    const GnosisDepositProcessorL1 = await ethers.getContractFactory("GnosisDepositProcessorL1");
-    gnosisDepositProcessorL1 = await GnosisDepositProcessorL1.deploy(olas.address, depository.address,
-        bridgeRelayer.address, bridgeRelayer.address, gnosisChainId);
-    await gnosisDepositProcessorL1.deployed();
 
     const GnosisStakingProcessorL2 = await ethers.getContractFactory("GnosisStakingProcessorL2");
-    gnosisStakingProcessorL2 = await GnosisStakingProcessorL2.deploy(olas.address, stakingManager.address,
-        bridgeRelayer.address, bridgeRelayer.address, gnosisDepositProcessorL1.address, gnosisChainId);
+    gnosisStakingProcessorL2 = await GnosisStakingProcessorL2.deploy(parsedData.olasAddress,
+        parsedData.stakingManagerProxyAddress, parsedData.gnosisOmniBridgeAddress, parsedData.gnosisAMBHomeAddress,
+        parsedData.gnosisDepositProcessorL1Address, gnosisChainId);
     await gnosisStakingProcessorL2.deployed();
 
+    // Wait for half a minute for the transaction completion
+    await new Promise(r => setTimeout(r, 30000));
+
+    await hre.run("verify:verify", {
+        address: gnosisStakingProcessorL2.address,
+        constructorArguments: [parsedData.olasAddress, parsedData.stakingManagerProxyAddress,
+            parsedData.gnosisOmniBridgeAddress, parsedData.gnosisAMBHomeAddress,
+            parsedData.gnosisDepositProcessorL1Address, gnosisChainId],
+    });
+    parsedData.gnosisStakingProcessorL2Address = gnosisStakingProcessorL2.address;
+    fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
+
+
     // changeStakingProcessorL2 for collector
-    await collector.changeStakingProcessorL2(gnosisStakingProcessorL2.address);
+    //collector = await ethers.getContractAt("Collector", parsedData.collectorProxyAddress);
+    await collector.changeStakingProcessorL2(parsedData.gnosisStakingProcessorL2Address);
 
     // changeStakingProcessorL2 for stakingManager
-    await stakingManager.changeStakingProcessorL2(gnosisStakingProcessorL2.address);
+    //stakingManager = await ethers.getContractAt("StakingManager", parsedData.stakingManagerProxyAddress);
+    await stakingManager.changeStakingProcessorL2(parsedData.gnosisStakingProcessorL2Address);
 
-    // Set the gnosisStakingProcessorL2 address in gnosisDepositProcessorL1
-    await gnosisDepositProcessorL1.setL2StakingProcessor(gnosisStakingProcessorL2.address);
-
-    // Whitelist deposit processors
-    await depository.setDepositProcessorChainIds([gnosisDepositProcessorL1.address], [gnosisChainId]);
 
     const ActivityChecker = await ethers.getContractFactory("ModuleActivityChecker");
     activityChecker = await ActivityChecker.deploy(livenessRatio);
     await activityChecker.deployed();
-    serviceParams.activityChecker = activityChecker.address;
+
+    // Wait for half a minute for the transaction completion
+    await new Promise(r => setTimeout(r, 30000));
+
+    await hre.run("verify:verify", {
+        address: activityChecker.address,
+        constructorArguments: [livenessRatio],
+    });
+    parsedData.activityCheckerAddress = activityChecker.address;
+    fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
+
 
     const StakingTokenLocked = await ethers.getContractFactory("StakingTokenLocked");
     stakingTokenImplementation = await StakingTokenLocked.deploy();
     await stakingTokenImplementation.deployed();
 
-    // Whitelist implementation
-    await stakingVerifier.setImplementationsStatuses([stakingTokenImplementation.address], [true], true);
+    // Wait for half a minute for the transaction completion
+    await new Promise(r => setTimeout(r, 30000));
 
+    await hre.run("verify:verify", {
+        address: stakingTokenImplementation.address,
+        constructorArguments: [],
+    });
+    parsedData.stakingTokenImplementationAddress = stakingTokenImplementation.address;
+    fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
+
+
+    // Whitelist implementation
+    stakingVerifier = await ethers.getContractAt("StakingVerifier", parsedData.stakingVerifierAddress);
+    await stakingVerifier.setImplementationsStatuses([parsedData.stakingTokenImplementationAddress], [true], true);
+
+    serviceParams.serviceRegistry = parsedData.serviceRegistryAddress,
+    serviceParams.serviceRegistryTokenUtility = parsedData.serviceRegistryTokenUtilityAddress,
+    serviceParams.stakingToken = parsedData.olasAddress;
+    serviceParams.activityChecker = parsedData.activityCheckerAddress;
+    serviceParams.stakingManager = parsedData.stakingManagerProxyAddress;
+
+
+    stakingFactory = await ethers.getContractAt("StakingFactory", parsedData.stakingFactoryAddress);
+    //stakingTokenImplementation = await ethers.getContractAt("StakingTokenLocked", parsedData.stakingTokenImplementationAddress);
     initPayload = stakingTokenImplementation.interface.encodeFunctionData("initialize", [serviceParams]);
-    const tx = await stakingFactory.createStakingInstance(stakingTokenImplementation.address, initPayload);
+    const tx = await stakingFactory.createStakingInstance(parsedData.stakingTokenImplementationAddress, initPayload,
+        {gasLimit: 5000000});
     const res = await tx.wait();
     // Get staking contract instance address from the event
-    const stakingTokenAddress = "0x" + res.logs[0].topics[2].slice(26);
-    stakingTokenInstance = await ethers.getContractAt("StakingTokenLocked", stakingTokenAddress);
+    parsedData.stakingTokenAddress = "0x" + res.logs[0].topics[2].slice(26);
+    fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
 
-    // Set service manager
-    await serviceRegistry.changeManager(serviceManager.address);
-    await serviceRegistryTokenUtility.changeManager(serviceManager.address);
+    // Wait for half a minute for the transaction completion
+    await new Promise(r => setTimeout(r, 30000));
 
-    // Whitelist gnosis multisig implementations
-    await serviceRegistry.changeMultisigPermission(gnosisSafeMultisig.address, true);
-    await serviceRegistry.changeMultisigPermission(gnosisSafeSameAddressMultisig.address, true);
+    await hre.run("verify:verify", {
+        address: parsedData.stakingTokenAddress,
+        constructorArguments: [parsedData.stakingTokenImplementationAddress],
+    });
 
     // Fund the staking contract
-    await olas.approve(stakingTokenAddress, stakingSupply);
-    await stakingTokenInstance.deposit(stakingSupply);
-
-    // Add model to L1
-    await depository.createAndActivateStakingModels([gnosisChainId], [stakingTokenAddress], [stakingSupply]);
+    //olas = await ethers.getContractAt("ERC20Token", parsedData.olasAddress);
+    //const amount = regDeposit.mul(10);
+    //await olas.approve(parsedData.stakingTokenAddress, amount);
+    //stakingTokenInstance = await ethers.getContractAt("StakingTokenLocked", parsedData.stakingTokenAddress);
+    //await stakingTokenInstance.deposit(amount, { gasLimit: 300000 });
 };
 
 main()
