@@ -20,7 +20,7 @@ const main = async () => {
     const deployer = new ethers.Wallet(account, provider);
     console.log("Deployer address:", deployer.address);
 
-    gnosisStakingProcessorL2 = await ethers.getContractAt("GnosisStakingProcessorL2",
+    const gnosisStakingProcessorL2 = await ethers.getContractAt("GnosisStakingProcessorL2",
         parsedData.gnosisStakingProcessorL2Address);
 
     const target = "0x3e8A4d23b14739f862Bc62f334d013846d2147d5";
