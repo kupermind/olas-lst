@@ -177,7 +177,7 @@ describe("Liquid Staking", function () {
         await treasury.deployed();
 
         const TreasuryProxy = await ethers.getContractFactory("Proxy");
-        initPayload = treasury.interface.encodeFunctionData("initialize", []);
+        initPayload = treasury.interface.encodeFunctionData("initialize", [0]);
         const treasuryProxy = await TreasuryProxy.deploy(treasury.address, initPayload);
         await treasuryProxy.deployed();
         treasury = await ethers.getContractAt("Treasury", treasuryProxy.address);

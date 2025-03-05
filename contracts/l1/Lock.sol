@@ -169,9 +169,11 @@ contract Lock is Implementation {
         // Approve OLAS for veOLAS
         IToken(olas).approve(ve, olasAmount);
 
-        // Increase amount and unlock time to a maximum
+        // Increase lock amount
         IVEOLAS(ve).increaseAmount(olasAmount);
-        IVEOLAS(ve).increaseUnlockTime(MAX_LOCK_TIME);
+        // Increase unlock time to a maximum, if possible
+        bytes memory increaseUnlockTimeData = abi.encodeCall(IVEOLAS.increaseUnlockTime, (MAX_LOCK_TIME));
+        ve.call(increaseUnlockTimeData);
     }
 
     function unlock(address account, uint256 amount) external {

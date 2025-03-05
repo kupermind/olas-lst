@@ -46,6 +46,7 @@ error Overflow(uint256 provided, uint256 max);
 
 /// @title Treasury - Smart contract for treasury
 contract Treasury is Implementation, ERC6909 {
+    event WithdrawDelayUpdates(uint256 withdrawDelay);
     event WithdrawRequestInitiated(address indexed requester, uint256 indexed requestId, uint256 stAmount,
         uint256 olasAmount, uint256 withdrawTime);
     event WithdrawRequestExecuted(uint256 requestId, uint256 amount);
@@ -69,13 +70,24 @@ contract Treasury is Implementation, ERC6909 {
     }
 
     /// @dev Treasury initializer.
-    function initialize() external{
+    function initialize(uint256 _withdrawDelay) external{
         // Check for already initialized
         if (owner != address(0)) {
             revert AlreadyInitialized();
         }
 
+        withdrawDelay = _withdrawDelay;
         owner = msg.sender;
+    }
+
+    function changeWithdrawDelay(uint256 newWithdrawDelay) external {
+        // Check for ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
+        }
+
+        withdrawDelay = newWithdrawDelay;
+        emit WithdrawDelayUpdates(newWithdrawDelay);
     }
 
     // TODO Move high level part to depository?

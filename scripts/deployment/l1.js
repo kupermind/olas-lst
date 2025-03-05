@@ -147,7 +147,7 @@ const main = async () => {
 
 
     const TreasuryProxy = await ethers.getContractFactory("Proxy");
-    initPayload = treasury.interface.encodeFunctionData("initialize", []);
+    initPayload = treasury.interface.encodeFunctionData("initialize", [parsedData.withdrawDelay]);
     const treasuryProxy = await TreasuryProxy.deploy(parsedData.treasuryAddress, initPayload);
     await treasuryProxy.deployed();
 
