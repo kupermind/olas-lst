@@ -96,8 +96,7 @@ const main = async () => {
     // Transfer initial lock
     await olas.transfer(parsedData.lockProxyAddress, ethers.utils.parseEther("1"));
     // Set governor and create first lock
-    // Governor address is irrelevant for testing
-    await lock.setGovernorAndCreateFirstLock(deployer.address, {gasLimit: 500000});
+    await lock.setGovernorAndCreateFirstLock(parsedData.olasGovernorAddress, {gasLimit: 500000});
 
     const Depository = await ethers.getContractFactory("Depository");
     depository = await Depository.deploy(parsedData.olasAddress, parsedData.stOLASAddress, parsedData.lockProxyAddress);
