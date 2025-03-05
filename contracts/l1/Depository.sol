@@ -297,7 +297,7 @@ contract Depository is Implementation {
     /// @dev Changes depository params.
     /// @param newLockFactor New lock factor value.
     /// @param newMaxStakingLimit New max staking limit per staking proxy.
-    function changeLockFactor(uint256 newLockFactor, uint256 newMaxStakingLimit) external {
+    function changeDepositoryParams(uint256 newLockFactor, uint256 newMaxStakingLimit) external {
         // Check for ownership
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);
