@@ -18,7 +18,6 @@ const main = async () => {
     const AddressZero = ethers.constants.AddressZero;
     const HashZero = ethers.constants.HashZero;
     const initSupply = "5" + "0".repeat(26);
-    const lockFactor = 100;
     const maxStakingLimit = ethers.utils.parseEther("20000");
     const gnosisChainId = 100;
     const regDeposit = ethers.utils.parseEther("10000");
@@ -114,7 +113,7 @@ const main = async () => {
 
 
     const DepositoryProxy = await ethers.getContractFactory("Proxy");
-    initPayload = depository.interface.encodeFunctionData("initialize", [lockFactor, maxStakingLimit]);
+    initPayload = depository.interface.encodeFunctionData("initialize", [parsedData.lockFactor, parsedData.maxStakingLimit]);
     const depositoryProxy = await DepositoryProxy.deploy(parsedData.depositoryAddress, initPayload);
     await depositoryProxy.deployed();
 
