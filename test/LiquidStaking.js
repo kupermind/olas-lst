@@ -975,7 +975,7 @@ describe("Liquid Staking", function () {
             snapshot.restore();
         });
 
-        it("Multiple stakes-unstakes", async function () {
+        it.only("Multiple stakes-unstakes", async function () {
             // Take a snapshot of the current state of the blockchain
             const snapshot = await helpers.takeSnapshot();
 
@@ -984,7 +984,7 @@ describe("Liquid Staking", function () {
             // Get initial OLAS amount to stake
             let olasAmount = (minStakingDeposit.mul(5)).div(4);
 
-            let numIters = 12;
+            let numIters = 25;
             const numStakes = 18;
             let chainIds = new Array(numStakes).fill(gnosisChainId);
             let stakingInstances = new Array(numStakes).fill(stakingTokenInstance.address);
@@ -1075,8 +1075,8 @@ describe("Liquid Staking", function () {
                 console.log("User approves stOLAS for treasury:", stBalance.toString());
                 await st.approve(treasury.address, stBalance);
 
-                // Unstake minStakingDeposit as stOLAS amount will always be smaller than OLAS amount
-                let stAmount = minStakingDeposit;
+                // Unstake minStakingDeposit * i as stOLAS amount will always be smaller than OLAS amount
+                let stAmount = stBalance.div(10);
                 const numUnstakes = 25;
                 chainIds = new Array(numUnstakes).fill(gnosisChainId);
                 stakingInstances = new Array(numUnstakes).fill(stakingTokenInstance.address);

@@ -22,6 +22,9 @@ error TreasuryOnly(address sender, address depository);
 /// @dev Provided zero address.
 error ZeroAddress();
 
+/// @dev Provided zero value.
+error ZeroValue();
+
 /// @dev Value overflow.
 /// @param provided Overflow value.
 /// @param max Maximum possible value.
@@ -96,21 +99,22 @@ contract stOLAS is ERC4626 {
             revert DepositoryOnly(msg.sender, depository);
         }
 
-        // Update total assets
-        uint256 curStakedBalance = stakedBalance;
-
-        if (assets > 0) {
-            // topUpBalance is subtracted as it is passed as part of the assets value and already deposited
-            // and accounted in vaultBalance via topUpReserveBalance() function call
-            curStakedBalance = curStakedBalance + assets - topUpBalance;
-            stakedBalance = curStakedBalance;
+        // Check for zero balance
+        if (assets == 0) {
+            revert ZeroValue();
         }
+
+        // topUpBalance is subtracted as it is passed as part of the assets value and already deposited
+        // and accounted in vaultBalance via topUpReserveBalance() function call
+        uint256 curStakedBalance = stakedBalance + assets - topUpBalance;
+        stakedBalance = curStakedBalance;
 
         // TODO Vault inflation attack
         // Get current vault balance
         uint256 curVaultBalance = asset.balanceOf(address(this));
         vaultBalance = curVaultBalance;
 
+        // Update total assets
         uint256 curTotalReserves = curStakedBalance + curVaultBalance;
         totalReserves = curTotalReserves;
 

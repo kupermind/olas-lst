@@ -33,7 +33,7 @@ interface IStaking {
     /// @return reward Staking reward.
     function unstake(uint256 serviceId) external returns (uint256);
 
-    /// @dev Claims rewards for the service without an additional checkpoint call.
+    /// @dev Checkpoints and claims rewards for the service.
     /// @param serviceId Service Id.
     /// @return Staking reward.
     function claim(uint256 serviceId) external returns (uint256);
