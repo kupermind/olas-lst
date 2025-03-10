@@ -41,8 +41,8 @@ interface IToken {
     function balanceOf(address account) external view returns (uint256);
 }
 
-/// @title DefaultStakerL2 - Smart contract for processing tokens and data received on L2, and data sent back to L1.
-abstract contract DefaultStakerL2 is IBridgeErrors {
+/// @title DefaultStakingProcessorL2 - Smart contract for processing tokens and data received on L2, and tokens sent back to L1.
+abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
     event OwnerUpdated(address indexed owner);
     event FundsReceived(address indexed sender, uint256 value);
     event StakingRequestExecuted(address[] targets, uint256[] amounts, bytes32 indexed batchHash);
@@ -103,7 +103,6 @@ abstract contract DefaultStakerL2 is IBridgeErrors {
     /// @param _stakingManager StakingManager address.
     /// @param _l2TokenRelayer L2 token relayer bridging contract address.
     /// @param _l2MessageRelayer L2 message relayer bridging contract address.
-    /// @param _l1DepositProcessor L1 deposit processor address.
     /// @param _l1SourceChainId L1 source chain Id.
     constructor(
         address _olas,
@@ -416,7 +415,7 @@ abstract contract DefaultStakerL2 is IBridgeErrors {
         // _locked is now set to 2 for good
     }
 
-    function relayToL1(uint256 olasAmount) external virtual payable;
+    function relayToL1(address to, uint256 olasAmount) external virtual payable;
 
     /// @dev Gets the maximum number of token decimals able to be transferred across the bridge.
     /// @return Number of supported decimals.

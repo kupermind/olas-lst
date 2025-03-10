@@ -9,6 +9,7 @@ require("@nomicfoundation/hardhat-chai-matchers");
 require("@nomiclabs/hardhat-ethers");
 require("@nomiclabs/hardhat-etherscan");
 require("@nomicfoundation/hardhat-toolbox");
+require("solidity-docgen");
 
 const ALCHEMY_API_KEY_MAINNET = process.env.ALCHEMY_API_KEY_MAINNET;
 const ALCHEMY_API_KEY_MATIC = process.env.ALCHEMY_API_KEY_MATIC;
@@ -260,5 +261,10 @@ module.exports = {
     },
     gasReporter: {
         enabled: false
+    },
+    docgen: {
+        path: './docs',
+        clear: true,
+        runOnCompile: true,
     }
 };

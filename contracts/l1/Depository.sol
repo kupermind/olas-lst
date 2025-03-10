@@ -25,6 +25,12 @@ interface IDepositProcessor {
         uint256 transferAmount, bytes32 operation) external payable;
 }
 
+interface ILock {
+    /// @dev Increases lock amount and time.
+    /// @param olasAmount OLAS amount.
+    function increaseLock(uint256 olasAmount) external;
+}
+
 interface ITreasury {
     /// @dev Processes OLAS amount supplied and mints corresponding amount of stOLAS.
     /// @param account Account address.
@@ -77,6 +83,9 @@ struct StakingModel {
 contract Depository {
     event ImplementationUpdated(address indexed implementation);
     event OwnerUpdated(address indexed owner);
+    event TreasuryUpdated(address indexed treasury);
+    event LockFactorUpdated(uint256 lockFactor);
+    event Locked(address indexed account, uint256 olasAmount, uint256 lockAmount, uint256 vaultBalance);
     event SetDepositProcessorChainIds(address[] depositProcessors, uint256[] chainIds);
     event SetGuardianServiceStatuses(address[] guardianServices, bool[] statuses);
     event StakingModelsActivated(uint256[] chainIds, address[] stakingProxies, uint256[] supplies);
@@ -89,13 +98,18 @@ contract Depository {
     bytes32 public constant STAKE = 0x1bcc0f4c3fad314e585165815f94ecca9b96690a26d6417d7876448a9a867a69;
     // Unstake operation
     bytes32 public constant UNSTAKE = 0x8ca9a95e41b5eece253c93f5b31eed1253aed6b145d8a6e14d913fdf8e732293;
+    // Max lock factor
+    uint256 public constant MAX_LOCK_FACTOR = 10_000;
 
     address public immutable olas;
-    address public immutable st;
-    address public immutable treasury;
+    address public immutable ve;
+    address public immutable lock;
 
+    address public treasury;
     address public owner;
 
+    // Lock factor in 10_000 value
+    uint256 public lockFactor;
     uint256 internal _nonce;
 
     mapping(uint256 => StakingModel) public mapStakingModels;
@@ -106,15 +120,31 @@ contract Depository {
     uint256[] public setStakingModelIds;
 
     // TODO change to initialize in prod
-    constructor(address _olas, address _st, address _treasury) {
+    constructor(address _olas, address _ve, address _treasury, address _lock, uint256 _lockFactor) {
         olas = _olas;
-        st = _st;
+        ve = _ve;
         treasury = _treasury;
+        lock = _lock;
+        lockFactor = _lockFactor;
 
         owner = msg.sender;
     }
 
-    /// @dev Contributors initializer.
+    function _increaseLock(uint256 olasAmount) internal returns (uint256 remainder) {
+        // Get treasury veOLAS lock amount
+        uint256 lockAmount = (olasAmount * lockFactor) / MAX_LOCK_FACTOR;
+        remainder = olasAmount - lockAmount;
+
+        // Approve OLAS for Lock
+        IToken(olas).transfer(lock, lockAmount);
+
+        // Increase lock
+        ILock(lock).increaseLock(lockAmount);
+
+        emit Locked(msg.sender, olasAmount, lockAmount, remainder);
+    }
+
+    /// @dev Depository initializer.
     function initialize() external{
         // Check for already initialized
         if (owner != address(0)) {
@@ -160,6 +190,23 @@ contract Depository {
 
         owner = newOwner;
         emit OwnerUpdated(newOwner);
+    }
+
+    /// @dev Changes Treasury contract address.
+    /// @param newTreasury Address of a new treasury.
+    function changeTreasury(address newTreasury) external {
+        // Check for ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
+        }
+
+        // Check for zero address
+        if (newTreasury == address(0)) {
+            revert ZeroAddress();
+        }
+
+        treasury = newTreasury;
+        emit TreasuryUpdated(newTreasury);
     }
 
     /// @dev Sets guardian service multisig statues.
@@ -269,6 +316,7 @@ contract Depository {
 
             // Set supply and activate
             stakingModel.supply = uint96(supplies[i]);
+            stakingModel.remainder = uint96(supplies[i]);
             stakingModel.active = true;
 
             // Add into global staking model set
@@ -309,7 +357,25 @@ contract Depository {
         emit ChangeModelStatuses(stakingModelIds, statuses);
     }
 
+    /// @dev Changes lock factor value.
+    /// @param newLockFactor New lock factor value.
+    function changeLockFactor(uint256 newLockFactor) external {
+        // Check for ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
+        }
+
+        // Check for zero value
+        if (lockFactor == 0) {
+            revert ZeroValue();
+        }
+
+        lockFactor = newLockFactor;
+        emit LockFactorUpdated(newLockFactor);
+    }
+
     // TODO: array of modelId-s and olasAmount-s as on stake might not fit into one model
+    // TODO: consider taking any amount, just add to the stOLAS balance unused remainder
     function deposit(
         uint256 stakingModelId,
         uint256 olasAmount,
@@ -337,6 +403,9 @@ contract Depository {
         // Get OLAS from sender
         IToken(olas).transferFrom(msg.sender, address(this), olasAmount);
 
+        // Lock OLAS for veOLAS
+        olasAmount = _increaseLock(olasAmount);
+
         // Calculates stAmount and mints stOLAS
         stAmount = ITreasury(treasury).processAndMintStToken(msg.sender, olasAmount);
 
@@ -348,10 +417,11 @@ contract Depository {
         address depositProcessor = mapChainIdDepositProcessors[chainId];
 
         // Approve OLAS for depositProcessor
-        IToken(olas).approve(depositProcessor, olasAmount);
+        IToken(olas).transfer(depositProcessor, olasAmount);
 
         // Transfer OLAS to its corresponding Staker on L2
-        IDepositProcessor(depositProcessor).sendMessage(stakingProxy, olasAmount, bridgePayload, olasAmount, STAKE);
+        IDepositProcessor(depositProcessor).sendMessage{value: msg.value}(stakingProxy, olasAmount, bridgePayload,
+            olasAmount, STAKE);
 
         emit Deposit(msg.sender, stakingModelId, olasAmount, stAmount);
     }
@@ -389,6 +459,8 @@ contract Depository {
             uint256 olasAmount;
 
             for (uint256 j = 0; i < stakingProxies[i].length; ++j) {
+                amounts[i] = new uint256[](stakingProxies[i].length);
+
                 // TODO stakingProxies order
                 // Push a pair of key defining variables into one key: chainId | stakingProxy
                 // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256

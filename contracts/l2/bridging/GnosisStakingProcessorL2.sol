@@ -1,7 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "./DefaultStakerL2.sol";
+import {DefaultStakingProcessorL2} from "./DefaultStakingProcessorL2.sol";
+
+// ERC20 token interface
+interface IToken {
+    /// @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
+    /// @param spender Account address that will be able to transfer tokens on behalf of the caller.
+    /// @param amount Token amount.
+    /// @return True if the function execution is successful.
+    function approve(address spender, uint256 amount) external returns (bool);
+
+    /// @dev Transfers the token amount that was previously approved up until the maximum allowance.
+    /// @param from Account address to transfer from.
+    /// @param to Account address to transfer to.
+    /// @param amount Amount to transfer to.
+    /// @return True if the function execution is successful.
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+}
 
 interface IBridge {
     // Contract: AMB Contract Proxy Home
@@ -24,8 +40,8 @@ interface IBridge {
     function messageSender() external view returns (address);
 }
 
-/// @title GnosisTargetDispenserL2 - Smart contract for processing tokens and data received on Gnosis L2, and token sent back to L1.
-contract GnosisStakerL2 is DefaultStakerL2 {
+/// @title GnosisStakingProcessorL2 - Smart contract for processing tokens and data received on Gnosis L2, and tokens sent back to L1.
+contract GnosisStakingProcessorL2 is DefaultStakingProcessorL2 {
     // Bridge payload length
     uint256 public constant BRIDGE_PAYLOAD_LENGTH = 32;
 
@@ -44,7 +60,8 @@ contract GnosisStakerL2 is DefaultStakerL2 {
         address _l1DepositProcessor,
         uint256 _l1SourceChainId
     )
-        DefaultStakerL2(_olas, _proxyFactory, _l2TokenRelayer, _l2MessageRelayer, _l1DepositProcessor, _l1SourceChainId)
+        DefaultStakingProcessorL2(_olas, _proxyFactory, _l2TokenRelayer, _l2MessageRelayer, _l1DepositProcessor,
+            _l1SourceChainId)
     {}
 
     /// @dev Processes a message received from the AMB Contract Proxy (Home) contract.
@@ -57,14 +74,13 @@ contract GnosisStakerL2 is DefaultStakerL2 {
         _receiveMessage(msg.sender, processor, data);
     }
 
-    function relayToL1(uint256 olasAmount) external virtual override payable {
+    function relayToL1(address to, uint256 olasAmount) external virtual override payable {
         // msg.value must be zero
         if (msg.value > 0) {
             revert();
         }
 
-        IToken(olas).transferFrom(msg.sender, address(this), olasAmount);
         IToken(olas).approve(l2TokenRelayer, olasAmount);
-        IBridge(l2TokenRelayer).relayTokens(olas, l1DepositProcessor, olasAmount);
+        IBridge(l2TokenRelayer).relayTokens(olas, to, olasAmount);
     }
 }

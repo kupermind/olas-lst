@@ -24,6 +24,10 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
     event L2StakerUpdated(address indexed l2StakingProcessor);
     event LeftoversRefunded(address indexed sender, uint256 leftovers);
 
+    // Stake operation
+    bytes32 public constant STAKE = 0x1bcc0f4c3fad314e585165815f94ecca9b96690a26d6417d7876448a9a867a69;
+    // Unstake operation
+    bytes32 public constant UNSTAKE = 0x8ca9a95e41b5eece253c93f5b31eed1253aed6b145d8a6e14d913fdf8e732293;
     // receiveMessage selector to be executed on L2
     bytes4 public constant RECEIVE_MESSAGE = bytes4(keccak256(bytes("receiveMessage(bytes)")));
     // Maximum chain Id as per EVM specs

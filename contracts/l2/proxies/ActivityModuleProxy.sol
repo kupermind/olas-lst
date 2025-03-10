@@ -25,9 +25,8 @@ contract ActivityModuleProxy {
     address public immutable olas;
 
     /// @dev ActivityModuleProxy constructor.
-    /// @param _olas OLAS address.
     /// @param _beacon Beacon address.
-    constructor(address _olas, address _beacon) {
+    constructor(address _beacon) {
         // Check for zero address
         if (_beacon == address(0)) {
             revert ZeroAddress();

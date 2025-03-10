@@ -2,16 +2,23 @@
 pragma solidity ^0.8.28;
 
 interface IBridge {
-    function relayToL1(uint256 olasAmount) external payable;
+    function relayToL1(address to, uint256 olasAmount) external payable;
 }
 
 // ERC20 token interface
 interface IToken {
-    /// @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
-    /// @param spender Account address that will be able to transfer tokens on behalf of the caller.
-    /// @param amount Token amount.
+    /// @dev Transfers the token amount.
+    /// @param to Address to transfer to.
+    /// @param amount The amount to transfer.
     /// @return True if the function execution is successful.
-    function approve(address spender, uint256 amount) external returns (bool);
+    function transfer(address to, uint256 amount) external returns (bool);
+
+    /// @dev Transfers the token amount that was previously approved up until the maximum allowance.
+    /// @param from Account address to transfer from.
+    /// @param to Account address to transfer to.
+    /// @param amount Amount to transfer to.
+    /// @return True if the function execution is successful.
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
 
     /// @dev Gets the amount of tokens owned by a specified account.
     /// @param account Account address.
@@ -28,6 +35,11 @@ error ZeroValue();
 /// @dev The contract is already initialized.
 error AlreadyInitialized();
 
+/// @dev Value overflow.
+/// @param provided Overflow value.
+/// @param max Maximum possible value.
+error Overflow(uint256 provided, uint256 max);
+
 /// @dev Only `owner` has a privilege, but the `sender` was provided.
 /// @param sender Sender address.
 /// @param owner Required sender address as an owner.
@@ -38,11 +50,16 @@ contract Collector {
     event ProtocolFactorUpdated(uint256 protocolFactor);
     event ActivityIncreased(uint256 activityChange);
 
+    // TODO adjust
+    // Min olas balance to relay
+    uint256 public constant MIN_OLAS_BALANCE = 1;// ether;
     // Max protocol factor
     uint256 public constant MAX_PROTOCOL_FACTOR = 10_000;
 
     // OLAS contract address
     address public immutable olas;
+    // stOLAS contract address on L1
+    address public immutable l1St;
 
     // Protocol balance
     uint256 public protocolBalance;
@@ -53,18 +70,37 @@ contract Collector {
     // Owner address
     address public owner;
 
-    constructor(address _olas, address _l2StakingProcessor) {
+    /// @param _olas OLAS address on L2.
+    /// @param _l1St stOLAS address on L1.
+    constructor(address _olas, address _l1St) {
         olas = _olas;
-        l2StakingProcessor = _l2StakingProcessor;
+        l1St = _l1St;
     }
 
-    function initialize(uint256 _protocolFactor) external {
+    /// @dev Initializes collector.
+    /// @param _l2StakingProcessor L2 Staking Processor address.
+    /// @param _protocolFactor Protocol factor in 10_000 value.
+    function initialize(address _l2StakingProcessor, uint256 _protocolFactor) external {
         if (owner != address(0)) {
             revert AlreadyInitialized();
         }
 
+        l2StakingProcessor = _l2StakingProcessor;
         protocolFactor = _protocolFactor;
         owner = msg.sender;
+    }
+
+    function changeStakingProcessorL2(address newStakingProcessorL2) external {
+        // Check for ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
+        }
+
+        if (newStakingProcessorL2 == address(0)) {
+            revert ZeroAddress();
+        }
+
+        l2StakingProcessor = newStakingProcessorL2;
     }
 
     /// @dev Changes protocol factor value.
@@ -83,18 +119,21 @@ contract Collector {
         protocolFactor = newProtocolFactor;
         emit ProtocolFactorUpdated(newProtocolFactor);
     }
-    
-    // TODO service to post info about incoming transfers on L1?
-    function relayTokens() external payable {
+
+    function relayRewardTokens() external payable {
         // Get OLAS balance
         uint256 olasBalance = IToken(olas).balanceOf(address(this));
         // Get current protocol balance
         uint256 curProtocolBalance = protocolBalance;
 
-        // TODO overflow check
+        // Overflow check: this must never happen, as protocol balance is included in total OLAS balance
+        if (olasBalance < curProtocolBalance) {
+            revert Overflow(olasBalance, curProtocolBalance);
+        }
+
         uint256 amount = olasBalance - curProtocolBalance;
-        // Minimum balance is 1 OLAS
-        if (amount < 1 ether) {
+        // Check for minimum balance
+        if (amount < MIN_OLAS_BALANCE) {
             revert ZeroValue();
         }
 
@@ -105,9 +144,12 @@ contract Collector {
         curProtocolBalance += protocolAmount;
         protocolBalance = curProtocolBalance;
 
-        // Approve tokens
-        IToken(olas).approve(l2StakingProcessor, amount);
+        // Transfer tokens
+        IToken(olas).transfer(l2StakingProcessor, amount);
 
-        IBridge(l2StakingProcessor).relayToL1{value: msg.value}(amount);
+        // TODO Check on relays, but the majority of them does not require value
+        // TODO: Make sure once again no value is needed to send tokens back
+        // Send tokens to L1
+        IBridge(l2StakingProcessor).relayToL1{value: msg.value}(l1St, amount);
     }
 }

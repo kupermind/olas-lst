@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import {ERC1155, ERC1155TokenReceiver} from "../../lib/autonolas-registries/lib/solmate/src/tokens/ERC1155.sol";
 import {IToken} from "../interfaces/IToken.sol";
+import "hardhat/console.sol";
 
 interface IDepository {
     /// @dev Calculates amounts and initiates cross-chain unstake request from specified models.
@@ -14,12 +15,6 @@ interface IDepository {
     /// @return amounts Corresponding OLAS amounts for each staking proxy.
     function processUnstake(uint256 unstakeAmount, uint256[] memory chainIds, address[][] memory stakingProxies,
         bytes[] memory bridgePayloads, uint256[] memory values) external payable returns (uint256[][] memory amounts);
-}
-
-interface ILock {
-    /// @dev Increases lock amount and time.
-    /// @param olasAmount OLAS amount.
-    function increaseLock(uint256 olasAmount) external;
 }
 
 interface IST {
@@ -36,9 +31,7 @@ interface IST {
     /// @return assets OLAS amount.
     function redeem(uint256 shares, address receiver, address owner) external returns (uint256 assets);
 
-    function updateTotalAssets(int256 olasAmount) external;
-
-    function vaultBalance() external returns(uint256);
+    function stakedBalance() external returns(uint256);
 }
 
 /// @dev Only `owner` has a privilege, but the `sender` was provided.
@@ -69,8 +62,6 @@ error Overflow(uint256 provided, uint256 max);
 contract Treasury is ERC1155, ERC1155TokenReceiver {
     event ImplementationUpdated(address indexed implementation);
     event OwnerUpdated(address indexed owner);
-    event LockFactorUpdated(uint256 lockFactor);
-    event Locked(address indexed account, uint256 olasAmount, uint256 lockAmount, uint256 vaultBalance);
     event WithdrawRequestInitiated(address indexed requester, uint256 indexed requestId, uint256 stAmount,
         uint256 olasAmount, uint256 withdrawTime);
     event WithdrawRequestExecuted(uint256 requestId, uint256 amount);
@@ -81,9 +72,10 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
     uint256 public constant MAX_LOCK_FACTOR = 10_000;
 
     address public immutable olas;
-    address public immutable ve;
     address public immutable st;
     address public immutable lock;
+    // Depository address
+    address public immutable depository;
 
     // Lock factor in 10_000 value
     uint256 public lockFactor;
@@ -93,18 +85,14 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
     uint256 public withdrawDelay;
     // Number of withdraw requests
     uint256 public numWithdrawRequests;
-    // Depository address
-    address public depository;
     // Contract owner
     address public owner;
 
     // TODO change to initialize in prod
-    constructor(address _olas, address _ve, address _st, address _lock, uint256 _lockFactor) {
+    constructor(address _olas, address _st, address _depository) {
         olas = _olas;
-        ve = _ve;
         st = _st;
-        lock = _lock;
-        _lockFactor;
+        depository = _depository;
 
         owner = msg.sender;
     }
@@ -157,72 +145,14 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         emit OwnerUpdated(newOwner);
     }
 
-    /// @dev Changes lock factor value.
-    /// @param newLockFactor New lock factor value.
-    function changeLockFactor(uint256 newLockFactor) external {
-        // Check for ownership
-        if (msg.sender != owner) {
-            revert OwnerOnly(msg.sender, owner);
-        }
-
-        // Check for zero value
-        if (lockFactor == 0) {
-            revert ZeroValue();
-        }
-
-        lockFactor = newLockFactor;
-        emit LockFactorUpdated(newLockFactor);
-    }
-
     function processAndMintStToken(address account, uint256 olasAmount) external returns (uint256 stAmount) {
         // Check for depository access
         if (msg.sender != depository) {
             revert DepositoryOnly(msg.sender, depository);
         }
 
-        // Lock OLAS for veOLAS
-        uint256 olasAmountAfterLock = _increaseLock(olasAmount);
-
-        // Update stOLAS total assets
-        IST(st).updateTotalAssets(int256(olasAmountAfterLock));
-
         // mint stOLAS
-        stAmount = IST(st).deposit(olasAmountAfterLock, account);
-    }
-
-    function _increaseLock(uint256 olasAmount) internal returns (uint256 remainder) {
-        // Get treasury veOLAS lock amount
-        uint256 lockAmount = (olasAmount * lockFactor) / MAX_LOCK_FACTOR;
-        remainder = olasAmount - lockAmount;
-
-        // Approve OLAS for Lock
-        IToken(olas).approve(ve, lockAmount);
-
-        // Increase lock
-        ILock(lock).increaseLock(lockAmount);
-
-        emit Locked(msg.sender, olasAmount, lockAmount, remainder);
-    }
-
-    /// @dev Deposits OLAS for Vault and veOLAS lock.
-    /// @notice Tokens are taken from `msg.sender`'s balance.
-    /// @param olasAmount OLAS amount.
-    function depositAndLock(uint256 olasAmount) external {
-        if (olasAmount == 0) {
-            revert ZeroValue();
-        }
-
-        IToken(olas).transferFrom(msg.sender, address(this), olasAmount);
-
-        // TODO Is this correctly accounted for staked balance? Or accident OLAS funds must be sent as just Vault amount?
-        // Get any other possible OLAS balance on Treasury account
-        olasAmount += IToken(olas).balanceOf(address(this)) - withdrawAmountRequested;
-
-        // Lock corresponding amounts and send everything else to Vault (stOLAS)
-        uint256 olasAmountAfterLock = _increaseLock(olasAmount);
-
-        // Update stOLAS total assets
-        IST(st).updateTotalAssets(int256(olasAmountAfterLock));
+        stAmount = IST(st).deposit(olasAmount, account);
     }
 
     /// @dev Calculates amounts and initiates cross-chain unstake request from specified models.
@@ -238,9 +168,6 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         bytes[] memory bridgePayloads,
         uint256[] memory values
     ) internal {
-        // Update stOLAS total assets
-        IST(st).updateTotalAssets(-int256(unstakeAmount));
-
         // Calculate OLAS amounts and initiate unstake messages to L2-s
         IDepository(depository).processUnstake(unstakeAmount, chainIds, stakingProxies, bridgePayloads, values);
     }
@@ -299,8 +226,8 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         // requestId occupies first 64 bits, withdrawTime occupies next bits as they both fit well in uint256
         requestId |= withdrawTime << 64;
 
-        // Update stOLAS total assets
-        IST(st).updateTotalAssets(0);
+        // Get current staked balance
+        uint256 stakedBalanceBefore = IST(st).stakedBalance();
 
         // Redeem OLAS and burn stOLAS tokens
         olasAmount = IST(st).redeem(stAmount, address(this), address(this));
@@ -312,12 +239,12 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         uint256 curWithdrawAmountRequested = withdrawAmountRequested + olasAmount;
         withdrawAmountRequested = curWithdrawAmountRequested;
 
-        // Get current vault balance
-        uint256 curVaultBalance = IST(st).vaultBalance();
+        // Get updated staked balance
+        uint256 stakedBalanceAfter = IST(st).stakedBalance();
 
         // If withdraw amount is bigger than the current one, need to unstake
-        if (curWithdrawAmountRequested > curVaultBalance) {
-            uint256 withdrawDiff = curWithdrawAmountRequested - curVaultBalance;
+        if (stakedBalanceBefore > stakedBalanceAfter) {
+            uint256 withdrawDiff = stakedBalanceBefore - stakedBalanceAfter;
 
             _unstake(withdrawDiff, chainIds, stakingProxies, bridgePayloads, values);
         }
@@ -338,7 +265,7 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
 
         uint256 totalAmount;
         // Traverse all withdraw requests
-        for (uint256 i = 0; i < requestIds[i]; ++i) {
+        for (uint256 i = 0; i < requestIds.length; ++i) {
             // Decode a pair of key defining variables from one key: withdrawTime | requestId
             // requestId occupies first 64 bits, withdrawTime occupies next bits as they both fit well in uint256
             uint256 requestId = requestIds[i] & type(uint64).max;
@@ -369,6 +296,8 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         // OLAS has been redeemed when withdraw request was posted
         IToken(olas).transfer(msg.sender, totalAmount);
     }
+
+    // TODO Withdraw by owner - any asset
 
     function getWithdrawRequestId(uint256 requestId, uint256 withdrawTime) external pure returns (uint256) {
         return requestId | (withdrawTime << 64);

@@ -41,45 +41,44 @@ error ValueLowerThan(uint256 provided, uint256 expected);
 /// @param account Account address.
 error UnauthorizedAccount(address account);
 
-/// @title StakingTokenLocked - Smart contract for staking a service with a token stake via a specific staker
+/// @title StakingTokenLocked - Smart contract for staking a service with a token stake via a specific stakingManager
 contract StakingTokenLocked is StakingBase {
     // ServiceRegistryTokenUtility address
     address public serviceRegistryTokenUtility;
     // Security token address for staking corresponding to the service deposit token
     address public stakingToken;
-    // Staker address
-    address public staker;
+    // Staking manager address
+    address public stakingManager;
 
     /// @dev StakingToken initialization.
     /// @param _stakingParams Service staking parameters.
     /// @param _serviceRegistryTokenUtility ServiceRegistryTokenUtility contract address.
     /// @param _stakingToken Address of a service staking token.
-    /// @param _staker Staker address - the only sender that is allowed to stake tokens.
+    /// @param _stakingManager Staker address - the only sender that is allowed to stake tokens.
     function initialize(
         StakingParams memory _stakingParams,
         address _serviceRegistryTokenUtility,
         address _stakingToken,
-        address _staker
-    ) external
-    {
+        address _stakingManager
+    ) external {
         _initialize(_stakingParams);
 
         // Initial checks
-        if (_stakingToken == address(0) || _serviceRegistryTokenUtility == address(0) || staker == address(0)) {
+        if (_stakingToken == address(0) || _serviceRegistryTokenUtility == address(0) || _stakingManager == address(0)) {
             revert ZeroTokenAddress();
         }
 
         stakingToken = _stakingToken;
         serviceRegistryTokenUtility = _serviceRegistryTokenUtility;
-        staker = _staker;
+        stakingManager = _stakingManager;
     }
 
     /// @dev Checks token staking deposit.
     /// @param serviceId Service Id.
     /// @param serviceAgentIds Service agent Ids.
     function _checkTokenStakingDeposit(uint256 serviceId, uint256, uint32[] memory serviceAgentIds) internal view override {
-        // Check for staker address
-        if (msg.sender != staker) {
+        // Check for stakingManager address
+        if (msg.sender != stakingManager) {
             revert UnauthorizedAccount(msg.sender);
         }
 

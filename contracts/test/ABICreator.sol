@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 // Getting ABIs for the Gnosis Safe master copy and proxy contracts
 import "@gnosis.pm/safe-contracts/contracts/GnosisSafe.sol";
+import "@gnosis.pm/safe-contracts/contracts/GnosisSafeL2.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/GnosisSafeProxyFactory.sol";
 import "@gnosis.pm/safe-contracts/contracts/handler/DefaultCallbackHandler.sol";
 import "@gnosis.pm/safe-contracts/contracts/libraries/MultiSendCallOnly.sol";
@@ -14,4 +15,6 @@ import {ServiceRegistryTokenUtility} from "../../lib/autonolas-registries/contra
 import {ServiceManagerToken} from "../../lib/autonolas-registries/contracts/ServiceManagerToken.sol";
 import {GnosisSafeMultisig} from "../../lib/autonolas-registries/contracts/multisigs/GnosisSafeMultisig.sol";
 import {GnosisSafeSameAddressMultisig} from "../../lib/autonolas-registries/contracts/multisigs/GnosisSafeSameAddressMultisig.sol";
+import {StakingVerifier} from "../../lib/autonolas-registries/contracts/staking/StakingVerifier.sol";
 import {StakingFactory} from "../../lib/autonolas-registries/contracts/staking/StakingFactory.sol";
+import {ERC20Token} from "../../lib/autonolas-registries/contracts/test/ERC20Token.sol";
