@@ -139,6 +139,7 @@ contract Lock {
         IVEOLAS(ve).createLock(olasAmount, MAX_LOCK_TIME);
     }
 
+    // TODO lock full balance and make this ownerless?
     /// @dev Increases lock amount and time.
     /// @param olasAmount OLAS amount.
     function increaseLock(uint256 olasAmount) external {

@@ -73,6 +73,7 @@ contract LiquidityManager {
 
     // Owner address
     address public owner;
+    // TODO change to transient bool
     // Reentrancy lock
     uint256 internal _locked;
 

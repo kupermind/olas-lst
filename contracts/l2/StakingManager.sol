@@ -116,6 +116,7 @@ contract StakingManager is ERC721TokenReceiver {
 
     // Nonce
     uint256 internal _nonce;
+    // TODO change to transient bool
     // Reentrancy lock
     uint256 internal _locked = 1;
 
