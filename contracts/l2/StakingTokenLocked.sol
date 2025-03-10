@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {StakingBase} from "../lib/autonolas-registries/contracts/staking/StakingBase.sol";
-import {SafeTransferLib} from "../lib/autonolas-registries/contracts/utils/SafeTransferLib.sol";
-
-/// @dev Provided zero token address.
-error ZeroTokenAddress();
+import {StakingBase} from "../../lib/autonolas-registries/contracts/staking/StakingBase.sol";
+import {SafeTransferLib} from "../../lib/autonolas-registries/contracts/utils/SafeTransferLib.sol";
 
 // Service Registry Token Utility interface
 interface IServiceTokenUtility {
@@ -22,6 +19,14 @@ interface IServiceTokenUtility {
     function getAgentBond(uint256 serviceId, uint256 agentId) external view returns (uint256 bond);
 }
 
+/// @dev Provided zero token address.
+error ZeroTokenAddress();
+
+/// @dev The token does not have enough decimals.
+/// @param token Token address.
+/// @param decimals Number of decimals.
+error NotEnoughTokenDecimals(address token, uint8 decimals);
+
 /// @dev The staking token is wrong.
 /// @param expected Expected staking token.
 /// @param provided Provided staking token.
@@ -32,45 +37,52 @@ error WrongStakingToken(address expected, address provided);
 /// @param expected Expected value.
 error ValueLowerThan(uint256 provided, uint256 expected);
 
-/// @title StakingProxyToken - Smart contract for staking a service with a proxy token stake
-contract StakingProxyToken is StakingBase {
+/// @dev Account is unauthorized.
+/// @param account Account address.
+error UnauthorizedAccount(address account);
+
+/// @title StakingTokenLocked - Smart contract for staking a service with a token stake via a specific staker
+contract StakingTokenLocked is StakingBase {
     // ServiceRegistryTokenUtility address
     address public serviceRegistryTokenUtility;
-    // Security proxy token address for staking the proxy token
+    // Security token address for staking corresponding to the service deposit token
     address public stakingToken;
-    // Rewards token address for staking the proxy token
-    address public rewardToken;
+    // Staker address
+    address public staker;
 
     /// @dev StakingToken initialization.
     /// @param _stakingParams Service staking parameters.
     /// @param _serviceRegistryTokenUtility ServiceRegistryTokenUtility contract address.
-    /// @param _stakingToken Address of a staking rewards token.
-    /// @param _rewardToken Address of a service staking proxy token.
+    /// @param _stakingToken Address of a service staking token.
+    /// @param _staker Staker address - the only sender that is allowed to stake tokens.
     function initialize(
         StakingParams memory _stakingParams,
         address _serviceRegistryTokenUtility,
         address _stakingToken,
-        address _rewardToken
+        address _staker
     ) external
     {
         _initialize(_stakingParams);
 
         // Initial checks
-        if (_serviceRegistryTokenUtility == address(0) || _stakingToken == address(0) || _rewardToken == address(0)) {
+        if (_stakingToken == address(0) || _serviceRegistryTokenUtility == address(0) || staker == address(0)) {
             revert ZeroTokenAddress();
         }
 
-        serviceRegistryTokenUtility = _serviceRegistryTokenUtility;
         stakingToken = _stakingToken;
-        rewardToken = _rewardToken;
+        serviceRegistryTokenUtility = _serviceRegistryTokenUtility;
+        staker = _staker;
     }
 
-    /// @dev Checks proxy token staking deposit.
+    /// @dev Checks token staking deposit.
     /// @param serviceId Service Id.
     /// @param serviceAgentIds Service agent Ids.
-    function _checkTokenStakingDeposit(uint256 serviceId, uint256, uint32[] memory serviceAgentIds)
-        internal virtual view override
-    {
+    function _checkTokenStakingDeposit(uint256 serviceId, uint256, uint32[] memory serviceAgentIds) internal view override {
+        // Check for staker address
+        if (msg.sender != staker) {
+            revert UnauthorizedAccount(msg.sender);
+        }
+
         // Get the service staking token and deposit
         (address token, uint96 stakingDeposit) =
             IServiceTokenUtility(serviceRegistryTokenUtility).mapServiceIdTokenDeposit(serviceId);
@@ -100,11 +112,11 @@ contract StakingProxyToken is StakingBase {
     /// @notice The balance is always greater or equal the amount, as follows from the Base contract logic.
     /// @param to Address to.
     /// @param amount Amount to withdraw.
-    function _withdraw(address to, uint256 amount) internal virtual override {
+    function _withdraw(address to, uint256 amount) internal override {
         // Update the contract balance
         balance -= amount;
 
-        SafeTransferLib.safeTransfer(rewardToken, to, amount);
+        SafeTransferLib.safeTransfer(stakingToken, to, amount);
 
         emit Withdraw(to, amount);
     }
@@ -121,7 +133,7 @@ contract StakingProxyToken is StakingBase {
         availableRewards = newAvailableRewards;
 
         // Add to the overall balance
-        SafeTransferLib.safeTransferFrom(rewardToken, msg.sender, address(this), amount);
+        SafeTransferLib.safeTransferFrom(stakingToken, msg.sender, address(this), amount);
 
         emit Deposit(msg.sender, amount, newBalance, newAvailableRewards);
     }
