@@ -23,7 +23,7 @@ const main = async () => {
     const regDeposit = ethers.utils.parseEther("10000");
     const agentId = 1;
     const livenessPeriod = oneDay; // 24 hours
-    const livenessRatio = "11111111111111"; // 1 transaction per 25 hours
+    const livenessRatio = "1"; // 1 transaction per 25 hours
     const maxNumServices = 20;
     const minStakingDeposit = regDeposit;
     const timeForEmissions = oneDay * 30;

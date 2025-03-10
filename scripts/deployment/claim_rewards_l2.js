@@ -24,6 +24,10 @@ const main = async () => {
     const stakingManager = await ethers.getContractAt("StakingManager", parsedData.stakingManagerProxyAddress);
     const stakingTokenInstance = await ethers.getContractAt("StakingTokenLocked", parsedData.stakingTokenAddress);
 
+    // Checkpoint
+    await stakingTokenInstance.checkpoint();
+
+    // Claim rewards
     const stakedServiceIds = await stakingManager.getStakedServiceIds(parsedData.stakingTokenAddress);
     for (let i = 0; i < stakedServiceIds.length; i++) {
         const serviceInfo = await stakingTokenInstance.mapServiceInfo(stakedServiceIds[i]);
