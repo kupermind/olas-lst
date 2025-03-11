@@ -90,7 +90,8 @@ contract Depository {
     event SetGuardianServiceStatuses(address[] guardianServices, bool[] statuses);
     event StakingModelsActivated(uint256[] chainIds, address[] stakingProxies, uint256[] supplies);
     event ChangeModelStatuses(uint256[] modelIds, bool[] statuses);
-    event Deposit(address indexed sender, uint256 indexed stakingModelId, uint256 olasAmount, uint256 stAmount);
+    event Deposit(address indexed sender, uint256 stakeAmount, uint256 stAmount, uint256[] chainIds,
+        address[][] stakingProxies, uint256[][] amounts);
 
     // Code position in storage is keccak256("DEPOSITORY_PROXY") = "0x40f951bb727bcaf251807e38aa34e1b3f20d890f9f3286454f4c473c60a21cdc"
     bytes32 public constant DEPOSITORY_PROXY = 0x40f951bb727bcaf251807e38aa34e1b3f20d890f9f3286454f4c473c60a21cdc;
@@ -374,56 +375,96 @@ contract Depository {
         emit LockFactorUpdated(newLockFactor);
     }
 
-    // TODO: array of modelId-s and olasAmount-s as on stake might not fit into one model
     // TODO: consider taking any amount, just add to the stOLAS balance unused remainder
+    /// @dev Calculates amounts and initiates cross-chain stake request for specified models.
+    /// @param stakeAmount Total incoming amount to stake.
+    /// @param chainIds Set of chain Ids with staking proxies.
+    /// @param stakingProxies Set of sets of staking proxies corresponding to each chain Id.
+    /// @param bridgePayloads Bridge payloads corresponding to each chain Id.
+    /// @param values Value amounts for each bridge interaction, if applicable.
+    /// @return stAmount Amount of stOLAS minted for staking.
+    /// @return amounts Corresponding OLAS amounts for each staking proxy.
     function deposit(
-        uint256 stakingModelId,
-        uint256 olasAmount,
-        bytes memory bridgePayload
-    ) external payable returns (uint256 stAmount) {
-        // Get staking model
-        StakingModel storage stakingModel = mapStakingModels[stakingModelId];
-        // Check for model existence and activity
-        if (stakingModel.supply == 0 || !stakingModel.active) {
-            revert WrongStakingModel(stakingModelId);
+        uint256 stakeAmount,
+        uint256[] memory chainIds,
+        address[][] memory stakingProxies,
+        bytes[] memory bridgePayloads,
+        uint256[] memory values
+    ) external payable returns (uint256 stAmount, uint256[][] memory amounts) {
+        if (stakeAmount > type(uint96).max) {
+            revert Overflow(stakeAmount, uint256(type(uint96).max));
         }
-
-        if (olasAmount > type(uint96).max) {
-            revert Overflow(olasAmount, uint256(type(uint96).max));
-        }
-
-        // Check for staking model remainder
-        if (olasAmount > stakingModel.remainder) {
-            revert Overflow(olasAmount, stakingModel.remainder);
-        }
-
-        // Update staking model remainder
-        stakingModel.remainder = stakingModel.remainder - uint96(olasAmount);
 
         // Get OLAS from sender
-        IToken(olas).transferFrom(msg.sender, address(this), olasAmount);
+        IToken(olas).transferFrom(msg.sender, address(this), stakeAmount);
 
         // Lock OLAS for veOLAS
-        olasAmount = _increaseLock(olasAmount);
+        stakeAmount = _increaseLock(stakeAmount);
+
+        // Allocate arrays of max possible size
+        amounts = new uint256[][](chainIds.length);
+
+        // TODO Check array lengths
+
+        // Remainder is all funds available on Depository
+        uint256 remainder = IToken(olas).balanceOf(address(this));
+
+        // Collect staking contracts and amounts
+        for (uint256 i = 0; i < chainIds.length; ++i) {
+            // TODO chain Ids order
+
+            // Check if more cycles are needed
+            if (remainder == 0) {
+                break;
+            }
+
+            uint256 olasAmount;
+            amounts[i] = new uint256[](stakingProxies[i].length);
+            // Traverse all (or required) staking proxies
+            for (uint256 j = 0; j < stakingProxies[i].length; ++j) {
+                // TODO stakingProxies order
+                // Push a pair of key defining variables into one key: chainId | stakingProxy
+                // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
+                uint256 stakingModelId = uint256(uint160(stakingProxies[i][j]));
+                stakingModelId |= chainIds[i] << 160;
+
+                StakingModel memory stakingModel = mapStakingModels[stakingModelId];
+                // Check for model existence and activity
+                if (stakingModel.supply == 0 || !stakingModel.active) {
+                    revert WrongStakingModel(stakingModelId);
+                }
+
+                if (remainder > stakingModel.remainder) {
+                    amounts[i][j] = stakingModel.remainder;
+                    olasAmount += stakingModel.remainder;
+                    remainder -= stakingModel.remainder;
+                    // Update staking model remainder
+                    mapStakingModels[stakingModelId].remainder = 0;
+                } else {
+                    amounts[i][j] = remainder;
+                    olasAmount += remainder;
+                    // Update staking model remainder
+                    mapStakingModels[stakingModelId].remainder -= uint96(remainder);
+                    remainder = 0;
+                    break;
+                }
+            }
+
+            // Transfer OLAS via the bridge
+            address depositProcessor = mapChainIdDepositProcessors[chainIds[i]];
+
+            // Approve OLAS for depositProcessor
+            IToken(olas).transfer(depositProcessor, olasAmount);
+
+            // Transfer OLAS to its corresponding Staker on L2
+            IDepositProcessor(depositProcessor).sendMessageBatch{value: values[i]}(stakingProxies[i], amounts[i],
+                bridgePayloads[i], olasAmount, STAKE);
+        }
 
         // Calculates stAmount and mints stOLAS
-        stAmount = ITreasury(treasury).processAndMintStToken(msg.sender, olasAmount);
+        stAmount = ITreasury(treasury).processAndMintStToken(msg.sender, stakeAmount);
 
-        // Decode chain Id and staking proxy
-        uint256 chainId = stakingModelId >> 160;
-        address stakingProxy = address(uint160(stakingModelId));
-
-        // Transfer OLAS via the bridge
-        address depositProcessor = mapChainIdDepositProcessors[chainId];
-
-        // Approve OLAS for depositProcessor
-        IToken(olas).transfer(depositProcessor, olasAmount);
-
-        // Transfer OLAS to its corresponding Staker on L2
-        IDepositProcessor(depositProcessor).sendMessage{value: msg.value}(stakingProxy, olasAmount, bridgePayload,
-            olasAmount, STAKE);
-
-        emit Deposit(msg.sender, stakingModelId, olasAmount, stAmount);
+        emit Deposit(msg.sender, stakeAmount, stAmount, chainIds, stakingProxies, amounts);
     }
 
     /// @dev Calculates amounts and initiates cross-chain unstake request from specified models.
@@ -457,10 +498,10 @@ contract Depository {
             }
 
             uint256 olasAmount;
+            amounts[i] = new uint256[](stakingProxies[i].length);
 
-            for (uint256 j = 0; i < stakingProxies[i].length; ++j) {
-                amounts[i] = new uint256[](stakingProxies[i].length);
-
+            // Traverse all (or required) staking proxies
+            for (uint256 j = 0; j < stakingProxies[i].length; ++j) {
                 // TODO stakingProxies order
                 // Push a pair of key defining variables into one key: chainId | stakingProxy
                 // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
@@ -478,8 +519,8 @@ contract Depository {
                 } else {
                     amounts[i][j] = unstakeAmount;
                     olasAmount += unstakeAmount;
-                    unstakeAmount = 0;
                     mapStakingModels[stakingModelId].remainder += stakingModel.remainder + uint96(unstakeAmount);
+                    unstakeAmount = 0;
                     break;
                 }
             }
@@ -494,13 +535,16 @@ contract Depository {
 
             // Transfer OLAS to its corresponding Staker on L2
             IDepositProcessor(depositProcessor).sendMessageBatch{value: values[i]}(stakingProxies[i], amounts[i],
-                bridgePayloads[i], totalAmount, UNSTAKE);
+                bridgePayloads[i], olasAmount, UNSTAKE);
         }
 
         // Check if accumulated necessary amount of tokens
         if (unstakeAmount > 0) {
-            revert();
+            // TODO correct with unstakeAmount vs totalAmount
+            revert Overflow(unstakeAmount, 0);
         }
+
+        // TODO event
     }
 
     function getNumStakingModels() external view returns (uint256) {
