@@ -20,7 +20,6 @@ interface IToken {
 abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
     event MessagePosted(uint256 indexed sequence, address[] targets, uint256[] stakingShares,
         uint256 transferAmount, bytes32 indexed batchHash);
-    event MessageReceived(address indexed l1Relayer, uint256 indexed chainId, bytes data);
     event L2StakerUpdated(address indexed l2StakingProcessor);
     event LeftoversRefunded(address indexed sender, uint256 leftovers);
 
