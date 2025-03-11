@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import {Implementation, OwnerOnly, ZeroAddress} from "../Implementation.sol";
+
 interface IBridge {
     function relayToL1(address to, uint256 olasAmount) external payable;
 }
@@ -26,9 +28,6 @@ interface IToken {
     function balanceOf(address account) external view returns (uint256);
 }
 
-/// @dev Zero address.
-error ZeroAddress();
-
 /// @dev Zero value.
 error ZeroValue();
 
@@ -40,13 +39,8 @@ error AlreadyInitialized();
 /// @param max Maximum possible value.
 error Overflow(uint256 provided, uint256 max);
 
-/// @dev Only `owner` has a privilege, but the `sender` was provided.
-/// @param sender Sender address.
-/// @param owner Required sender address as an owner.
-error OwnerOnly(address sender, address owner);
-
 /// @title Collector - Smart contract for collecting staking rewards
-contract Collector {
+contract Collector is Implementation {
     event ProtocolFactorUpdated(uint256 protocolFactor);
     event ActivityIncreased(uint256 activityChange);
 
@@ -67,8 +61,6 @@ contract Collector {
     uint256 public protocolFactor;
     // L2 staking processor address
     address public l2StakingProcessor;
-    // Owner address
-    address public owner;
 
     /// @param _olas OLAS address on L2.
     /// @param _l1St stOLAS address on L1.
@@ -78,15 +70,11 @@ contract Collector {
     }
 
     /// @dev Initializes collector.
-    /// @param _l2StakingProcessor L2 Staking Processor address.
-    /// @param _protocolFactor Protocol factor in 10_000 value.
-    function initialize(address _l2StakingProcessor, uint256 _protocolFactor) external {
+    function initialize() external {
         if (owner != address(0)) {
             revert AlreadyInitialized();
         }
 
-        l2StakingProcessor = _l2StakingProcessor;
-        protocolFactor = _protocolFactor;
         owner = msg.sender;
     }
 
@@ -105,7 +93,7 @@ contract Collector {
 
     /// @dev Changes protocol factor value.
     /// @param newProtocolFactor New lock factor value.
-    function changeLockFactor(uint256 newProtocolFactor) external {
+    function changeProtocolFactor(uint256 newProtocolFactor) external {
         // Check for ownership
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);

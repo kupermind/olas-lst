@@ -2,8 +2,8 @@
 pragma solidity ^0.8.28;
 
 import {ERC6909} from "../../lib/solmate/src/tokens/ERC6909.sol";
+import {Implementation, OwnerOnly, ZeroAddress} from "../Implementation.sol";
 import {IToken} from "../interfaces/IToken.sol";
-import "hardhat/console.sol";
 
 interface IDepository {
     /// @dev Calculates amounts and initiates cross-chain unstake request from specified models.
@@ -18,12 +18,6 @@ interface IDepository {
 }
 
 interface IST {
-    /// @dev Deposits OLAS in exchange for stOLAS tokens.
-    /// @param assets OLAS amount.
-    /// @param receiver Receiver account address.
-    /// @return shares stOLAS amount.
-    function deposit(uint256 assets, address receiver) external returns (uint256 shares);
-
     /// @dev Redeems OLAS in exchange for stOLAS tokens.
     /// @param shares stOLAS amount.
     /// @param receiver Receiver account address.
@@ -34,18 +28,10 @@ interface IST {
     function stakedBalance() external returns(uint256);
 }
 
-/// @dev Only `owner` has a privilege, but the `sender` was provided.
-/// @param sender Sender address.
-/// @param owner Required sender address as an owner.
-error OwnerOnly(address sender, address owner);
-
 /// @dev Only `depository` has a privilege, but the `sender` was provided.
 /// @param sender Sender address.
 /// @param depository Required depository address.
 error DepositoryOnly(address sender, address depository);
-
-/// @dev Zero address.
-error ZeroAddress();
 
 /// @dev Zero value.
 error ZeroValue();
@@ -59,42 +45,27 @@ error AlreadyInitialized();
 error Overflow(uint256 provided, uint256 max);
 
 /// @title Treasury - Smart contract for treasury
-contract Treasury is ERC6909 {
-    event ImplementationUpdated(address indexed implementation);
-    event OwnerUpdated(address indexed owner);
+contract Treasury is Implementation, ERC6909 {
     event WithdrawRequestInitiated(address indexed requester, uint256 indexed requestId, uint256 stAmount,
         uint256 olasAmount, uint256 withdrawTime);
     event WithdrawRequestExecuted(uint256 requestId, uint256 amount);
 
-    // Code position in storage is keccak256("TREASURY_PROXY") = "0x9b3195704d7d8da1c9110d90b2bf37e7d1d93753debd922cc1f20df74288b870"
-    bytes32 public constant TREASURY_PROXY = 0x9b3195704d7d8da1c9110d90b2bf37e7d1d93753debd922cc1f20df74288b870;
-    // Max lock factor
-    uint256 public constant MAX_LOCK_FACTOR = 10_000;
-
     address public immutable olas;
     address public immutable st;
-    address public immutable lock;
     // Depository address
     address public immutable depository;
 
-    // Lock factor in 10_000 value
-    uint256 public lockFactor;
     // Total withdraw amount requested
     uint256 public withdrawAmountRequested;
     // Withdraw time delay
     uint256 public withdrawDelay;
     // Number of withdraw requests
     uint256 public numWithdrawRequests;
-    // Contract owner
-    address public owner;
 
-    // TODO change to initialize in prod
     constructor(address _olas, address _st, address _depository) {
         olas = _olas;
         st = _st;
         depository = _depository;
-
-        owner = msg.sender;
     }
 
     /// @dev Treasury initializer.
@@ -105,54 +76,6 @@ contract Treasury is ERC6909 {
         }
 
         owner = msg.sender;
-    }
-
-    /// @dev Changes the contributors implementation contract address.
-    /// @param newImplementation New implementation contract address.
-    function changeImplementation(address newImplementation) external {
-        // Check for ownership
-        if (msg.sender != owner) {
-            revert OwnerOnly(msg.sender, owner);
-        }
-
-        // Check for zero address
-        if (newImplementation == address(0)) {
-            revert ZeroAddress();
-        }
-
-        // Store the contributors implementation address
-        assembly {
-            sstore(TREASURY_PROXY, newImplementation)
-        }
-
-        emit ImplementationUpdated(newImplementation);
-    }
-
-    /// @dev Changes contract owner address.
-    /// @param newOwner Address of a new owner.
-    function changeOwner(address newOwner) external {
-        // Check for ownership
-        if (msg.sender != owner) {
-            revert OwnerOnly(msg.sender, owner);
-        }
-
-        // Check for the zero address
-        if (newOwner == address(0)) {
-            revert ZeroAddress();
-        }
-
-        owner = newOwner;
-        emit OwnerUpdated(newOwner);
-    }
-
-    function processAndMintStToken(address account, uint256 olasAmount) external returns (uint256 stAmount) {
-        // Check for depository access
-        if (msg.sender != depository) {
-            revert DepositoryOnly(msg.sender, depository);
-        }
-
-        // mint stOLAS
-        stAmount = IST(st).deposit(olasAmount, account);
     }
 
     // TODO Move high level part to depository?
@@ -189,29 +112,22 @@ contract Treasury is ERC6909 {
 
         // Get current staked balance
         uint256 stakedBalanceBefore = IST(st).stakedBalance();
-        console.log("stakedBalanceBefore", stakedBalanceBefore);
 
         // Redeem OLAS and burn stOLAS tokens
         olasAmount = IST(st).redeem(stAmount, address(this), address(this));
-        console.log("!!! CALCULATED OLAS amount:", olasAmount);
 
         // Mint request tokens
         _mint(msg.sender, requestId, olasAmount);
-        console.log("Withdraw requestId", requestId);
-        console.log("Withdraw requestId amount", olasAmount);
 
         // Update total withdraw amount requested
-        uint256 curWithdrawAmountRequested = withdrawAmountRequested + olasAmount;
-        withdrawAmountRequested = curWithdrawAmountRequested;
+        withdrawAmountRequested += olasAmount;
 
         // Get updated staked balance
         uint256 stakedBalanceAfter = IST(st).stakedBalance();
-        console.log("stakedBalanceAfter", stakedBalanceAfter);
 
         // If withdraw amount is bigger than the current one, need to unstake
         if (stakedBalanceBefore > stakedBalanceAfter) {
             uint256 withdrawDiff = stakedBalanceBefore - stakedBalanceAfter;
-            console.log("withdrawDiff", withdrawDiff);
 
             IDepository(depository).unstake(withdrawDiff, chainIds, stakingProxies, bridgePayloads, values);
         }

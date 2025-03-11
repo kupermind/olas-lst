@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import {Implementation, OwnerOnly, ZeroAddress} from "../Implementation.sol";
 import {IToken} from "../interfaces/IToken.sol";
-import "hardhat/console.sol";
 
 interface IDepositProcessor {
     /// @dev Sends a message to the L2 side via a corresponding bridge.
@@ -20,6 +20,12 @@ interface ILock {
 }
 
 interface IST {
+    /// @dev Deposits OLAS in exchange for stOLAS tokens.
+    /// @param assets OLAS amount.
+    /// @param receiver Receiver account address.
+    /// @return shares stOLAS amount.
+    function deposit(uint256 assets, address receiver) external returns (uint256 shares);
+
     function topUpReserveBalance(uint256 amount) external;
 
     function fundDepository() external;
@@ -34,14 +40,6 @@ interface ITreasury {
     /// @return Amount of stOLAS
     function processAndMintStToken(address account, uint256 olasAmount) external returns (uint256);
 }
-
-/// @dev Only `owner` has a privilege, but the `sender` was provided.
-/// @param sender Sender address.
-/// @param owner Required sender address as an owner.
-error OwnerOnly(address sender, address owner);
-
-/// @dev Zero address.
-error ZeroAddress();
 
 /// @dev Zero value.
 error ZeroValue();
@@ -79,14 +77,11 @@ struct StakingModel {
 }
 
 /// @title Depository - Smart contract for the stOLAS Depository.
-contract Depository {
-    event ImplementationUpdated(address indexed implementation);
-    event OwnerUpdated(address indexed owner);
+contract Depository is Implementation {
     event TreasuryUpdated(address indexed treasury);
     event DepositoryParamsUpdated(uint256 lockFactor, uint256 maxStakingLimit);
     event Locked(address indexed account, uint256 olasAmount, uint256 lockAmount, uint256 vaultBalance);
     event SetDepositProcessorChainIds(address[] depositProcessors, uint256[] chainIds);
-    event SetGuardianServiceStatuses(address[] guardianServices, bool[] statuses);
     event StakingModelsActivated(uint256[] chainIds, address[] stakingProxies, uint256[] supplies);
     event ChangeModelStatuses(uint256[] modelIds, bool[] statuses);
     event Deposit(address indexed sender, uint256 stakeAmount, uint256 stAmount, uint256[] chainIds,
@@ -94,8 +89,6 @@ contract Depository {
     event Unstake(address indexed sender, uint256 unstakeAmount, uint256[] chainIds, address[] stakingProxies,
         uint256[] amounts);
 
-    // Code position in storage is keccak256("DEPOSITORY_PROXY") = "0x40f951bb727bcaf251807e38aa34e1b3f20d890f9f3286454f4c473c60a21cdc"
-    bytes32 public constant DEPOSITORY_PROXY = 0x40f951bb727bcaf251807e38aa34e1b3f20d890f9f3286454f4c473c60a21cdc;
     // Stake operation
     bytes32 public constant STAKE = 0x1bcc0f4c3fad314e585165815f94ecca9b96690a26d6417d7876448a9a867a69;
     // Unstake operation
@@ -114,8 +107,6 @@ contract Depository {
 
     // Treasury contract address
     address public treasury;
-    // Contract owner address
-    address public owner;
 
     // Lock factor in 10_000 value
     uint256 public lockFactor;
@@ -124,32 +115,16 @@ contract Depository {
 
     // Mapping of staking model Id => staking model
     mapping(uint256 => StakingModel) public mapStakingModels;
-    // Mapping of whitelisted guardian agents
-    mapping(address => bool) public mapGuardianAgents;
     // Mapping for L2 chain Id => dedicated deposit processors
     mapping(uint256 => address) public mapChainIdDepositProcessors;
     // Set of staking model Ids
     uint256[] public setStakingModelIds;
 
-    // TODO change to initialize in prod
-    constructor(
-        address _olas,
-        address _st,
-        address _ve,
-        address _treasury,
-        address _lock,
-        uint256 _lockFactor,
-        uint256 _maxStakingLimit
-    ) {
+    constructor(address _olas, address _st, address _ve, address _lock) {
         olas = _olas;
         st = _st;
         ve = _ve;
-        treasury = _treasury;
         lock = _lock;
-        lockFactor = _lockFactor;
-        maxStakingLimit = _maxStakingLimit;
-
-        owner = msg.sender;
     }
 
     /// @dev Increases veOLAS lock.
@@ -170,51 +145,16 @@ contract Depository {
     }
 
     /// @dev Depository initializer.
-    function initialize() external{
+    function initialize(uint256 _lockFactor, uint256 _maxStakingLimit) external{
         // Check for already initialized
         if (owner != address(0)) {
             revert AlreadyInitialized();
         }
 
+        lockFactor = _lockFactor;
+        maxStakingLimit = _maxStakingLimit;
+
         owner = msg.sender;
-    }
-
-    /// @dev Changes depository implementation contract address.
-    /// @param newImplementation New implementation contract address.
-    function changeImplementation(address newImplementation) external {
-        // Check for ownership
-        if (msg.sender != owner) {
-            revert OwnerOnly(msg.sender, owner);
-        }
-
-        // Check for zero address
-        if (newImplementation == address(0)) {
-            revert ZeroAddress();
-        }
-
-        // Store depository implementation address
-        assembly {
-            sstore(DEPOSITORY_PROXY, newImplementation)
-        }
-
-        emit ImplementationUpdated(newImplementation);
-    }
-
-    /// @dev Changes contract owner address.
-    /// @param newOwner Address of a new owner.
-    function changeOwner(address newOwner) external {
-        // Check for ownership
-        if (msg.sender != owner) {
-            revert OwnerOnly(msg.sender, owner);
-        }
-
-        // Check for zero address
-        if (newOwner == address(0)) {
-            revert ZeroAddress();
-        }
-
-        owner = newOwner;
-        emit OwnerUpdated(newOwner);
     }
 
     /// @dev Changes Treasury contract address.
@@ -232,33 +172,6 @@ contract Depository {
 
         treasury = newTreasury;
         emit TreasuryUpdated(newTreasury);
-    }
-
-    /// @dev Sets guardian service multisig statues.
-    /// @param guardianServices Guardian service multisig addresses.
-    /// @param statuses Corresponding whitelisting statues.
-    function setGuardianServiceStatuses(address[] memory guardianServices, bool[] memory statuses) external {
-        // Check for ownership
-        if (msg.sender != owner) {
-            revert OwnerOnly(msg.sender, owner);
-        }
-
-        // Check for array lengths
-        if (guardianServices.length == 0 || guardianServices.length != statuses.length) {
-            revert WrongArrayLength(guardianServices.length, statuses.length);
-        }
-
-        // Traverse all guardian service multisigs and statuses
-        for (uint256 i = 0; i < guardianServices.length; ++i) {
-            // Check for zero addresses
-            if (guardianServices[i] == address(0)) {
-                revert ZeroAddress();
-            }
-
-            mapGuardianAgents[guardianServices[i]] = statuses[i];
-        }
-
-        emit SetGuardianServiceStatuses(guardianServices, statuses);
     }
 
     /// @dev Sets deposit processor contracts addresses and L2 chain Ids.
@@ -426,8 +339,6 @@ contract Depository {
         // Lock OLAS for veOLAS
         stakeAmount = _increaseLock(stakeAmount);
 
-        console.log("!!! STAKE AMOUNT AFTER LOCK", stakeAmount);
-
         // TODO Check array lengths
 
         // Remainder is stake amount plus reserve balance
@@ -468,7 +379,6 @@ contract Depository {
             if (stakingModel.remainder == 0) {
                 continue;
             }
-            console.log("Staking model reminder", stakingModel.remainder);
 
             // Adjust staking amount to not overflow the max allowed one
             amounts[i] = remainder;
@@ -489,11 +399,6 @@ contract Depository {
 
             // Increase actual stake amount
             actualStakeAmount += amounts[i];
-
-            console.log("!!!!!!! supply", mapStakingModels[stakingModelId].supply);
-            console.log("remainder", mapStakingModels[stakingModelId].remainder);
-            console.log("global remainder", remainder);
-            console.log("actualStakeAmount", actualStakeAmount);
 
             // Transfer OLAS via the bridge
             address depositProcessor = mapChainIdDepositProcessors[chainIds[i]];
@@ -517,7 +422,6 @@ contract Depository {
         // If there are OLAS leftovers, transfer (back) to stOLAS
         if (stakeAmount > actualStakeAmount) {
             remainder = stakeAmount - actualStakeAmount;
-            console.log("!!!! RECALCULATED reminder", remainder);
             IToken(olas).approve(st, remainder);
             IST(st).topUpReserveBalance(remainder);
         }
@@ -525,7 +429,7 @@ contract Depository {
         // Calculates stAmount and mints stOLAS
         // If stakeAmount is zero, stakes are performed from reserves
         if (stakeAmount > 0) {
-            stAmount = ITreasury(treasury).processAndMintStToken(msg.sender, stakeAmount);
+            stAmount = IST(st).deposit(stakeAmount, msg.sender);
         }
 
         emit Deposit(msg.sender, stakeAmount, stAmount, chainIds, stakingProxies, amounts);
@@ -563,8 +467,6 @@ contract Depository {
 
         // Collect staking contracts and amounts
         for (uint256 i = 0; i < chainIds.length; ++i) {
-            console.log("unstakeAmount", unstakeAmount / 1e18);
-
             // Push a pair of key defining variables into one key: chainId | stakingProxy
             // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
             uint256 stakingModelId = uint256(uint160(stakingProxies[i]));
@@ -576,16 +478,11 @@ contract Depository {
                 revert WrongStakingModel(stakingModelId);
             }
 
-            console.log("Staking model reminder", stakingModel.remainder);
-
             // Adjust unstaking amount to not overflow the max allowed one
             amounts[i] = stakingModel.supply - stakingModel.remainder;
             if (amounts[i] > maxStakingLimit) {
                 amounts[i] = maxStakingLimit;
             }
-            console.log("supply", stakingModel.supply / 1e18);
-            console.log("staking remainder", stakingModel.remainder / 1e18);
-            console.log("maxUnstakeAmount", amounts[i] / 1e18);
 
             if (unstakeAmount > amounts[i]) {
                 // Remainder resulting value is limited by stakingModel.supply
@@ -611,7 +508,6 @@ contract Depository {
             IDepositProcessor(depositProcessor).sendMessage{value: values[i]}(stakingProxies[i], amounts[i],
                 bridgePayloads[i], UNSTAKE);
 
-            console.log("Updated remainder", mapStakingModels[stakingModelId].remainder / 1e18);
             if (unstakeAmount == 0) {
                 break;
             }
@@ -619,7 +515,6 @@ contract Depository {
 
         // Check if accumulated necessary amount of tokens
         if (unstakeAmount > 0) {
-            console.log("still unstakeAmount", unstakeAmount / 1e18);
             // TODO correct with unstakeAmount vs totalAmount
             revert Overflow(unstakeAmount, 0);
         }

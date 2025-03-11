@@ -18,7 +18,7 @@ Because proxy-pattern.
 ```
 mapGuardianAgents just settuped. 
 ```
-[]
+[x] Fixed
 
 #### Revert in fundDepository.
 ```
@@ -43,23 +43,23 @@ IST(st).fundDepository(remainder);
         // TODO event or Transfer event is enough?
     }
 ```
-[]
+[x] Fixed
 
 #### Question. function processUnstake() is non-ownable? Any can unstake all program
 ```
 Maybe only Treasure?
 ```
-[]
+[x] Fixed
 
 #### Fix todo in processUnstake()
-[]
+[x] Fixed
 
 ### LiquidityManager **unaudited**
 ```
 This contract is not currently involved in workflow. I suggest moving it somewhere to utilities. To avoid confusion.
 More features are good, of course, but they are confusing and will not be used in at least the first version of the protocol.
 ```
-[]
+[x] Noted
 
 ### Lock
 #### Logical issue. Need synchronization with contract Depository
@@ -70,7 +70,7 @@ D.deposit() -> L.increaseLock
 2. uint256 public constant MAX_LOCK_TIME = 4 * 365 * 1 days;
 What will happen after this time. Deposit will it be able to work?
 ```
-[]
+[x] Fixed, separate function now
 
 #### Design issue. Unlock
 ```
@@ -78,14 +78,14 @@ What will happen after this time. Deposit will it be able to work?
 Think again about the conditions unlock and the cycle after it.
 We can't increase the lock time - it's already maximum. We can unlock only after the maximum lock time. There's some problem with the logic here, what will happen after 4 years.
 ```
-[]
+[x] Withdraw is possible only after the full unlock, and for that one the lock factor needs to be set to zero
 
 #### Remove mock function. 
 ```
 function propose() + castVote()
 they refer to an undeveloped governance system. To avoid confusion, I suggest removing it from the first version.
 ```
-[]
+[x] Noted, left as is
 
 ### Treasury
 #### Design issue. Deposit -> Treasury (just re-route) -> stOLAS
@@ -106,7 +106,7 @@ function processAndMintStToken(address account, uint256 olasAmount) external ret
         stAmount = IST(st).deposit(olasAmount, account);
     }
 ```
-[]
+[x] Fixed
 
 #### Design auth/control issue. Treasury unstake vs Depository processUnstake
 ```
@@ -114,20 +114,20 @@ owner only -> Treasury.unstake() -> Treasury._unstake() -> IDepository(depositor
 vs
 any -> Depository.processUnstake
 ```
-[]
+[x] Fixed
 
 #### Treasure/stOLAS update stakedBalance after unstake
 ```
 stakedBalance only changed curStakedBalance += assets; in deposit
 stakedBalance affteced `unstake`?
 ```
-[]
+[x] Fixed
 
 #### requestToWithdraw non-clear using global variable withdrawAmountRequested
 ```
 Double-check uint256 curWithdrawAmountRequested = withdrawAmountRequested + olasAmount;
 ```
-[]
+[x] Fixed
 
 #### requestToWithdraw/redeem question. 
 ```

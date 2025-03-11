@@ -2,11 +2,11 @@
 pragma solidity ^0.8.28;
 
 import {ERC721TokenReceiver} from "../../lib/autonolas-registries/lib/solmate/src/tokens/ERC721.sol";
-import {ActivityModuleProxy} from "./proxies/ActivityModuleProxy.sol";
+import {BeaconProxy} from "../BeaconProxy.sol";
+import {Implementation, OwnerOnly, ZeroAddress} from "../Implementation.sol";
 import {IService} from "../interfaces/IService.sol";
 import {IStaking} from "../interfaces/IStaking.sol";
 import {IToken, INFToken} from "../interfaces/IToken.sol";
-import "hardhat/console.sol";
 
 interface IActivityModule {
     function initialize(address _multisig, address _stakingProxy, uint256 _serviceId) external;
@@ -27,14 +27,6 @@ interface IMultisig {
 interface ICollector {
     function relayStakedTokens(uint256 amount) external payable;
 }
-
-/// @dev Only `owner` has a privilege, but the `sender` was provided.
-/// @param sender Sender address.
-/// @param owner Required sender address as an owner.
-error OwnerOnly(address sender, address owner);
-
-/// @dev Zero address.
-error ZeroAddress();
 
 /// @dev Zero value.
 error ZeroValue();
@@ -73,10 +65,8 @@ error AlreadyProcessed(uint256 requestId);
 error ServiceNotEvicted(address stakingProxy, uint256 serviceId);
 
 /// @title StakingManager - Smart contract for OLAS staking management
-contract StakingManager is ERC721TokenReceiver {
-    event OwnerUpdated(address indexed owner);
+contract StakingManager is Implementation, ERC721TokenReceiver {
     event StakingProcessorL2Updated(address indexed l2StakingProcessor);
-    event SetGuardianServiceStatuses(address[] guardianServices, bool[] statuses);
     event StakingBalanceUpdated(bytes32 indexed operation, address indexed stakingProxy, uint256 numStakes,
         uint256 balance);
     event CreateAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig,
@@ -127,8 +117,6 @@ contract StakingManager is ERC721TokenReceiver {
     address public fallbackHandler;
     // L2 staking processor address
     address public l2StakingProcessor;
-    // Owner address
-    address public owner;
 
     // Nonce
     uint256 internal _nonce;
@@ -136,7 +124,6 @@ contract StakingManager is ERC721TokenReceiver {
     // Reentrancy lock
     uint256 internal _locked = 1;
 
-    mapping(address => bool) public mapGuardianAgents;
     mapping(uint256 => bool) public mapDeposits;
     mapping(address => uint256) public balanceOf;
     mapping(address => uint256) public mapStakingProxyBalances;
@@ -198,41 +185,21 @@ contract StakingManager is ERC721TokenReceiver {
     function initialize(
         address _safeMultisig,
         address _safeSameAddressMultisig,
-        address _fallbackHandler,
-        address _l2StakingProcessor
+        address _fallbackHandler
     ) external {
         if (owner != address(0)) {
             revert AlreadyInitialized();
         }
 
-        if (_safeMultisig == address(0) || _safeSameAddressMultisig == address(0) ||
-            _fallbackHandler == address(0) || _l2StakingProcessor == address(0))
-        {
+        if (_safeMultisig == address(0) || _safeSameAddressMultisig == address(0) || _fallbackHandler == address(0)) {
             revert ZeroAddress();
         }
+
         safeMultisig = _safeMultisig;
         safeSameAddressMultisig = _safeSameAddressMultisig;
         fallbackHandler = _fallbackHandler;
-        l2StakingProcessor = _l2StakingProcessor;
 
         owner = msg.sender;
-    }
-
-    /// @dev Changes contract owner address.
-    /// @param newOwner Address of a new owner.
-    function changeOwner(address newOwner) external {
-        // Check for ownership
-        if (msg.sender != owner) {
-            revert OwnerOnly(msg.sender, owner);
-        }
-
-        // Check for the zero address
-        if (newOwner == address(0)) {
-            revert ZeroAddress();
-        }
-
-        owner = newOwner;
-        emit OwnerUpdated(newOwner);
     }
 
     /// @dev Changes token relayer address.
@@ -250,33 +217,6 @@ contract StakingManager is ERC721TokenReceiver {
 
         l2StakingProcessor = newStakingProcessorL2;
         emit StakingProcessorL2Updated(newStakingProcessorL2);
-    }
-
-    /// @dev Sets guardian service multisig statues.
-    /// @param guardianServices Guardian service multisig addresses.
-    /// @param statuses Corresponding whitelisting statues.
-    function setGuardianServiceStatuses(address[] memory guardianServices, bool[] memory statuses) external {
-        // Check for ownership
-        if (msg.sender != owner) {
-            revert OwnerOnly(msg.sender, owner);
-        }
-
-        // Check for array lengths
-        if (guardianServices.length == 0 || guardianServices.length != statuses.length) {
-            revert WrongArrayLength(guardianServices.length, statuses.length);
-        }
-
-        // Traverse all guardian service multisigs and statuses
-        for (uint256 i = 0; i < guardianServices.length; ++i) {
-            // Check for zero addresses
-            if (guardianServices[i] == address(0)) {
-                revert ZeroAddress();
-            }
-
-            mapGuardianAgents[guardianServices[i]] = statuses[i];
-        }
-
-        emit SetGuardianServiceStatuses(guardianServices, statuses);
     }
 
     /// @dev Creates and deploys a service.
@@ -300,7 +240,7 @@ contract StakingManager is ERC721TokenReceiver {
         address[] memory instances = new address[](NUM_AGENT_INSTANCES);
 
         // Create activity module proxy
-        ActivityModuleProxy activityModuleProxy = new ActivityModuleProxy(beacon);
+        BeaconProxy activityModuleProxy = new BeaconProxy(beacon);
         // Assign address as agent instance
         activityModule = address(activityModuleProxy);
         instances[0] = activityModule;
@@ -418,12 +358,10 @@ contract StakingManager is ERC721TokenReceiver {
 
         // Add amount to current unstaked balance
         balance += amount;
-        console.log("!!!! L2 obtained amount", amount);
 
         // Calculate number of stakes
         uint256 numStakes = balance / fullStakingDeposit;
         uint256 totalStakingDeposit = numStakes * fullStakingDeposit;
-        console.log("!!!!!! NUMBER OF STAKES", numStakes);
         // Check if the balance is enough to create another stake
         if (numStakes > 0) {
             // Approve token for the serviceRegistryTokenUtility contract
@@ -453,7 +391,6 @@ contract StakingManager is ERC721TokenReceiver {
                     _createAndStake(stakingProxy, minStakingDeposit);
                 }
             }
-            console.log("!!!!!! STAKE NEXT IDX", nextIdx);
             // Update last staked service Id
             mapLastStakedServiceIdxs[stakingProxy] = nextIdx;
 
@@ -466,53 +403,6 @@ contract StakingManager is ERC721TokenReceiver {
         emit StakingBalanceUpdated(STAKE, stakingProxy, numStakes, balance);
 
         _locked = 1;
-    }
-
-    // TODO Probably obsolete - change to only deployed and unstaked services, do call for stake
-    /// @dev Re-stakes if services are evicted for any reason.
-    /// @param stakingProxies Set of staking proxy addresses.
-    /// @param serviceIds Corresponding sets of service Ids for each staking proxy address.
-    function reStake(address[] memory stakingProxies, uint256[][] memory serviceIds) external {
-        // Traverse all staking proxies
-        for (uint256 i = 0; i < stakingProxies.length; ++i) {
-            // Check for zero address
-            if (stakingProxies[i] == address(0)) {
-                revert ZeroAddress();
-            }
-
-            // Get number of stakes services
-            uint256 numServices = serviceIds[i].length;
-            // Check for zero value
-            if (numServices == 0) {
-                revert ZeroValue();
-            }
-
-            uint256 minStakingDeposit = IStaking(stakingProxies[i]).minStakingDeposit();
-            uint256 fullStakingDeposit = minStakingDeposit * (1 + NUM_AGENT_INSTANCES);
-
-            // Calculate total staking deposit
-            uint256 totalStakingDeposit = numServices * fullStakingDeposit;
-
-            // Approve token for the serviceRegistryTokenUtility contract
-            IToken(olas).approve(serviceRegistryTokenUtility, totalStakingDeposit);
-
-            // Traverse all required services
-            for (uint256 j = 0; j < numServices; ++j) {
-                // Check that the service is evicted
-                if (IStaking(stakingProxies[i]).getStakingState(serviceIds[i][j]) != IStaking.StakingState.Unstaked) {
-                    revert ServiceNotEvicted(stakingProxies[i], serviceIds[i][j]);
-                }
-
-                // Unstake evicted service
-                IStaking(stakingProxies[i]).unstake(serviceIds[i][j]);
-
-                // Approve service NFT for the staking instance
-                INFToken(serviceRegistry).approve(stakingProxies[i], serviceIds[i][j]);
-
-                // Stake the service
-                IStaking(stakingProxies[i]).stake(serviceIds[i][j]);
-            }
-        }
     }
 
     /// @dev Unstakes, if needed, and withdraws specified amounts from specified staking contracts.
@@ -534,8 +424,6 @@ contract StakingManager is ERC721TokenReceiver {
         // Get current unstaked balance
         uint256 balance = mapStakingProxyBalances[stakingProxy];
         uint256 numUnstakes;
-        console.log("amount", amount / 1e18);
-        console.log("balance", balance / 1e18);
         if (balance >= amount) {
             balance -= amount;
         } else {
@@ -549,7 +437,6 @@ contract StakingManager is ERC721TokenReceiver {
             uint256 fullStakingDeposit = minStakingDeposit * (1 + NUM_AGENT_INSTANCES);
             // Subtract unstaked balance
             uint256 balanceDiff = amount - balance;
-            console.log("balanceDiff", balanceDiff);
 
             // Calculate number of stakes
             numUnstakes = balanceDiff / fullStakingDeposit;
@@ -557,15 +444,12 @@ contract StakingManager is ERC721TokenReceiver {
             if (balanceDiff % fullStakingDeposit == 0) {
                 balance = 0;
             } else {
-                console.log("!!!!!! DO UNSTAKE");
                 numUnstakes++;
                 balance = numUnstakes * fullStakingDeposit - balanceDiff;
             }
-            console.log("!!!!!! NUMBER OF UNSTAKES", numUnstakes);
 
             // Get the last staked Service Id index
             uint256 lastIdx = mapLastStakedServiceIdxs[stakingProxy];
-            console.log("!!!!!! UNSTAKE LAST IDX", lastIdx);
             // This must never happen
             if (numUnstakes > lastIdx) {
                 revert Overflow(numUnstakes, lastIdx);
@@ -574,7 +458,6 @@ contract StakingManager is ERC721TokenReceiver {
             // Traverse all required unstakes
             for (uint256 i = 0; i < numUnstakes; ++i) {
                 uint256 serviceId = mapStakedServiceIds[stakingProxy][lastIdx];
-                console.log("!!!! UNSTAKE SERVICE ID", serviceId);
                 // Unstake, terminate and unbond the service
                 IStaking(stakingProxy).unstake(serviceId);
                 IService(serviceManager).terminate(serviceId);
@@ -583,7 +466,6 @@ contract StakingManager is ERC721TokenReceiver {
                 lastIdx--;
             }
 
-            console.log("!!!! LAST UNSTAKE SERVICE ID", lastIdx);
             // Update last staked service Id
             mapLastStakedServiceIdxs[stakingProxy] = lastIdx;
 
@@ -593,8 +475,6 @@ contract StakingManager is ERC721TokenReceiver {
         // Update staking balance
         mapStakingProxyBalances[stakingProxy] = balance;
 
-console.log("amount to send to L1", amount);
-console.log("Token balance on L2", IToken(olas).balanceOf(address(this)));
         // Send OLAS to collector to initiate L1 transfer for all the balances at this time
         IToken(olas).transfer(l2StakingProcessor, amount);
         // TODO Check on relays, but the majority of them does not require value
