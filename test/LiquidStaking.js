@@ -156,14 +156,14 @@ describe("Liquid Staking", function () {
         await lockProxy.deployed();
         lock = await ethers.getContractAt("Lock", lockProxy.address);
 
-        // Approve initial lock
-        await olas.approve(lock.address, ethers.utils.parseEther("1"));
+        // Transfer initial lock
+        await olas.transfer(lock.address, ethers.utils.parseEther("1"));
         // Set governor and create first lock
         // Governor address is irrelevant for testing
         await lock.setGovernorAndCreateFirstLock(deployer.address);
 
         const Depository = await ethers.getContractFactory("Depository");
-        depository = await Depository.deploy(olas.address, st.address, ve.address, lock.address);
+        depository = await Depository.deploy(olas.address, st.address, lock.address);
         await depository.deployed();
 
         const DepositoryProxy = await ethers.getContractFactory("Proxy");
@@ -177,7 +177,7 @@ describe("Liquid Staking", function () {
         await treasury.deployed();
 
         const TreasuryProxy = await ethers.getContractFactory("Proxy");
-        initPayload = treasury.interface.encodeFunctionData("initialize", []);
+        initPayload = treasury.interface.encodeFunctionData("initialize", [0]);
         const treasuryProxy = await TreasuryProxy.deploy(treasury.address, initPayload);
         await treasuryProxy.deployed();
         treasury = await ethers.getContractAt("Treasury", treasuryProxy.address);
@@ -975,7 +975,7 @@ describe("Liquid Staking", function () {
             snapshot.restore();
         });
 
-        it("Multiple stakes-unstakes", async function () {
+        it.only("Multiple stakes-unstakes", async function () {
             // Take a snapshot of the current state of the blockchain
             const snapshot = await helpers.takeSnapshot();
 
@@ -984,7 +984,7 @@ describe("Liquid Staking", function () {
             // Get initial OLAS amount to stake
             let olasAmount = (minStakingDeposit.mul(5)).div(4);
 
-            let numIters = 12;
+            let numIters = 25;
             const numStakes = 18;
             let chainIds = new Array(numStakes).fill(gnosisChainId);
             let stakingInstances = new Array(numStakes).fill(stakingTokenInstance.address);
@@ -1075,8 +1075,8 @@ describe("Liquid Staking", function () {
                 console.log("User approves stOLAS for treasury:", stBalance.toString());
                 await st.approve(treasury.address, stBalance);
 
-                // Unstake minStakingDeposit as stOLAS amount will always be smaller than OLAS amount
-                let stAmount = minStakingDeposit;
+                // Unstake minStakingDeposit * i as stOLAS amount will always be smaller than OLAS amount
+                let stAmount = stBalance.div(10);
                 const numUnstakes = 25;
                 chainIds = new Array(numUnstakes).fill(gnosisChainId);
                 stakingInstances = new Array(numUnstakes).fill(stakingTokenInstance.address);

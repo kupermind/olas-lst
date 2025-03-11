@@ -113,17 +113,20 @@ contract Depository is Implementation {
     // Max staking limit per a single staking proxy
     uint256 public maxStakingLimit;
 
-    // Mapping of staking model Id => staking model
+    // Mapping for staking model Id => staking model
     mapping(uint256 => StakingModel) public mapStakingModels;
     // Mapping for L2 chain Id => dedicated deposit processors
     mapping(uint256 => address) public mapChainIdDepositProcessors;
+    // Mapping for account => deposit amounts
+    mapping(address => uint256) public mapAccountDeposits;
+    // Mapping for account => withdraw amounts
+    mapping(address => uint256) public mapAccountWithdraws;
     // Set of staking model Ids
     uint256[] public setStakingModelIds;
 
-    constructor(address _olas, address _st, address _ve, address _lock) {
+    constructor(address _olas, address _st, address _lock) {
         olas = _olas;
         st = _st;
-        ve = _ve;
         lock = _lock;
     }
 
@@ -298,7 +301,7 @@ contract Depository is Implementation {
     /// @dev Changes depository params.
     /// @param newLockFactor New lock factor value.
     /// @param newMaxStakingLimit New max staking limit per staking proxy.
-    function changeLockFactor(uint256 newLockFactor, uint256 newMaxStakingLimit) external {
+    function changeDepositoryParams(uint256 newLockFactor, uint256 newMaxStakingLimit) external {
         // Check for ownership
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);
@@ -333,13 +336,19 @@ contract Depository is Implementation {
         if (stakeAmount > type(uint96).max) {
             revert Overflow(stakeAmount, uint256(type(uint96).max));
         }
-        // Get OLAS from sender
-        IToken(olas).transferFrom(msg.sender, address(this), stakeAmount);
-
-        // Lock OLAS for veOLAS
-        stakeAmount = _increaseLock(stakeAmount);
 
         // TODO Check array lengths
+
+        if (stakeAmount > 0) {
+            // Get OLAS from sender
+            IToken(olas).transferFrom(msg.sender, address(this), stakeAmount);
+
+            // Increase deposit amounts
+            mapAccountDeposits[msg.sender] += stakeAmount;
+
+            // Lock OLAS for veOLAS
+            stakeAmount = _increaseLock(stakeAmount);
+        }
 
         // Remainder is stake amount plus reserve balance
         uint256 remainder = IST(st).reserveBalance();

@@ -19,6 +19,11 @@ interface IGovernor {
 }
 
 interface IToken {
+    /// @dev Gets the amount of tokens owned by a specified account.
+    /// @param account Account address.
+    /// @return Amount of tokens owned.
+    function balanceOf(address account) external view returns (uint256);
+
     /// @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
     /// @param spender Account address that will be able to transfer tokens on behalf of the caller.
     /// @param amount Token amount.
@@ -66,6 +71,9 @@ interface IVEOLAS {
 
     function mapLockedBalances(address account) external returns (LockedBalance memory);
 }
+
+/// @dev Zero value.
+error ZeroValue();
 
 /// @dev The contract is already initialized.
 error AlreadyInitialized();
@@ -139,9 +147,12 @@ contract Lock is Implementation {
         }
 
         // Deposit starting OLAS amount
-        uint256 olasAmount = 1 ether;
-        // Get OLAS from initializer
-        IToken(olas).transferFrom(msg.sender, address(this), olasAmount);
+        uint256 olasAmount = IToken(olas).balanceOf(address(this));
+        // Check for zero value
+        if (olasAmount == 0) {
+            revert ZeroValue();
+        }
+
         // Approve OLAS for veOLAS
         IToken(olas).approve(ve, olasAmount);
         // Create lock
@@ -158,9 +169,11 @@ contract Lock is Implementation {
         // Approve OLAS for veOLAS
         IToken(olas).approve(ve, olasAmount);
 
-        // Increase amount and unlock time to a maximum
+        // Increase lock amount
         IVEOLAS(ve).increaseAmount(olasAmount);
-        IVEOLAS(ve).increaseUnlockTime(MAX_LOCK_TIME);
+        // Increase unlock time to a maximum, if possible
+        bytes memory increaseUnlockTimeData = abi.encodeCall(IVEOLAS.increaseUnlockTime, (MAX_LOCK_TIME));
+        ve.call(increaseUnlockTimeData);
     }
 
     function unlock(address account, uint256 amount) external {
