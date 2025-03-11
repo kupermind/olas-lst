@@ -18,8 +18,7 @@ interface IToken {
 
 /// @title DefaultDepositProcessorL1 - Smart contract for sending tokens and data via arbitrary bridge from L1 to L2 and processing data received from L2.
 abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
-    event MessagePosted(uint256 indexed sequence, address[] targets, uint256[] stakingShares,
-        uint256 transferAmount, bytes32 indexed batchHash);
+    event MessagePosted(uint256 indexed sequence, address indexed target, uint256 amount, bytes32 indexed batchHash);
     event L2StakerUpdated(address indexed l2StakingProcessor);
     event LeftoversRefunded(address indexed sender, uint256 leftovers);
 
@@ -94,34 +93,30 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
 
     /// @dev Sends message to the L2 side via a corresponding bridge.
     /// @notice Message is sent to the staker contract to reflect transferred OLAS and staking amounts.
-    /// @param targets Set of staking target addresses.
-    /// @param stakingShares Corresponding set of staking amounts.
+    /// @param target Staking target address.
+    /// @param amount Corresponding staking amount.
     /// @param bridgePayload Bridge payload necessary (if required) for a specific bridging relayer.
-    /// @param transferAmount Actual total OLAS amount to be transferred.
     /// @param batchHash Unique batch hash for each message transfer.
     /// @param operation Funds operation: stake / unstake.
     /// @return sequence Unique message sequence (if applicable) or the batch hash converted to number.
     /// @return leftovers ETH leftovers from unused msg.value.
     function _sendMessage(
-        address[] memory targets,
-        uint256[] memory stakingShares,
+        address target,
+        uint256 amount,
         bytes memory bridgePayload,
-        uint256 transferAmount,
         bytes32 batchHash,
         bytes32 operation
     ) internal virtual returns (uint256 sequence, uint256 leftovers);
 
-    /// @dev Sends a single message to the L2 side via a corresponding bridge.
+    /// @dev Sends a message to the L2 side via a corresponding bridge.
     /// @param target Staking target addresses.
-    /// @param stakingShare Corresponding staking amount.
+    /// @param amount Corresponding staking amount.
     /// @param bridgePayload Bridge payload necessary (if required) for a specific bridge relayer.
-    /// @param transferAmount Actual OLAS amount to be transferred.
     /// @param operation Funds operation: stake / unstake.
     function sendMessage(
         address target,
-        uint256 stakingShare,
+        uint256 amount,
         bytes memory bridgePayload,
-        uint256 transferAmount,
         bytes32 operation
     ) external virtual payable {
         // Check for the dispenser contract to be the msg.sender
@@ -129,19 +124,12 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
             revert ManagerOnly(l1Depository, msg.sender);
         }
 
-        // Construct one-element arrays from targets and amounts
-        address[] memory targets = new address[](1);
-        targets[0] = target;
-        uint256[] memory stakingShares = new uint256[](1);
-        stakingShares[0] = stakingShare;
-
         // Get the batch hash
         uint256 batchNonce = stakingBatchNonce;
         bytes32 batchHash = keccak256(abi.encode(batchNonce, block.chainid, address(this)));
 
         // Send the message to L2
-        (uint256 sequence, uint256 leftovers) = _sendMessage(targets, stakingShares, bridgePayload, transferAmount,
-            batchHash, operation);
+        (uint256 sequence, uint256 leftovers) = _sendMessage(target, amount, bridgePayload, batchHash, operation);
 
         // Send leftover amount back to the sender, if any
         if (leftovers > 0) {
@@ -155,46 +143,7 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
         // Increase the staking batch nonce
         stakingBatchNonce = batchNonce + 1;
 
-        emit MessagePosted(sequence, targets, stakingShares, transferAmount, batchHash);
-    }
-
-    /// @dev Sends a batch message to the L2 side via a corresponding bridge.
-    /// @param targets Set of staking target addresses.
-    /// @param stakingShares Corresponding set of staking amounts.
-    /// @param bridgePayload Bridge payload necessary (if required) for a specific bridge relayer.
-    /// @param transferAmount Actual total OLAS amount across all the targets to be transferred.
-    /// @param operation Funds operation: stake / unstake.
-    function sendMessageBatch(
-        address[] memory targets,
-        uint256[] memory stakingShares,
-        bytes memory bridgePayload,
-        uint256 transferAmount,
-        bytes32 operation
-    ) external virtual payable {
-        // Check for the dispenser contract to be the msg.sender
-        if (msg.sender != l1Depository) {
-            revert ManagerOnly(l1Depository, msg.sender);
-        }
-
-        // Get the batch hash
-        uint256 batchNonce = stakingBatchNonce;
-        bytes32 batchHash = keccak256(abi.encode(batchNonce, block.chainid, address(this)));
-
-        // Send the message to L2
-        (uint256 sequence, uint256 leftovers) = _sendMessage(targets, stakingShares, bridgePayload, transferAmount,
-            batchHash, operation);
-
-        // Send leftover amount back to the sender, if any
-        if (leftovers > 0) {
-            // If the call fails, ignore to avoid the attack that would prevent this function from executing
-            // solhint-disable-next-line avoid-low-level-calls
-            tx.origin.call{value: leftovers}("");
-        }
-
-        // Increase the staking batch nonce
-        stakingBatchNonce = batchNonce + 1;
-
-        emit MessagePosted(sequence, targets, stakingShares, transferAmount, batchHash);
+        emit MessagePosted(sequence, target, amount, batchHash);
     }
 
     /// @dev Updated the batch hash of a failed message, if applicable.
