@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ERC1155, ERC1155TokenReceiver} from "../../lib/autonolas-registries/lib/solmate/src/tokens/ERC1155.sol";
+import {ERC6909} from "../../lib/solmate/src/tokens/ERC6909.sol";
 import {IToken} from "../interfaces/IToken.sol";
 import "hardhat/console.sol";
 
@@ -59,7 +59,7 @@ error AlreadyInitialized();
 error Overflow(uint256 provided, uint256 max);
 
 /// @title Treasury - Smart contract for treasury
-contract Treasury is ERC1155, ERC1155TokenReceiver {
+contract Treasury is ERC6909 {
     event ImplementationUpdated(address indexed implementation);
     event OwnerUpdated(address indexed owner);
     event WithdrawRequestInitiated(address indexed requester, uint256 indexed requestId, uint256 stAmount,
@@ -196,7 +196,9 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         console.log("!!! CALCULATED OLAS amount:", olasAmount);
 
         // Mint request tokens
-        _mint(msg.sender, requestId, olasAmount, "");
+        _mint(msg.sender, requestId, olasAmount);
+        console.log("Withdraw requestId", requestId);
+        console.log("Withdraw requestId amount", olasAmount);
 
         // Update total withdraw amount requested
         uint256 curWithdrawAmountRequested = withdrawAmountRequested + olasAmount;
@@ -222,15 +224,14 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
     /// @param amounts Token amounts corresponding to request Ids.
     function finalizeWithdrawRequests(
         uint256[] calldata requestIds,
-        uint256[] calldata amounts,
-        bytes calldata data
+        uint256[] calldata amounts
     ) external {
-        // TODO Check for empty data?
-        safeBatchTransferFrom(msg.sender, address(this), requestIds, amounts, data);
-
         uint256 totalAmount;
         // Traverse all withdraw requests
         for (uint256 i = 0; i < requestIds.length; ++i) {
+            // Get amount for a specified withdraw request Id
+            transferFrom(msg.sender, address(this), requestIds[i], amounts[i]);
+
             // Decode a pair of key defining variables from one key: withdrawTime | requestId
             // requestId occupies first 64 bits, withdrawTime occupies next bits as they both fit well in uint256
             uint256 requestId = requestIds[i] & type(uint64).max;
@@ -248,13 +249,13 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
                 revert();
             }
 
+            // Burn withdraw tokens
+            _burn(address(this), requestIds[i], amounts[i]);
+
             totalAmount += amounts[i];
 
             emit WithdrawRequestExecuted(requestIds[i], amounts[i]);
         }
-
-        // Burn withdraw tokens
-        _batchBurn(address(this), requestIds, amounts);
 
         // Transfer total amount of OLAS
         // The transfer overflow check is not needed since balances are in sync
@@ -270,9 +271,5 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
 
     function getWithdrawIdAndTime(uint256 withdrawRequestId) external pure returns (uint256, uint256) {
         return ((withdrawRequestId & type(uint64).max), (withdrawRequestId >> 64));
-    }
-
-    function uri(uint256 id) public view virtual override returns (string memory) {
-        return "";
     }
 }
