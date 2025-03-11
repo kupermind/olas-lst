@@ -2,11 +2,17 @@
 pragma solidity ^0.8.28;
 
 import {ERC20, ERC4626} from  "../../lib/solmate/src/tokens/ERC4626.sol";
+import {IToken} from "../l2/ActivityModule.sol";
 
-/// @dev Only `minter` has a privilege, but the `sender` was provided.
+/// @dev Only `owner` has a privilege, but the `sender` was provided.
 /// @param sender Sender address.
-/// @param minter Required sender address as a minter.
-error MinterOnly(address sender, address minter);
+/// @param owner Required owner address.
+error OwnerOnly(address sender, address owner);
+
+/// @dev Only `treasury` has a privilege, but the `sender` was provided.
+/// @param sender Sender address.
+/// @param treasury Required sender address as a treasury.
+error TreasuryOnly(address sender, address treasury);
 
 /// @dev Provided zero address.
 error ZeroAddress();
@@ -18,36 +24,60 @@ error Overflow(uint256 provided, uint256 max);
 
 /// @title stOLAS - Smart contract for the stOLAS token.
 contract stOLAS is ERC4626 {
-    event MinterUpdated(address indexed minter);
-    event TotalReservesUpdated(uint256 stakedBalance, uint256 vaultBalance, uint256 totalReserves);
+    event OwnerUpdated(address indexed owner);
+    event ManagersUpdated(address indexed treasury, address indexed depository);
+    event TotalReservesUpdated(uint256 stakedBalance, uint256 vaultBalance, uint256 reserveBalance, uint256 totalReserves);
 
     // Staked balance
     uint256 public stakedBalance;
     // Vault balance
     uint256 public vaultBalance;
+    // Reserve balance
+    uint256 public reserveBalance;
     // Total OLAS reserves that include staked and vault balance
     uint256 public totalReserves;
 
-    // Minter address
-    address public minter;
+    // Owner address
+    address public owner;
+    // Treasury address
+    address public treasury;
+    // Depository address
+    address public depository;
 
     constructor(ERC20 _olas) ERC4626(_olas, "Staked OLAS", "stOLAS") {
-        minter = msg.sender;
+        owner = msg.sender;
     }
 
-    /// @dev Changes the minter address.
-    /// @param newMinter Address of a new minter.
-    function changeMinter(address newMinter) external {
-        if (msg.sender != minter) {
-            revert MinterOnly(msg.sender, minter);
+    /// @dev Changes the owner address.
+    /// @param newOwner Address of a new owner.
+    function changeOwner(address newOwner) external {
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
         }
 
-        if (newMinter == address(0)) {
+        if (newOwner == address(0)) {
             revert ZeroAddress();
         }
 
-        minter = newMinter;
-        emit MinterUpdated(newMinter);
+        owner = newOwner;
+        emit OwnerUpdated(newOwner);
+    }
+
+    /// @dev Changes various managing contract addresses.
+    /// @param newTreasury New treasury address.
+    /// @param newDepository New depository address.
+    function changeManagers(address newTreasury, address newDepository) external {
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
+        }
+
+        if (newTreasury == address(0) || newDepository == address(0)) {
+            revert ZeroAddress();
+        }
+
+        treasury = newTreasury;
+        depository = newDepository;
+        emit ManagersUpdated(newTreasury, newDepository);
     }
 
     /// @dev Deposits OLAS in exchange for stOLAS tokens.
@@ -55,8 +85,8 @@ contract stOLAS is ERC4626 {
     /// @param receiver Receiver account address.
     /// @return shares stOLAS amount.
     function deposit(uint256 assets, address receiver) public override returns (uint256 shares) {
-        if (msg.sender != minter) {
-            revert MinterOnly(msg.sender, minter);
+        if (msg.sender != treasury) {
+            revert TreasuryOnly(msg.sender, treasury);
         }
 
         // Update total assets
@@ -80,25 +110,25 @@ contract stOLAS is ERC4626 {
 
         _mint(receiver, shares);
 
-        emit TotalReservesUpdated(curStakedBalance, curVaultBalance, curTotalReserves);
+        emit TotalReservesUpdated(curStakedBalance, curVaultBalance, reserveBalance, curTotalReserves);
         emit Deposit(msg.sender, receiver, assets, shares);
     }
 
     /// @dev Redeems OLAS in exchange for stOLAS tokens.
     /// @param shares stOLAS amount.
     /// @param receiver Receiver account address.
-    /// @param owner Token owner account address.
+    /// @param tokenOwner Token owner account address.
     /// @return assets OLAS amount.
-    function redeem(uint256 shares, address receiver, address owner) public override returns (uint256 assets) {
-        if (msg.sender != minter) {
-            revert MinterOnly(msg.sender, minter);
+    function redeem(uint256 shares, address receiver, address tokenOwner) public override returns (uint256 assets) {
+        if (msg.sender != treasury) {
+            revert TreasuryOnly(msg.sender, treasury);
         }
 
         // TODO Is this check needed?
-        if (msg.sender != owner) {
-            uint256 allowed = allowance[owner][msg.sender]; // Saves gas for limited approvals.
+        if (msg.sender != tokenOwner) {
+            uint256 allowed = allowance[tokenOwner][msg.sender]; // Saves gas for limited approvals.
 
-            if (allowed != type(uint256).max) allowance[owner][msg.sender] = allowed - shares;
+            if (allowed != type(uint256).max) allowance[tokenOwner][msg.sender] = allowed - shares;
         }
 
         // TODO Optimize
@@ -107,19 +137,27 @@ contract stOLAS is ERC4626 {
         // Check for rounding error since we round down in previewRedeem.
         require((assets = previewRedeem(shares)) != 0, "ZERO_ASSETS");
 
-        _burn(owner, shares);
+        _burn(tokenOwner, shares);
 
         // TODO Is it correct it happens after assets calculation? Seems so, as assets must be calculated on current holdings
         // Update total assets
-        // Get current staked and vault balance
+        // Get current staked and vault balance (including reserve balance)
         uint256 curStakedBalance = stakedBalance;
         uint256 curVaultBalance = asset.balanceOf(address(this));
+        uint256 curReserveBalance = reserveBalance;
         uint256 transferAmount;
 
         // TODO optimize?
         if (curVaultBalance > assets) {
             transferAmount = assets;
-            curVaultBalance -= assets;
+
+            // Reserve balance update
+            if (assets > curReserveBalance) {
+                curReserveBalance = 0;
+                curVaultBalance -= (assets - curReserveBalance);
+            } else {
+                curReserveBalance -= assets;
+            }
         } else {
             transferAmount = curVaultBalance;
             uint256 diff = assets - curVaultBalance;
@@ -132,6 +170,7 @@ contract stOLAS is ERC4626 {
 
             curStakedBalance -= diff;
             stakedBalance = curStakedBalance;
+            reserveBalance = 0;
         }
 
         uint256 curTotalReserves = curStakedBalance + curVaultBalance;
@@ -140,18 +179,50 @@ contract stOLAS is ERC4626 {
 
         asset.transfer(receiver, transferAmount);
 
-        emit TotalReservesUpdated(curStakedBalance, curVaultBalance, curTotalReserves);
-        emit Withdraw(msg.sender, receiver, owner, assets, shares);
+        emit TotalReservesUpdated(curStakedBalance, curVaultBalance, curReserveBalance, curTotalReserves);
+        emit Withdraw(msg.sender, receiver, tokenOwner, assets, shares);
     }
 
     /// @dev Overrides mint function that is never used.
-    function mint(uint256, address) public override returns (uint256) {
+    function mint(uint256, address) public pure override returns (uint256) {
         return 0;
     }
 
     /// @dev Overrides withdraw function that is never used.
-    function withdraw(uint256, address, address) public override returns (uint256) {
+    function withdraw(uint256, address, address) public pure override returns (uint256) {
         return 0;
+    }
+
+    function topUpReserveBalance(uint256 amount) external {
+        if (msg.sender != depository) {
+            revert();
+        }
+
+        asset.transferFrom(msg.sender, address(this), amount);
+        reserveBalance += amount;
+        totalReserves += amount;
+
+        // TODO event or Transfer event is enough?
+    }
+
+    function fundDepository(uint256 amount) external {
+        if (msg.sender != depository) {
+            revert();
+        }
+
+        uint256 curReserveBalance = reserveBalance;
+        // This must never happen
+        if (amount > curReserveBalance) {
+            revert Overflow(amount, curReserveBalance);
+        }
+
+        curReserveBalance -= amount;
+        reserveBalance = curReserveBalance;
+        totalReserves -= amount;
+
+        asset.transfer(msg.sender, amount);
+
+        // TODO event or Transfer event is enough?
     }
 
     // TODO Optimize
@@ -167,7 +238,7 @@ contract stOLAS is ERC4626 {
         uint256 curTotalReserves = curStakedBalance + curVaultBalance;
         totalReserves = curTotalReserves;
 
-        emit TotalReservesUpdated(curStakedBalance, curVaultBalance, curTotalReserves);
+        emit TotalReservesUpdated(curStakedBalance, curVaultBalance, reserveBalance, curTotalReserves);
     }
     
     function totalAssets() public view override returns (uint256) {

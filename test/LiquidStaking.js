@@ -157,21 +157,22 @@ describe("Liquid Staking", function () {
         await lock.deployed();
 
         const Depository = await ethers.getContractFactory("Depository");
-        depository = await Depository.deploy(olas.address, ve.address, AddressZero, lock.address, lockFactor);
+        depository = await Depository.deploy(olas.address, st.address, ve.address, AddressZero, lock.address, lockFactor);
         await depository.deployed();
 
         const Treasury = await ethers.getContractFactory("Treasury");
         treasury = await Treasury.deploy(olas.address, st.address, depository.address);
         await treasury.deployed();
 
+        // Change managers for stOLAS
+        // Only Treasury contract can mint OLAS
+        await st.changeManagers(treasury.address, depository.address);
+
         // Initialize lock
         await lock.initialize(treasury.address, deployer.address);
 
         // Change treasury address in depository
         await depository.changeTreasury(treasury.address);
-
-        // Only Treasury contract can mint proxy OLAS
-        await st.changeMinter(treasury.address);
 
         const StakingVerifier = await ethers.getContractFactory("StakingVerifier");
         stakingVerifier = await StakingVerifier.deploy(olas.address, serviceRegistry.address,

@@ -13,7 +13,7 @@ interface IDepository {
     /// @param bridgePayloads Bridge payloads corresponding to each chain Id.
     /// @param values Value amounts for each bridge interaction, if applicable.
     /// @return amounts Corresponding OLAS amounts for each staking proxy.
-    function processUnstake(uint256 unstakeAmount, uint256[] memory chainIds, address[][] memory stakingProxies,
+    function unstake(uint256 unstakeAmount, uint256[] memory chainIds, address[][] memory stakingProxies,
         bytes[] memory bridgePayloads, uint256[] memory values) external payable returns (uint256[][] memory amounts);
 }
 
@@ -155,45 +155,6 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         stAmount = IST(st).deposit(olasAmount, account);
     }
 
-    /// @dev Calculates amounts and initiates cross-chain unstake request from specified models.
-    /// @param unstakeAmount Total amount to unstake.
-    /// @param chainIds Set of chain Ids with staking proxies.
-    /// @param stakingProxies Set of sets of staking proxies corresponding to each chain Id.
-    /// @param bridgePayloads Bridge payloads corresponding to each chain Id.
-    /// @param values Value amounts for each bridge interaction, if applicable.
-    function _unstake(
-        uint256 unstakeAmount,
-        uint256[] memory chainIds,
-        address[][] memory stakingProxies,
-        bytes[] memory bridgePayloads,
-        uint256[] memory values
-    ) internal {
-        // Calculate OLAS amounts and initiate unstake messages to L2-s
-        IDepository(depository).processUnstake(unstakeAmount, chainIds, stakingProxies, bridgePayloads, values);
-    }
-
-    /// @dev Unstakes from specified staking models.
-    /// @notice This allows to deduct reserves from their staked part and get them back as vault part.
-    /// @param unstakeAmount Total amount to unstake.
-    /// @param chainIds Set of chain Ids with staking proxies.
-    /// @param stakingProxies Set of sets of staking proxies corresponding to each chain Id.
-    /// @param bridgePayloads Bridge payloads corresponding to each chain Id.
-    /// @param values Value amounts for each bridge interaction, if applicable.
-    function unstake(
-        uint256 unstakeAmount,
-        uint256[] memory chainIds,
-        address[][] memory stakingProxies,
-        bytes[] memory bridgePayloads,
-        uint256[] memory values
-    ) external payable {
-        // Check for ownership
-        if (msg.sender != owner) {
-            revert OwnerOnly(msg.sender, owner);
-        }
-
-        _unstake(unstakeAmount, chainIds, stakingProxies, bridgePayloads, values);
-    }
-
     // TODO Move high level part to depository?
     /// @dev Requests withdraw of OLAS in exchange of provided stOLAS.
     /// @notice Vault reserves are used first. If there is a lack of OLAS reserves, the backup amount is requested
@@ -246,7 +207,7 @@ contract Treasury is ERC1155, ERC1155TokenReceiver {
         if (stakedBalanceBefore > stakedBalanceAfter) {
             uint256 withdrawDiff = stakedBalanceBefore - stakedBalanceAfter;
 
-            _unstake(withdrawDiff, chainIds, stakingProxies, bridgePayloads, values);
+            IDepository(depository).unstake(withdrawDiff, chainIds, stakingProxies, bridgePayloads, values);
         }
 
         emit WithdrawRequestInitiated(msg.sender, requestId, stAmount, olasAmount, withdrawTime);

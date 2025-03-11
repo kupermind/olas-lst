@@ -152,4 +152,6 @@ contract Collector {
         // Send tokens to L1
         IBridge(l2StakingProcessor).relayToL1{value: msg.value}(l1St, amount);
     }
+
+    // TODO withdraw
 }
