@@ -65,12 +65,13 @@ const main = async () => {
     // Wait for half a minute for the transaction completion
     await new Promise(r => setTimeout(r, 30000));
 
-    await hre.run("verify:verify", {
-        address: collector.address,
-        constructorArguments: [parsedData.olasAddress, parsedData.stOLASAddress],
-    });
     parsedData.collectorAddress = collector.address;
     fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
+
+    await hre.run("verify:verify", {
+        address: parsedData.collectorAddress,
+        constructorArguments: [parsedData.olasAddress, parsedData.stOLASAddress],
+    });
 
     const CollectorProxy = await ethers.getContractFactory("Proxy");
     let initPayload = collector.interface.encodeFunctionData("initialize", []);
@@ -80,14 +81,14 @@ const main = async () => {
     // Wait for half a minute for the transaction completion
     await new Promise(r => setTimeout(r, 30000));
 
-    await hre.run("verify:verify", {
-        address: collectorProxy.address,
-        constructorArguments: [collector.address, initPayload],
-    });
     parsedData.collectorProxyAddress = collectorProxy.address;
     fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
-    collector = await ethers.getContractAt("Collector", parsedData.collectorProxyAddress);
 
+    await hre.run("verify:verify", {
+        address: parsedData.collectorProxyAddress,
+        constructorArguments: [collector.address, initPayload],
+    });
+    collector = await ethers.getContractAt("Collector", parsedData.collectorProxyAddress);
 
     const ActivityModule = await ethers.getContractFactory("ActivityModule");
     activityModule = await ActivityModule.deploy(parsedData.olasAddress, parsedData.collectorProxyAddress);
@@ -96,12 +97,13 @@ const main = async () => {
     // Wait for half a minute for the transaction completion
     await new Promise(r => setTimeout(r, 30000));
 
-    await hre.run("verify:verify", {
-        address: activityModule.address,
-        constructorArguments: [parsedData.olasAddress, parsedData.collectorProxyAddress],
-    });
     parsedData.activityModuleAddress = activityModule.address;
     fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
+
+    await hre.run("verify:verify", {
+        address: parsedData.activityModuleAddress,
+        constructorArguments: [parsedData.olasAddress, parsedData.collectorProxyAddress],
+    });
 
 
     const Beacon = await ethers.getContractFactory("Beacon");
@@ -119,7 +121,6 @@ const main = async () => {
         constructorArguments: [parsedData.activityModuleAddress],
     });
 
-
     const StakingManager = await ethers.getContractFactory("StakingManager");
     stakingManager = await StakingManager.deploy(parsedData.olasAddress, parsedData.treasuryProxyAddress,
         parsedData.serviceManagerTokenAddress, parsedData.stakingFactoryAddress, parsedData.safeToL2SetupAddress,
@@ -129,14 +130,15 @@ const main = async () => {
     // Wait for half a minute for the transaction completion
     await new Promise(r => setTimeout(r, 30000));
 
+    parsedData.stakingManagerAddress = stakingManager.address;
+    fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
+
     await hre.run("verify:verify", {
-        address: stakingManager.address,
+        address: parsedData.stakingManagerAddress,
         constructorArguments: [parsedData.olasAddress, parsedData.treasuryProxyAddress, parsedData.serviceManagerTokenAddress,
             parsedData.stakingFactoryAddress, parsedData.safeToL2SetupAddress, parsedData.gnosisSafeL2Address,
             parsedData.beaconAddress, parsedData.collectorProxyAddress, agentId, defaultHash],
     });
-    parsedData.stakingManagerAddress = stakingManager.address;
-    fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
 
     // Initialize stakingManager
     const StakingManagerProxy = await ethers.getContractFactory("Proxy");
@@ -148,14 +150,14 @@ const main = async () => {
     // Wait for half a minute for the transaction completion
     await new Promise(r => setTimeout(r, 30000));
 
-    await hre.run("verify:verify", {
-        address: stakingManagerProxy.address,
-        constructorArguments: [parsedData.stakingManagerAddress, initPayload],
-    });
     parsedData.stakingManagerProxyAddress = stakingManagerProxy.address;
     fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
-    stakingManager = await ethers.getContractAt("StakingManager", parsedData.stakingManagerProxyAddress);
 
+    await hre.run("verify:verify", {
+        address: parsedData.stakingManagerProxyAddress,
+        constructorArguments: [parsedData.stakingManagerAddress, initPayload],
+    });
+    stakingManager = await ethers.getContractAt("StakingManager", parsedData.stakingManagerProxyAddress);
 
     // Fund staking manager with native to support staking creation
     await deployer.sendTransaction({to: stakingManager.address, value: ethers.utils.parseEther("0.000001")});
@@ -181,11 +183,11 @@ const main = async () => {
     });
 
     // changeStakingProcessorL2 for collector
-    collector = await ethers.getContractAt("Collector", parsedData.collectorProxyAddress);
+    //collector = await ethers.getContractAt("Collector", parsedData.collectorProxyAddress);
     await collector.changeStakingProcessorL2(parsedData.baseStakingProcessorL2Address);
 
     // changeStakingProcessorL2 for stakingManager
-    stakingManager = await ethers.getContractAt("StakingManager", parsedData.stakingManagerProxyAddress);
+    //stakingManager = await ethers.getContractAt("StakingManager", parsedData.stakingManagerProxyAddress);
     await stakingManager.changeStakingProcessorL2(parsedData.baseStakingProcessorL2Address);
 
 
@@ -200,10 +202,9 @@ const main = async () => {
     fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
 
     await hre.run("verify:verify", {
-        address: parsedData.activityCheckerAddress ,
+        address: parsedData.activityCheckerAddress,
         constructorArguments: [livenessRatio],
     });
-
 
     const StakingTokenLocked = await ethers.getContractFactory("StakingTokenLocked");
     stakingTokenImplementation = await StakingTokenLocked.deploy();
@@ -219,7 +220,6 @@ const main = async () => {
         address: parsedData.stakingTokenImplementationAddress,
         constructorArguments: [],
     });
-
 
     // Whitelist implementation
     stakingVerifier = await ethers.getContractAt("StakingVerifier", parsedData.stakingVerifierAddress);
