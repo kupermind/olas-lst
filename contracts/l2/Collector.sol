@@ -108,6 +108,7 @@ contract Collector is Implementation {
         emit ProtocolFactorUpdated(newProtocolFactor);
     }
 
+    // TODO Add bridgePayload
     function relayRewardTokens() external payable {
         // Get OLAS balance
         uint256 olasBalance = IToken(olas).balanceOf(address(this));

@@ -10,26 +10,9 @@ interface IToken {
     /// @param amount Token amount.
     /// @return True if the function execution is successful.
     function approve(address spender, uint256 amount) external returns (bool);
-
-    /// @dev Transfers the token amount that was previously approved up until the maximum allowance.
-    /// @param from Account address to transfer from.
-    /// @param to Account address to transfer to.
-    /// @param amount Amount to transfer to.
-    /// @return True if the function execution is successful.
-    function transferFrom(address from, address to, uint256 amount) external returns (bool);
 }
 
 interface IBridge {
-    // Contract: AMB Contract Proxy Home
-    // Source: https://github.com/omni/tokenbridge-contracts/blob/908a48107919d4ab127f9af07d44d47eac91547e/contracts/upgradeable_contracts/arbitrary_message/MessageDelivery.sol#L22
-    // Doc: https://docs.gnosischain.com/bridges/Token%20Bridge/amb-bridge
-    /// @dev Requests message relay to the opposite network
-    /// @param target Executor address on the other side.
-    /// @param data Calldata passed to the executor on the other side.
-    /// @param maxGasLimit Gas limit used on the other network for executing a message.
-    /// @return Message Id.
-    function requireToPassMessage(address target, bytes memory data, uint256 maxGasLimit) external returns (bytes32);
-
     // Contract: Omnibridge Multi-Token Mediator Proxy
     // Source: https://github.com/omni/omnibridge/blob/c814f686487c50462b132b9691fd77cc2de237d3/contracts/upgradeable_contracts/components/common/TokensRelayer.sol#L54
     // Doc: https://docs.gnosischain.com/bridges/Token%20Bridge/omnibridge

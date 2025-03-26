@@ -18,10 +18,6 @@ interface IBridge {
     // Source: https://github.com/omni/omnibridge/blob/c814f686487c50462b132b9691fd77cc2de237d3/contracts/upgradeable_contracts/components/common/TokensRelayer.sol#L54
     // Doc: https://docs.gnosischain.com/bridges/Token%20Bridge/omnibridge
     function relayTokens(address token, address receiver, uint256 amount) external;
-
-    // Source: https://github.com/omni/omnibridge/blob/c814f686487c50462b132b9691fd77cc2de237d3/contracts/interfaces/IAMB.sol#L14
-    // Doc: https://docs.gnosischain.com/bridges/Token%20Bridge/amb-bridge#security-considerations-for-receiving-a-call
-    function messageSender() external returns (address);
 }
 
 /// @title GnosisDepositProcessorL1 - Smart contract for sending tokens and data via Gnosis bridge from L1 to L2 and processing data received from L2.

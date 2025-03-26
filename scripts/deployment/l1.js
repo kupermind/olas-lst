@@ -13,13 +13,14 @@ const main = async () => {
     let collector;
     let beacon;
     let gnosisDepositProcessorL1;
-    let gnosisStakingProcessorL2;
+    let baseDepositProcessorL1;
     let deployer;
     const AddressZero = ethers.constants.AddressZero;
     const HashZero = ethers.constants.HashZero;
     const initSupply = "5" + "0".repeat(26);
     const maxStakingLimit = ethers.utils.parseEther("20000");
     const gnosisChainId = 100;
+    const baseChainId = 8453;
     const regDeposit = ethers.utils.parseEther("10000");
     const maxNumServices = 100;
     const stakingSupply = (regDeposit.mul(2)).mul(ethers.BigNumber.from(maxNumServices));
@@ -185,11 +186,34 @@ const main = async () => {
     fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
 
 
-    // Whitelist deposit processors
-    await depository.setDepositProcessorChainIds([gnosisDepositProcessorL1.address], [gnosisChainId]);
+    const BaseDepositProcessorL1 = await ethers.getContractFactory("BaseDepositProcessorL1");
+    baseDepositProcessorL1 = await BaseDepositProcessorL1.deploy(parsedData.olasAddress, parsedData.depositoryProxyAddress,
+        parsedData.baseL1StandardBridgeProxyAddress, parsedData.baseL1CrossDomainMessengerProxyAddress, gnosisChainId,
+        parsedData.baseOLASAddress);
+    await baseDepositProcessorL1.deployed();
 
-    // Set the gnosisStakingProcessorL2 address in gnosisDepositProcessorL1
-    //await gnosisDepositProcessorL1.setL2StakingProcessor(gnosisStakingProcessorL2.address);
+    // Wait for half a minute for the transaction completion
+    await new Promise(r => setTimeout(r, 30000));
+
+    parsedData.baseDepositProcessorL1Address = baseDepositProcessorL1.address;
+    fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
+
+    await hre.run("verify:verify", {
+        address: parsedData.baseDepositProcessorL1Address,
+        constructorArguments: [parsedData.olasAddress, parsedData.depositoryProxyAddress,
+            parsedData.baseL1StandardBridgeProxyAddress, parsedData.baseL1CrossDomainMessengerProxyAddress, gnosisChainId,
+            parsedData.baseOLASAddress],
+    });
+
+
+    // Whitelist deposit processors
+    //depository = await ethers.getContractAt("Depository", parsedData.depositoryProxyAddress);
+    await depository.setDepositProcessorChainIds([parsedData.gnosisDepositProcessorL1Address], [gnosisChainId]);
+    await depository.setDepositProcessorChainIds([parsedData.baseDepositProcessorL1Address], [baseChainId]);
+
+    // Set StakingProcessorL2-s addresses in DepositProcessorL1-s
+    //await gnosisDepositProcessorL1.setL2StakingProcessor(gnosisStakingProcessorL2Address);
+    //await baseDepositProcessorL1.setL2StakingProcessor(baseStakingProcessorL2Address);
 
     // Add model to L1
     //await depository.createAndActivateStakingModels([gnosisChainId], [stakingTokenAddress], [stakingSupply]);

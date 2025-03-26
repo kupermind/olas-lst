@@ -421,6 +421,7 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
         // _locked is now set to 2 for good
     }
 
+    // TODO Add bridgePayload
     function relayToL1(address to, uint256 olasAmount) external virtual payable;
 
     /// @dev Gets the maximum number of token decimals able to be transferred across the bridge.
