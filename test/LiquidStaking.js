@@ -49,6 +49,7 @@ describe("Liquid Staking", function () {
     const livenessRatio = "11111111111111"; // 1 transaction per 25 hours
     const maxNumServices = 100;
     const minStakingDeposit = regDeposit;
+    const fullStakeDeposit = regDeposit.mul(2);
     const timeForEmissions = oneDay * 30;
     let serviceParams = {
         maxNumServices,
@@ -69,7 +70,7 @@ describe("Liquid Staking", function () {
     const chainId = 31337;
     const gnosisChainId = 100;
     const stakingRewardsPerEpoch = ethers.BigNumber.from(serviceParams.rewardsPerSecond).mul(ethers.BigNumber.from(maxNumServices)).mul(timeForEmissions);
-    const stakingSupply = (regDeposit.mul(2)).mul(ethers.BigNumber.from(maxNumServices));
+    const stakingSupply = fullStakeDeposit.mul(ethers.BigNumber.from(maxNumServices));
     const bridgePayload = "0x";
 
     beforeEach(async function () {
@@ -167,7 +168,7 @@ describe("Liquid Staking", function () {
         await depository.deployed();
 
         const DepositoryProxy = await ethers.getContractFactory("Proxy");
-        initPayload = depository.interface.encodeFunctionData("initialize", [lockFactor, maxStakingLimit]);
+        initPayload = depository.interface.encodeFunctionData("initialize", [lockFactor]);
         const depositoryProxy = await DepositoryProxy.deploy(depository.address, initPayload);
         await depositoryProxy.deployed();
         depository = await ethers.getContractAt("Depository", depositoryProxy.address);
@@ -292,7 +293,8 @@ describe("Liquid Staking", function () {
         await stakingTokenInstance.deposit(stakingSupply);
 
         // Add model to L1
-        await depository.createAndActivateStakingModels([gnosisChainId], [stakingTokenAddress], [stakingSupply]);
+        await depository.createAndActivateStakingModels([gnosisChainId], [stakingTokenAddress], [fullStakeDeposit],
+            [maxNumServices]);
     });
 
     context("Staking", function () {

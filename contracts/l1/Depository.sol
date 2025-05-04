@@ -78,10 +78,11 @@ contract Depository is Implementation {
     }
 
     event TreasuryUpdated(address indexed treasury);
-    event DepositoryParamsUpdated(uint256 lockFactor, uint256 maxStakingLimit);
+    event LockFactorUpdated(uint256 lockFactor);
     event Locked(address indexed account, uint256 olasAmount, uint256 lockAmount, uint256 vaultBalance);
     event SetDepositProcessorChainIds(address[] depositProcessors, uint256[] chainIds);
-    event StakingModelsActivated(uint256[] chainIds, address[] stakingProxies, uint256[] supplies);
+    event StakingModelsActivated(uint256[] chainIds, address[] stakingProxies, uint256[] stakeLimitPerSlots,
+        uint256[] numSlots);
     event ChangeModelStatuses(uint256[] modelIds, StakingModelStatus[] statuses);
     event Deposit(address indexed sender, uint256 stakeAmount, uint256 stAmount, uint256[] chainIds,
         address[] stakingProxies, uint256[] amounts);
@@ -93,6 +94,7 @@ contract Depository is Implementation {
     struct StakingModel {
         uint96 supply;
         uint96 remainder;
+        uint96 stakeLimitPerSlot;
         StakingModelStatus status;
     }
 
@@ -117,8 +119,6 @@ contract Depository is Implementation {
 
     // Lock factor in 10_000 value
     uint256 public lockFactor;
-    // Max staking limit per a single staking proxy
-    uint256 public maxStakingLimit;
 
     // TODO Change to transient
     // Reentrancy lock
@@ -159,14 +159,13 @@ contract Depository is Implementation {
     }
 
     /// @dev Depository initializer.
-    function initialize(uint256 _lockFactor, uint256 _maxStakingLimit) external{
+    function initialize(uint256 _lockFactor) external{
         // Check for already initialized
         if (owner != address(0)) {
             revert AlreadyInitialized();
         }
 
         lockFactor = _lockFactor;
-        maxStakingLimit = _maxStakingLimit;
 
         owner = msg.sender;
         _locked = 1;
@@ -223,11 +222,13 @@ contract Depository is Implementation {
     /// @dev Creates and activates staking models.
     /// @param chainIds Chain Ids.
     /// @param stakingProxies Corresponding staking proxy addresses.
-    /// @param supplies Corresponding staking supplies.
+    /// @param stakeLimitPerSlots Corresponding staking limits per each staking slot.
+    /// @param numSlots Corresponding number of staking slots.
     function createAndActivateStakingModels(
         uint256[] memory chainIds,
         address[] memory stakingProxies,
-        uint256[] memory supplies
+        uint256[] memory stakeLimitPerSlots,
+        uint256[] memory numSlots
     ) external {
         // Check for ownership
         if (msg.sender != owner) {
@@ -235,18 +236,21 @@ contract Depository is Implementation {
         }
 
         // Check for array lengths
-        if (chainIds.length == 0 || chainIds.length != stakingProxies.length || chainIds.length != supplies.length) {
+        if (chainIds.length == 0 || chainIds.length != stakingProxies.length || chainIds.length != numSlots.length ||
+            chainIds.length != stakeLimitPerSlots.length) {
             revert WrongArrayLength();
         }
 
         for (uint256 i = 0; i < chainIds.length; ++i) {
+            uint256 supply = stakeLimitPerSlots[i] * numSlots[i];
+
             // Check for overflow
-            if (supplies[i] > type(uint96).max) {
-                revert Overflow(supplies[i], type(uint96).max);
+            if (supply > type(uint96).max) {
+                revert Overflow(supply, type(uint96).max);
             }
 
             // Check for zero value
-            if (supplies[i] == 0) {
+            if (supply == 0) {
                 revert ZeroValue();
             }
 
@@ -269,15 +273,16 @@ contract Depository is Implementation {
             }
 
             // Set supply and activate
-            stakingModel.supply = uint96(supplies[i]);
-            stakingModel.remainder = uint96(supplies[i]);
+            stakingModel.supply = uint96(supply);
+            stakingModel.remainder = uint96(supply);
+            stakingModel.stakeLimitPerSlot = uint96(stakeLimitPerSlots[i]);
             stakingModel.status = StakingModelStatus.Active;
 
             // Add into global staking model set
             setStakingModelIds.push(stakingModelId);
         }
 
-        emit StakingModelsActivated(chainIds, stakingProxies, supplies);
+        emit StakingModelsActivated(chainIds, stakingProxies, stakeLimitPerSlots, numSlots);
     }
 
     // TODO Deactivate modules for good via proofs
@@ -312,21 +317,19 @@ contract Depository is Implementation {
 
     /// @dev Changes depository params.
     /// @param newLockFactor New lock factor value.
-    /// @param newMaxStakingLimit New max staking limit per staking proxy.
-    function changeDepositoryParams(uint256 newLockFactor, uint256 newMaxStakingLimit) external {
+    function changeLockFactor(uint256 newLockFactor) external {
         // Check for ownership
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);
         }
 
         // Check for zero value
-        if (newLockFactor == 0 || newMaxStakingLimit == 0) {
+        if (newLockFactor == 0) {
             revert ZeroValue();
         }
 
         lockFactor = newLockFactor;
-        maxStakingLimit = newMaxStakingLimit;
-        emit DepositoryParamsUpdated(newLockFactor, newMaxStakingLimit);
+        emit LockFactorUpdated(newLockFactor);
     }
 
     /// @dev Calculates amounts and initiates cross-chain stake request for specified models.
@@ -390,9 +393,6 @@ contract Depository is Implementation {
         // Allocate arrays of max possible size
         amounts = new uint256[](chainIds.length);
 
-        // Get max staking limit
-        uint256 curMaxStakingLimit = maxStakingLimit;
-
         // Collect staking contracts and amounts
         for (uint256 i = 0; i < chainIds.length; ++i) {
             // Push a pair of key defining variables into one key: chainId | stakingProxy
@@ -413,8 +413,8 @@ contract Depository is Implementation {
 
             // Adjust staking amount to not overflow the max allowed one
             amounts[i] = remainder;
-            if (amounts[i] > curMaxStakingLimit) {
-                amounts[i] = curMaxStakingLimit;
+            if (amounts[i] > stakingModel.stakeLimitPerSlot) {
+                amounts[i] = stakingModel.stakeLimitPerSlot;
             }
 
             if (amounts[i] > stakingModel.remainder) {
@@ -518,8 +518,8 @@ contract Depository is Implementation {
 
             // Adjust unstaking amount to not overflow the max allowed one
             amounts[i] = stakingModel.supply - stakingModel.remainder;
-            if (amounts[i] > maxStakingLimit) {
-                amounts[i] = maxStakingLimit;
+            if (amounts[i] > stakingModel.stakeLimitPerSlot) {
+                amounts[i] = stakingModel.stakeLimitPerSlot;
             }
 
             if (unstakeAmount > amounts[i]) {
