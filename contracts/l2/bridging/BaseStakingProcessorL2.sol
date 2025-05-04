@@ -74,7 +74,7 @@ contract BaseStakingProcessorL2 is DefaultStakingProcessorL2 {
         _receiveMessage(msg.sender, l1Processor, data);
     }
 
-    function relayToL1(address to, uint256 olasAmount) external virtual override payable {
+    function relayToL1(address to, uint256 olasAmount, bytes memory) external virtual override payable {
         // msg.value must be zero
         if (msg.value > 0) {
             revert();

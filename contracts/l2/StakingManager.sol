@@ -14,7 +14,7 @@ interface IActivityModule {
 }
 
 interface IBridge {
-    function relayToL1(address to, uint256 olasAmount) external payable;
+    function relayToL1(address to, uint256 olasAmount, bytes memory) external payable;
 }
 
 // Multisig interface
@@ -120,7 +120,6 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
 
     // Nonce
     uint256 internal _nonce;
-    // TODO change to transient bool
     // Reentrancy lock
     uint256 internal _locked = 1;
 
@@ -130,6 +129,7 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
     mapping(address => uint256[]) public mapStakedServiceIds;
     mapping(uint256 => address) public mapServiceIdActivityModules;
     mapping(address => uint256) public mapLastStakedServiceIdxs;
+    mapping(address => address) public mapActivityModuleStakingProxies;
 
     /// @dev StakerL2 constructor.
     /// @param _olas OLAS token address.
@@ -297,6 +297,9 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
 
         // Initialize activity module
         IActivityModule(activityModule).initialize(multisig, stakingProxy, serviceId);
+
+        // Record Activity Module <-> Staking Proxy correspondence
+        mapActivityModuleStakingProxies[activityModule] = stakingProxy;
 
         // Stake the service
         _stake(stakingProxy, serviceId, activityModule);
@@ -477,20 +480,26 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
 
         // Send OLAS to collector to initiate L1 transfer for all the balances at this time
         IToken(olas).transfer(l2StakingProcessor, amount);
-        // TODO Check on relays, but the majority of them does not require value
+
         // Send tokens to L1 Treasury and not stOLAS, since the redeem finalization is handled by Treasury
-        IBridge(l2StakingProcessor).relayToL1(l1Treasury, amount);
+        // Note that if any msg.value is needed for relay to L1, it must be handled in the corresponding
+        // Staking Processor L2 contract, since this function is called in the L1-L2-L1 tx and it is difficult
+        // to pre-calculate L2-L1 value before hand as bridging time varies and quotes might become outdated
+        IBridge(l2StakingProcessor).relayToL1(l1Treasury, amount, "");
 
         _locked = 1;
     }
 
     /// @dev Claims specified service rewards.
-    /// @param stakingProxy Staking proxy address.
     /// @param serviceId Service Id.
     /// @return Staking reward.
-    function claim(address stakingProxy, uint256 serviceId) external returns (uint256) {
-        // TODO Check that activityModule is eligible, i.e. created by address(this)
-        // TODO map of activityModule => staking proxy?
+    function claim(uint256 serviceId) external returns (uint256) {
+        // Check that msg.sender is a valid Activity Module by getting its Staking Proxy address
+        address stakingProxy = mapActivityModuleStakingProxies[msg.sender];
+        if (stakingProxy == address(0)) {
+            revert UnauthorizedAccount(msg.sender);
+        }
+
         return IStaking(stakingProxy).claim(serviceId);
     }
 

@@ -162,7 +162,6 @@ contract Lock is Implementation {
         emit OlasGovernorUpdated(_olasGovernor);
     }
 
-    // TODO lock full balance and make this ownerless?
     /// @dev Increases lock amount and time.
     /// @param olasAmount OLAS amount.
     function increaseLock(uint256 olasAmount) external {

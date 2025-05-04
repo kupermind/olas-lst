@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import {Implementation, OwnerOnly, ZeroAddress} from "../Implementation.sol";
 
 interface IBridge {
-    function relayToL1(address to, uint256 olasAmount) external payable;
+    function relayToL1(address to, uint256 olasAmount, bytes memory bridgePayload) external payable;
 }
 
 // ERC20 token interface
@@ -108,8 +108,7 @@ contract Collector is Implementation {
         emit ProtocolFactorUpdated(newProtocolFactor);
     }
 
-    // TODO Add bridgePayload
-    function relayRewardTokens() external payable {
+    function relayRewardTokens(bytes memory bridgePayload) external payable {
         // Get OLAS balance
         uint256 olasBalance = IToken(olas).balanceOf(address(this));
         // Get current protocol balance
@@ -136,10 +135,8 @@ contract Collector is Implementation {
         // Transfer tokens
         IToken(olas).transfer(l2StakingProcessor, amount);
 
-        // TODO Check on relays, but the majority of them does not require value
-        // TODO: Make sure once again no value is needed to send tokens back
         // Send tokens to L1
-        IBridge(l2StakingProcessor).relayToL1{value: msg.value}(l1St, amount);
+        IBridge(l2StakingProcessor).relayToL1{value: msg.value}(l1St, amount, bridgePayload);
     }
 
     // TODO withdraw

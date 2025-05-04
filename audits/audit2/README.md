@@ -105,7 +105,8 @@ if (stakeAmount > 0) {
             stakeAmount = _increaseLock(stakeAmount);
         }
 else {revert()} ?
-```    
+``` 
+[x] False positive - the amount is assembled with the reserve balance on stOLAS
 
 ### Fix ToDo  function unstake(). Remove msg.sender == owner?
 ```

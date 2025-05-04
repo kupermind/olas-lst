@@ -359,7 +359,7 @@ describe("Liquid Staking", function () {
 
             // Relay rewards to L1
             console.log("Calling relay tokens to L1 by agent or manually");
-            await collector.relayRewardTokens();
+            await collector.relayRewardTokens(bridgePayload);
 
             console.log("\nL1");
 
@@ -512,7 +512,7 @@ describe("Liquid Staking", function () {
 
             // Relay rewards to L1
             console.log("Calling relay tokens to L1 by agent or manually");
-            await collector.relayRewardTokens();
+            await collector.relayRewardTokens(bridgePayload);
 
             console.log("\nL1");
 
@@ -659,7 +659,7 @@ describe("Liquid Staking", function () {
 
             // Relay rewards to L1
             console.log("Calling relay tokens to L1 by agent or manually");
-            await collector.relayRewardTokens();
+            await collector.relayRewardTokens(bridgePayload);
 
             console.log("\nL1");
 
@@ -771,7 +771,7 @@ describe("Liquid Staking", function () {
 
             // Relay rewards to L1
             console.log("Calling relay tokens to L1 by agent or manually");
-            await collector.relayRewardTokens();
+            await collector.relayRewardTokens(bridgePayload);
 
             console.log("\nL1");
 
@@ -911,7 +911,7 @@ describe("Liquid Staking", function () {
 
             // Relay rewards to L1
             console.log("Calling relay tokens to L1 by agent or manually");
-            await collector.relayRewardTokens();
+            await collector.relayRewardTokens(bridgePayload);
 
             console.log("\nL1");
 
@@ -1061,7 +1061,7 @@ describe("Liquid Staking", function () {
 
                 // Relay rewards to L1
                 console.log("Calling relay tokens to L1 by agent or manually");
-                await collector.relayRewardTokens();
+                await collector.relayRewardTokens(bridgePayload);
 
                 console.log("\nL1");
 

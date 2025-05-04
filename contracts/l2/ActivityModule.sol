@@ -58,10 +58,9 @@ interface ISafe {
 
 interface IStakingManager {
     /// @dev Claims specified service rewards.
-    /// @param stakingProxy Staking proxy address.
     /// @param serviceId Service Id.
     /// @return Staking reward.
-    function claim(address stakingProxy, uint256 serviceId) external returns (uint256);
+    function claim(uint256 serviceId) external returns (uint256);
 }
 
 // ERC20 token interface
@@ -87,6 +86,9 @@ error ZeroValue();
 /// @dev The contract is already initialized.
 error AlreadyInitialized();
 
+/// @dev Caught reentrancy violation.
+error ReentrancyGuard();
+
 /// @dev Only `manager` has a privilege, but the `sender` was provided.
 /// @param sender Sender address.
 /// @param manager Required sender address as a manager.
@@ -95,6 +97,8 @@ error ManagerOnly(address sender, address manager);
 /// @title ActivityModule - Smart contract for multisig activity tracking
 contract ActivityModule {
     event ActivityIncreased(uint256 activityChange);
+
+    uint256 public constant DEFAULT_ACTIVITY = 1;
 
     // OLAS token address
     address public immutable olas;
@@ -112,6 +116,9 @@ contract ActivityModule {
     // Staking manager address
     address public stakingManager;
 
+    // Reentrancy lock
+    uint256 internal _locked;
+
     /// @dev ActivityModule constructor.
     /// @param _olas OLAS address.
     /// @param _collector Collector address.
@@ -127,7 +134,11 @@ contract ActivityModule {
     }
 
     function initialize(address _multisig, address _stakingProxy, uint256 _serviceId) external {
-        // TODO reentrancy check?
+        // Reentrancy guard
+        if (_locked > 1) {
+            revert ReentrancyGuard();
+        }
+        _locked = 2;
 
         if (multisig != address(0)) {
             revert AlreadyInitialized();
@@ -172,6 +183,8 @@ contract ActivityModule {
         // Execute multisig transaction
         ISafe(multisig).execTransaction(multisig, 0, data, ISafe.Operation.Call, 0, 0, 0, address(0),
             payable(address(0)), signature);
+
+        _locked = 1;
     }
 
     function increaseInitialActivity() external {
@@ -179,15 +192,15 @@ contract ActivityModule {
             revert ManagerOnly(msg.sender, stakingManager);
         }
 
-        _increaseActivity(1);
+        _increaseActivity(DEFAULT_ACTIVITY);
     }
 
     function claim() external {
         // Get staking reward
-        IStakingManager(stakingManager).claim(stakingProxy, serviceId);
+        IStakingManager(stakingManager).claim(serviceId);
 
         // Increases activity for the next staking epoch
-        _increaseActivity(1);
+        _increaseActivity(DEFAULT_ACTIVITY);
 
         // Get multisig balance
         uint256 balance = IToken(olas).balanceOf(multisig);
