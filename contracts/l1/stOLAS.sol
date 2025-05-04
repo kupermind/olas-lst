@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ERC20, ERC4626} from  "../../lib/solmate/src/tokens/ERC4626.sol";
+import {ERC20, ERC4626, FixedPointMathLib} from  "../../lib/solmate/src/tokens/ERC4626.sol";
 import {IToken} from "../l2/ActivityModule.sol";
 
 /// @dev Only `owner` has a privilege, but the `sender` was provided.
@@ -32,6 +32,8 @@ error Overflow(uint256 provided, uint256 max);
 
 /// @title stOLAS - Smart contract for the stOLAS token.
 contract stOLAS is ERC4626 {
+    using FixedPointMathLib for uint256;
+
     event OwnerUpdated(address indexed owner);
     event ManagersUpdated(address indexed treasury, address indexed depository);
     event TotalReservesUpdated(uint256 stakedBalance, uint256 vaultBalance, uint256 reserveBalance, uint256 totalReserves);
@@ -104,27 +106,41 @@ contract stOLAS is ERC4626 {
             revert ZeroValue();
         }
 
-        // topUpBalance is subtracted as it is passed as part of the assets value and already deposited
-        // and accounted in vaultBalance via topUpReserveBalance() function call
-        uint256 curStakedBalance = stakedBalance + assets - topUpBalance;
+        // Calculate and update all balances
+        (uint256 curStakedBalance, uint256 curVaultBalance, uint256 curTotalReserves) = calculateBalances(assets);
         stakedBalance = curStakedBalance;
-
-        // TODO Vault inflation attack
-        // Get current vault balance
-        uint256 curVaultBalance = asset.balanceOf(address(this));
         vaultBalance = curVaultBalance;
-
-        // Update total assets
-        uint256 curTotalReserves = curStakedBalance + curVaultBalance;
         totalReserves = curTotalReserves;
 
-        // Check for rounding error since we round down in previewDeposit.
-        require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
+        // Check for rounding error since we round down in convertToShares.
+        require((shares = convertToShares(assets)) != 0, "ZERO_SHARES");
 
         _mint(receiver, shares);
 
         emit TotalReservesUpdated(curStakedBalance, curVaultBalance, reserveBalance, curTotalReserves);
         emit Deposit(msg.sender, receiver, assets, shares);
+    }
+
+    function calculateBalances(uint256 assets) public view
+        returns (uint256 curStakedBalance, uint256 curVaultBalance, uint256 curTotalReserves)
+    {
+        // topUpBalance is subtracted as it is passed as part of the assets value and already deposited
+        // and accounted in vaultBalance via topUpReserveBalance() function call
+        curStakedBalance = stakedBalance + assets - topUpBalance;
+
+        // Get current vault balance
+        curVaultBalance = asset.balanceOf(address(this));
+
+        // Update total assets
+        curTotalReserves = curStakedBalance + curVaultBalance;
+    }
+
+    function previewDeposit(uint256 assets) public view override returns (uint256) {
+        (, , uint256 curTotalReserves) = calculateBalances(assets);
+
+        uint256 supply = totalSupply;
+
+        return supply == 0 ? assets : assets.mulDivDown(supply, curTotalReserves);
     }
 
     /// @dev Redeems OLAS in exchange for stOLAS tokens.
@@ -137,22 +153,14 @@ contract stOLAS is ERC4626 {
             revert TreasuryOnly(msg.sender, treasury);
         }
 
-        // TODO Is this check needed?
-        if (msg.sender != tokenOwner) {
-            uint256 allowed = allowance[tokenOwner][msg.sender]; // Saves gas for limited approvals.
-
-            if (allowed != type(uint256).max) allowance[tokenOwner][msg.sender] = allowed - shares;
-        }
-
         // TODO Optimize
         updateTotalAssets();
 
-        // Check for rounding error since we round down in previewRedeem.
-        require((assets = previewRedeem(shares)) != 0, "ZERO_ASSETS");
+        // Check for rounding error since we round down in convertToAssets.
+        require((assets = convertToAssets(shares)) != 0, "ZERO_ASSETS");
 
         _burn(tokenOwner, shares);
 
-        // TODO Is it correct it happens after assets calculation? Seems so, as assets must be calculated on current holdings
         // Update total assets
         // Get current staked and vault balance (including reserve balance)
         uint256 curStakedBalance = stakedBalance;
@@ -197,6 +205,16 @@ contract stOLAS is ERC4626 {
         emit Withdraw(msg.sender, receiver, tokenOwner, assets, shares);
     }
 
+    function previewRedeem(uint256 shares) public view override returns (uint256) {
+        //updateTotalAssets
+        // TODO
+        uint256 curTotalReserves = totalAssets();
+
+        uint256 supply = totalSupply;
+
+        return supply == 0 ? shares : shares.mulDivDown(curTotalReserves, supply);
+    }
+
     /// @dev Overrides mint function that is never used.
     function mint(uint256, address) public pure override returns (uint256) {
         return 0;
@@ -236,10 +254,8 @@ contract stOLAS is ERC4626 {
 
     // TODO Optimize
     function updateTotalAssets() public {
-        // TODO Vault inflation attack
         uint256 curStakedBalance = stakedBalance;
 
-        // TODO Change with function balanceOf()
         // Get current vault balance
         uint256 curVaultBalance = asset.balanceOf(address(this));
         vaultBalance = curVaultBalance;
