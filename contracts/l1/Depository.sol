@@ -47,10 +47,8 @@ error ZeroValue();
 /// @dev The contract is already initialized.
 error AlreadyInitialized();
 
-/// @dev Wrong length of two arrays.
-/// @param numValues1 Number of values in a first array.
-/// @param numValues2 Number of values in a second array.
-error WrongArrayLength(uint256 numValues1, uint256 numValues2);
+/// @dev Wrong length of arrays.
+error WrongArrayLength();
 
 /// @dev Value overflow.
 /// @param provided Overflow value.
@@ -69,25 +67,34 @@ error WrongStakingModel(uint256 stakingModelId);
 /// @param account Account address.
 error UnauthorizedAccount(address account);
 
-// StakingModel struct
-struct StakingModel {
-    uint96 supply;
-    uint96 remainder;
-    bool active;
-}
-
+/// @dev Caught reentrancy violation.
+error ReentrancyGuard();
 /// @title Depository - Smart contract for the stOLAS Depository.
 contract Depository is Implementation {
+    enum StakingModelStatus {
+        Retired,
+        Active,
+        Inactive
+    }
+
     event TreasuryUpdated(address indexed treasury);
     event DepositoryParamsUpdated(uint256 lockFactor, uint256 maxStakingLimit);
     event Locked(address indexed account, uint256 olasAmount, uint256 lockAmount, uint256 vaultBalance);
     event SetDepositProcessorChainIds(address[] depositProcessors, uint256[] chainIds);
     event StakingModelsActivated(uint256[] chainIds, address[] stakingProxies, uint256[] supplies);
-    event ChangeModelStatuses(uint256[] modelIds, bool[] statuses);
+    event ChangeModelStatuses(uint256[] modelIds, StakingModelStatus[] statuses);
     event Deposit(address indexed sender, uint256 stakeAmount, uint256 stAmount, uint256[] chainIds,
         address[] stakingProxies, uint256[] amounts);
     event Unstake(address indexed sender, uint256 unstakeAmount, uint256[] chainIds, address[] stakingProxies,
         uint256[] amounts);
+    event Retired(uint256[] chainIds, address[] stakingProxies);
+
+    // StakingModel struct
+    struct StakingModel {
+        uint96 supply;
+        uint96 remainder;
+        StakingModelStatus status;
+    }
 
     // Stake operation
     bytes32 public constant STAKE = 0x1bcc0f4c3fad314e585165815f94ecca9b96690a26d6417d7876448a9a867a69;
@@ -112,6 +119,10 @@ contract Depository is Implementation {
     uint256 public lockFactor;
     // Max staking limit per a single staking proxy
     uint256 public maxStakingLimit;
+
+    // TODO Change to transient
+    // Reentrancy lock
+    uint256 internal _locked;
 
     // Mapping for staking model Id => staking model
     mapping(uint256 => StakingModel) public mapStakingModels;
@@ -158,6 +169,7 @@ contract Depository is Implementation {
         maxStakingLimit = _maxStakingLimit;
 
         owner = msg.sender;
+        _locked = 1;
     }
 
     /// @dev Changes Treasury contract address.
@@ -190,7 +202,7 @@ contract Depository is Implementation {
 
         // Check for array length correctness
         if (depositProcessors.length == 0 || depositProcessors.length != chainIds.length) {
-            revert WrongArrayLength(depositProcessors.length, chainIds.length);
+            revert WrongArrayLength();
         }
 
         // Link L1 and L2 bridge mediators, set L2 chain Ids
@@ -207,6 +219,7 @@ contract Depository is Implementation {
         emit SetDepositProcessorChainIds(depositProcessors, chainIds);
     }
 
+    // TODO Activate via proofs
     /// @dev Creates and activates staking models.
     /// @param chainIds Chain Ids.
     /// @param stakingProxies Corresponding staking proxy addresses.
@@ -221,21 +234,21 @@ contract Depository is Implementation {
             revert OwnerOnly(msg.sender, owner);
         }
 
-        // TODO Check array sizes
         // Check for array lengths
-//        if (modelIds.length == 0 || modelIds.length != statuses.length) {
-//            revert WrongArrayLength(modelIds.length, statuses.length);
-//        }
+        if (chainIds.length == 0 || chainIds.length != stakingProxies.length || chainIds.length != supplies.length) {
+            revert WrongArrayLength();
+        }
 
         for (uint256 i = 0; i < chainIds.length; ++i) {
-            // TODO Check chainIds order
+            // Check for overflow
+            if (supplies[i] > type(uint96).max) {
+                revert Overflow(supplies[i], type(uint96).max);
+            }
 
             // Check for zero value
             if (supplies[i] == 0) {
                 revert ZeroValue();
             }
-
-            // TODO Check supplies overflow
 
             // Check for zero address
             if (stakingProxies[i] == address(0)) {
@@ -250,7 +263,7 @@ contract Depository is Implementation {
             // Get staking model struct
             StakingModel storage stakingModel = mapStakingModels[stakingModelId];
 
-            // Check for existent staking model
+            // Check for existing staking model
             if (stakingModel.supply > 0) {
                 revert StakingModelAlreadyExists(stakingModelId);
             }
@@ -258,7 +271,7 @@ contract Depository is Implementation {
             // Set supply and activate
             stakingModel.supply = uint96(supplies[i]);
             stakingModel.remainder = uint96(supplies[i]);
-            stakingModel.active = true;
+            stakingModel.status = StakingModelStatus.Active;
 
             // Add into global staking model set
             setStakingModelIds.push(stakingModelId);
@@ -267,13 +280,13 @@ contract Depository is Implementation {
         emit StakingModelsActivated(chainIds, stakingProxies, supplies);
     }
 
-
-    /// @dev Sets staking model statuses.
-    /// @notice Models must be sorted in ascending order. If the model is deactivated, it does not meat that it must
-    ///         be unstaked right away as it might continue working and accumulating rewards until fully depleted.
+    // TODO Deactivate modules for good via proofs
+    /// @dev Sets existing staking model statuses.
+    /// @notice If the model is inactive, it does not mean that it must be unstaked right away as it might continue
+    ///         working and accumulating rewards until fully depleted. Then it must be retired and unstaked.
     /// @param stakingModelIds Staking model Ids in ascending order.
     /// @param statuses Corresponding staking model statuses.
-    function setStakingModelStatuses(uint256[] memory stakingModelIds, bool[] memory statuses) external {
+    function setStakingModelStatuses(uint256[] memory stakingModelIds, StakingModelStatus[] memory statuses) external {
         // Check for ownership
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);
@@ -281,20 +294,19 @@ contract Depository is Implementation {
 
         // Check for array length correctness
         if (stakingModelIds.length == 0 || stakingModelIds.length != statuses.length) {
-            revert WrongArrayLength(stakingModelIds.length, statuses.length);
+            revert WrongArrayLength();
         }
 
-        uint256 localNum;
+        // Traverse staking models and statuses
         for (uint256 i = 0; i < stakingModelIds.length; ++i) {
-            if (localNum >= stakingModelIds[i]) {
-                revert Overflow(localNum, stakingModelIds[i]);
+            // Check for staking model existence
+            if (mapStakingModels[stakingModelIds[i]].supply == 0) {
+                revert WrongStakingModel(stakingModelIds[i]);
             }
 
-            mapStakingModels[stakingModelIds[i]].active = statuses[i];
-
-            localNum = stakingModelIds[i];
+            mapStakingModels[stakingModelIds[i]].status = statuses[i];
         }
-        
+
         emit ChangeModelStatuses(stakingModelIds, statuses);
     }
 
@@ -317,7 +329,6 @@ contract Depository is Implementation {
         emit DepositoryParamsUpdated(newLockFactor, newMaxStakingLimit);
     }
 
-    // TODO: consider taking any amount, just add to the stOLAS balance unused remainder
     /// @dev Calculates amounts and initiates cross-chain stake request for specified models.
     /// @param stakeAmount Total incoming amount to stake.
     /// @param chainIds Set of chain Ids with staking proxies.
@@ -333,11 +344,22 @@ contract Depository is Implementation {
         bytes[] memory bridgePayloads,
         uint256[] memory values
     ) external payable returns (uint256 stAmount, uint256[] memory amounts) {
+        // Reentrancy guard
+        if (_locked > 1) {
+            revert ReentrancyGuard();
+        }
+        _locked = 2;
+
+        // Check for overflow
         if (stakeAmount > type(uint96).max) {
-            revert Overflow(stakeAmount, uint256(type(uint96).max));
+            revert Overflow(stakeAmount, type(uint96).max);
         }
 
-        // TODO Check array lengths
+        // Check for array lengths
+        if (chainIds.length == 0 || chainIds.length != stakingProxies.length ||
+            chainIds.length != bridgePayloads.length || chainIds.length != values.length) {
+            revert WrongArrayLength();
+        }
 
         if (stakeAmount > 0) {
             // Get OLAS from sender
@@ -380,7 +402,7 @@ contract Depository is Implementation {
 
             StakingModel memory stakingModel = mapStakingModels[stakingModelId];
             // Check for model existence and activity
-            if (stakingModel.supply == 0 || !stakingModel.active) {
+            if (stakingModel.supply == 0 || stakingModel.status != StakingModelStatus.Active) {
                 revert WrongStakingModel(stakingModelId);
             }
 
@@ -409,7 +431,7 @@ contract Depository is Implementation {
             // Increase actual stake amount
             actualStakeAmount += amounts[i];
 
-            // Transfer OLAS via the bridge
+            // Get Deposit Processor address
             address depositProcessor = mapChainIdDepositProcessors[chainIds[i]];
             // Check for zero address
             if (depositProcessor == address(0)) {
@@ -442,10 +464,12 @@ contract Depository is Implementation {
         }
 
         emit Deposit(msg.sender, stakeAmount, stAmount, chainIds, stakingProxies, amounts);
+
+        _locked = 1;
     }
 
-    /// @dev Calculates amounts and initiates cross-chain unstake request from specified models.
-    /// @notice This allows to deduct reserves from their staked part and get them back as vault assets.
+    /// @dev Calculates amounts and initiates cross-chain unstake request for specified models by Treasury.
+    /// @notice This action deducts reserves from their staked part and get them back as vault assets.
     /// @param unstakeAmount Total amount to unstake.
     /// @param chainIds Set of chain Ids with staking proxies.
     /// @param stakingProxies Set of staking proxies corresponding to each chain Id.
@@ -459,17 +483,22 @@ contract Depository is Implementation {
         bytes[] memory bridgePayloads,
         uint256[] memory values
     ) external payable returns (uint256[] memory amounts) {
-        if (msg.sender != owner && msg.sender != treasury) {
+        // Reentrancy guard
+        if (_locked > 1) {
+            revert ReentrancyGuard();
+        }
+        _locked = 2;
+
+        // Check for Treasury access
+        if (msg.sender != treasury) {
             revert UnauthorizedAccount(msg.sender);
         }
 
-        // TODO - obsolete as called by Treasury?
-        // Check for zero value
-        if (unstakeAmount == 0) {
-            revert ZeroValue();
+        // Check array lengths
+        if (chainIds.length == 0 || chainIds.length != stakingProxies.length ||
+            chainIds.length != bridgePayloads.length || chainIds.length != values.length) {
+            revert WrongArrayLength();
         }
-
-        // TODO Check array lengths
 
         // Allocate arrays of max possible size
         amounts = new uint256[](chainIds.length);
@@ -482,7 +511,7 @@ contract Depository is Implementation {
             stakingModelId |= chainIds[i] << 160;
 
             StakingModel memory stakingModel = mapStakingModels[stakingModelId];
-            // Check for model existence and activity
+            // Check for model existence
             if (stakingModel.supply == 0) {
                 revert WrongStakingModel(stakingModelId);
             }
@@ -522,14 +551,49 @@ contract Depository is Implementation {
             }
         }
 
-        // Check if accumulated necessary amount of tokens
+        // Check if provided staking proxies result in necessary amount of tokens
         if (unstakeAmount > 0) {
-            // TODO correct with unstakeAmount vs totalAmount
             revert Overflow(unstakeAmount, 0);
         }
 
-        // TODO correct msg.sender
         emit Unstake(msg.sender, unstakeAmount, chainIds, stakingProxies, amounts);
+
+        _locked = 1;
+    }
+
+    /// @dev Retires specified models.
+    /// @notice This action is irreversible and clears up staking model info.
+    /// @param chainIds Set of chain Ids with staking proxies.
+    /// @param stakingProxies Set of staking proxies corresponding to each chain Id.
+    function retire(uint256[] memory chainIds, address[] memory stakingProxies) external {
+        // Check array lengths
+        if (chainIds.length == 0 || chainIds.length != stakingProxies.length) {
+            revert WrongArrayLength();
+        }
+
+        // Traverse and delete retired models
+        for (uint256 i = 0; i < chainIds.length; ++i) {
+            // Push a pair of key defining variables into one key: chainId | stakingProxy
+            // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
+            uint256 stakingModelId = uint256(uint160(stakingProxies[i]));
+            stakingModelId |= chainIds[i] << 160;
+
+            StakingModel memory stakingModel = mapStakingModels[stakingModelId];
+            // Check for retired model status
+            if (stakingModel.status != StakingModelStatus.Retired) {
+                revert WrongStakingModel(stakingModelId);
+            }
+
+            // Check for model existence and remainder as Staking Proxy must be fully unstaked
+            if (stakingModel.supply == 0 || stakingModel.remainder != stakingModel.supply) {
+                revert WrongStakingModel(stakingModelId);
+            }
+
+            // Remove staking model
+            delete mapStakingModels[stakingModelId];
+        }
+
+        emit Retired(chainIds, stakingProxies);
     }
 
     function getNumStakingModels() external view returns (uint256) {

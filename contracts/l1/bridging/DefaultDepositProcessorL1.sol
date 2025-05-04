@@ -124,6 +124,11 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
             revert ManagerOnly(l1Depository, msg.sender);
         }
 
+        // Check for zero value
+        if (operation == STAKE && amount == 0) {
+            revert ZeroValue();
+        }
+
         // Get the batch hash
         uint256 batchNonce = stakingBatchNonce;
         bytes32 batchHash = keccak256(abi.encode(batchNonce, block.chainid, address(this)));

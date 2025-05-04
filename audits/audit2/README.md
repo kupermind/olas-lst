@@ -80,6 +80,7 @@ grep -r TODO ./contracts/
 ```
 size arrays
 ```
+[x] Fixed
 
 ### Missign Reentrance guard. low issue
 ```
@@ -91,6 +92,7 @@ function deposit(
         uint256[] memory values
     ) external payable returns (uint256 stAmount, uint256[] memory amounts) {
 ```
+[x] Fixed
 
 ### Maybe stakeAmount == 0 => revert in function deposit(
 ```
@@ -125,6 +127,7 @@ withdrawDiff always > 0
 unstakeAmount -> alwys if controlled only by Treasury.
 But why msg.sender can by owner?
 ```
+[x] Fixed
 
 ### Medium. previewDeposit(assets) not "view" version of deposit 
 ```
