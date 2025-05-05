@@ -128,12 +128,18 @@ contract ActivityModule {
         collector = _collector;
     }
 
+    /// @dev Increases module activity.
+    /// @param activityChange Activity change value.
     function _increaseActivity(uint256 activityChange) internal {
         activityNonce += activityChange;
 
         emit ActivityIncreased(activityChange);
     }
 
+    /// @dev Initializes activity module proxy.
+    /// @param _multisig Service multisig address.
+    /// @param _stakingProxy Staking proxy address.
+    /// @param _serviceId Service Id.
     function initialize(address _multisig, address _stakingProxy, uint256 _serviceId) external {
         // Reentrancy guard
         if (_locked > 1) {
@@ -188,6 +194,7 @@ contract ActivityModule {
         _locked = 1;
     }
 
+    /// @dev Increases initial module activity.
     function increaseInitialActivity() external {
         if (msg.sender != stakingManager) {
             revert ManagerOnly(msg.sender, stakingManager);
@@ -196,11 +203,12 @@ contract ActivityModule {
         _increaseActivity(DEFAULT_ACTIVITY);
     }
 
+    /// @dev Claims corresponding service rewards.
     function claim() external {
-        // Get staking reward
+        // Claim staking reward
         IStakingManager(stakingManager).claim(stakingProxy, serviceId);
 
-        // Increases activity for the next staking epoch
+        // Increase activity for the next staking epoch
         _increaseActivity(DEFAULT_ACTIVITY);
 
         // Get multisig balance

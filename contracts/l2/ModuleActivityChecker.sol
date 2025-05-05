@@ -18,9 +18,6 @@ error ZeroAddress();
 
 /// @title ModuleActivityChecker - Smart contract for multisig module staking activity checking
 contract ModuleActivityChecker is StakingActivityChecker{
-    // AI agent mech marketplace contract address.
-    address public immutable mechMarketplace;
-
     /// @dev ModuleActivityChecker constructor.
     /// @param _livenessRatio Liveness ratio in the format of 1e18.
     constructor(uint256 _livenessRatio) StakingActivityChecker(_livenessRatio) {}

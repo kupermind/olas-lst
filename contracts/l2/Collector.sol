@@ -77,6 +77,8 @@ contract Collector is Implementation {
         owner = msg.sender;
     }
 
+    /// @dev Changes staking processor L2 address.
+    /// @param newStakingProcessorL2 New staking processor L2 address.
     function changeStakingProcessorL2(address newStakingProcessorL2) external {
         // Check for ownership
         if (msg.sender != owner) {
@@ -107,6 +109,8 @@ contract Collector is Implementation {
         emit ProtocolFactorUpdated(newProtocolFactor);
     }
 
+    /// @dev Relays reward tokens to L1.
+    /// @param bridgePayload Bridge payload.
     function relayRewardTokens(bytes memory bridgePayload) external payable {
         // Get OLAS balance
         uint256 olasBalance = IToken(olas).balanceOf(address(this));

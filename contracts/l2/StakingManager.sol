@@ -8,12 +8,23 @@ import {IService} from "../interfaces/IService.sol";
 import {IStaking} from "../interfaces/IStaking.sol";
 import {IToken, INFToken} from "../interfaces/IToken.sol";
 
+// Activity module interface
 interface IActivityModule {
+    /// @dev Initializes activity module proxy.
+    /// @param _multisig Service multisig address.
+    /// @param _stakingProxy Staking proxy address.
+    /// @param _serviceId Service Id.
     function initialize(address _multisig, address _stakingProxy, uint256 _serviceId) external;
+
+    /// @dev Increases initial module activity.
     function increaseInitialActivity() external;
 }
 
+// Bridge interface
 interface IBridge {
+    /// @dev Relays OLAS to L1.
+    /// @param to Address to send tokens to.
+    /// @param olasAmount OLAS amount.
     function relayToL1(address to, uint256 olasAmount, bytes memory) external payable;
 }
 
@@ -22,10 +33,6 @@ interface IMultisig {
     /// @dev Returns array of owners.
     /// @return Array of Safe owners.
     function getOwners() external view returns (address[] memory);
-}
-
-interface ICollector {
-    function relayStakedTokens(uint256 amount) external payable;
 }
 
 /// @dev Zero value.
