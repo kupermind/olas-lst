@@ -5,7 +5,7 @@
 stOLAS is a liquid staking token representing staked OLAS assets. It follows the ERC4626 vault standard and is designed to integrate seamlessly with DeFi protocols.
 
 ## Repository Structure
-- `StOlasVault.sol` — Main ERC4626 vault contract for OLAS staking.
+- `stOLAS.sol` — Main ERC4626 vault contract for OLAS staking.
 
 ## Usage
 Users deposit OLAS and receive stOLAS tokens in return. These tokens are freely transferable and can be used across the DeFi ecosystem.
