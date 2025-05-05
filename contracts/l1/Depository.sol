@@ -159,6 +159,7 @@ contract Depository is Implementation {
     }
 
     /// @dev Depository initializer.
+    /// @param _lockFactor Lock factor value.
     function initialize(uint256 _lockFactor) external{
         // Check for already initialized
         if (owner != address(0)) {
@@ -326,7 +327,7 @@ contract Depository is Implementation {
         emit ChangeModelStatuses(chainIds, stakingProxies, statuses);
     }
 
-    /// @dev Changes depository params.
+    /// @dev Changes lock factor value.
     /// @param newLockFactor New lock factor value.
     function changeLockFactor(uint256 newLockFactor) external {
         // Check for ownership
@@ -604,23 +605,26 @@ contract Depository is Implementation {
         emit Retired(chainIds, stakingProxies);
     }
 
+    /// @dev Gets number of all staking models that have been activated.
     function getNumStakingModels() external view returns (uint256) {
         return setStakingModelIds.length;
     }
 
+    /// @dev Gets set of staking model Ids.
+    function getSetStakingModelIds() external view returns (uint256[] memory) {
+        return setStakingModelIds;
+    }
+
+    /// @dev Gets staking model Id by provided chain Id and staking proxy address.
+    /// @param chainId Chain Id.
+    /// @param stakingProxy Staking proxy address.
     function getStakingModelId(uint256 chainId, address stakingProxy) external pure returns (uint256) {
         return uint256(uint160(stakingProxy)) | (chainId << 160);
     }
 
+    /// @dev Gets chain Id and staking proxy address by provided staking model Id.
+    /// @param stakingModelId Staking model Id.
     function getChainIdAndStakingProxy(uint256 stakingModelId) external pure returns (uint256, address) {
         return ((stakingModelId >> 160), address(uint160(stakingModelId)));
-    }
-
-    function getAllStakingModelIds() external view returns (uint256) {
-        return setStakingModelIds.length;
-    }
-
-    function getSetStakingModelIds() external view returns (uint256[] memory) {
-        return setStakingModelIds;
     }
 }
