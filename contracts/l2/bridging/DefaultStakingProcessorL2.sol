@@ -421,6 +421,10 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
         // _locked is now set to 2 for good
     }
 
+    /// @dev Relays OLAS to L1.
+    /// @param to Address to send tokens to.
+    /// @param olasAmount OLAS amount.
+    /// @param bridgePayload Bridge payload.
     function relayToL1(address to, uint256 olasAmount, bytes memory bridgePayload) external virtual payable;
 
     /// @dev Gets the maximum number of token decimals able to be transferred across the bridge.

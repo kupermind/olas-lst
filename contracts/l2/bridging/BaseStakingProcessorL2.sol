@@ -74,6 +74,7 @@ contract BaseStakingProcessorL2 is DefaultStakingProcessorL2 {
         _receiveMessage(msg.sender, l1Processor, data);
     }
 
+    /// @inheritdoc DefaultStakingProcessorL2
     function relayToL1(address to, uint256 olasAmount, bytes memory) external virtual override payable {
         // msg.value must be zero
         if (msg.value > 0) {
