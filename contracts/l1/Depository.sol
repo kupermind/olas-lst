@@ -83,7 +83,7 @@ contract Depository is Implementation {
     event SetDepositProcessorChainIds(address[] depositProcessors, uint256[] chainIds);
     event StakingModelsActivated(uint256[] chainIds, address[] stakingProxies, uint256[] stakeLimitPerSlots,
         uint256[] numSlots);
-    event ChangeModelStatuses(uint256[] modelIds, StakingModelStatus[] statuses);
+    event ChangeModelStatuses(uint256[] chainIds, address[] stakingProxies, StakingModelStatus[] statuses);
     event Deposit(address indexed sender, uint256 stakeAmount, uint256 stAmount, uint256[] chainIds,
         address[] stakingProxies, uint256[] amounts);
     event Unstake(address indexed sender, uint256 unstakeAmount, uint256[] chainIds, address[] stakingProxies,
@@ -285,34 +285,45 @@ contract Depository is Implementation {
         emit StakingModelsActivated(chainIds, stakingProxies, stakeLimitPerSlots, numSlots);
     }
 
-    // TODO Deactivate modules for good via proofs
+    // TODO Deactivate staking models for good via proofs
     /// @dev Sets existing staking model statuses.
     /// @notice If the model is inactive, it does not mean that it must be unstaked right away as it might continue
     ///         working and accumulating rewards until fully depleted. Then it must be retired and unstaked.
-    /// @param stakingModelIds Staking model Ids in ascending order.
+    /// @param chainIds Set of chain Ids with staking proxies.
+    /// @param stakingProxies Set of staking proxies corresponding to each chain Id.
     /// @param statuses Corresponding staking model statuses.
-    function setStakingModelStatuses(uint256[] memory stakingModelIds, StakingModelStatus[] memory statuses) external {
+    function setStakingModelStatuses(
+        uint256[] memory chainIds,
+        address[] memory stakingProxies,
+        StakingModelStatus[] memory statuses
+    ) external {
         // Check for ownership
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);
         }
 
         // Check for array length correctness
-        if (stakingModelIds.length == 0 || stakingModelIds.length != statuses.length) {
+        if (chainIds.length == 0 || chainIds.length != stakingProxies.length || chainIds.length != statuses.length) {
             revert WrongArrayLength();
         }
 
         // Traverse staking models and statuses
-        for (uint256 i = 0; i < stakingModelIds.length; ++i) {
+        for (uint256 i = 0; i < chainIds.length; ++i) {
+            // Get staking model Id
+            // Push a pair of key defining variables into one key: chainId | stakingProxy
+            // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
+            uint256 stakingModelId = uint256(uint160(stakingProxies[i]));
+            stakingModelId |= chainIds[i] << 160;
+
             // Check for staking model existence
-            if (mapStakingModels[stakingModelIds[i]].supply == 0) {
-                revert WrongStakingModel(stakingModelIds[i]);
+            if (mapStakingModels[stakingModelId].supply == 0) {
+                revert WrongStakingModel(stakingModelId);
             }
 
-            mapStakingModels[stakingModelIds[i]].status = statuses[i];
+            mapStakingModels[stakingModelId].status = statuses[i];
         }
 
-        emit ChangeModelStatuses(stakingModelIds, statuses);
+        emit ChangeModelStatuses(chainIds, stakingProxies, statuses);
     }
 
     /// @dev Changes depository params.
@@ -603,5 +614,13 @@ contract Depository is Implementation {
 
     function getChainIdAndStakingProxy(uint256 stakingModelId) external pure returns (uint256, address) {
         return ((stakingModelId >> 160), address(uint160(stakingModelId)));
+    }
+
+    function getAllStakingModelIds() external view returns (uint256) {
+        return setStakingModelIds.length;
+    }
+
+    function getSetStakingModelIds() external view returns (uint256[] memory) {
+        return setStakingModelIds;
     }
 }
