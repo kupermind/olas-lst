@@ -26,10 +26,14 @@ interface IST {
     /// @return shares stOLAS amount.
     function deposit(uint256 assets, address receiver) external returns (uint256 shares);
 
+    /// @dev Top-ups reserve balance via Depository.
+    /// @param amount OLAS amount.
     function topUpReserveBalance(uint256 amount) external;
 
+    /// @dev Funds Depository with reserve balances.
     function fundDepository() external;
 
+    /// @dev stOLAS reserve balance.
     function reserveBalance() external view returns (uint256);
 }
 

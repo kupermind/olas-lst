@@ -631,7 +631,7 @@ contract StakingTokenLocked is ERC721TokenReceiver {
         emit ServiceUnstaked(epochCounter, serviceId, msg.sender, multisig, nonces, reward, availableRewards);
     }
 
-    /// @dev Claims rewards for the service without an additional checkpoint call.
+    /// @dev Claims service rewards with additional checkpoint call.
     /// @param serviceId Service Id.
     /// @return reward Staking reward.
     function claim(uint256 serviceId) external returns (uint256 reward) {

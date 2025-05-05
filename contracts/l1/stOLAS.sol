@@ -58,6 +58,8 @@ contract stOLAS is ERC4626 {
     // Depository address
     address public depository;
 
+    /// @dev stOLAS constructor.
+    /// @param _olas OLAS token address.
     constructor(ERC20 _olas) ERC4626(_olas, "Staked OLAS", "stOLAS") {
         owner = msg.sender;
     }
@@ -129,27 +131,6 @@ contract stOLAS is ERC4626 {
         emit Deposit(msg.sender, receiver, assets, shares);
     }
 
-    function calculateDepositBalances(uint256 assets) public view
-        returns (uint256 curStakedBalance, uint256 curVaultBalance, uint256 curTotalReserves)
-    {
-        // topUpBalance is subtracted as it is passed as part of the assets value and already deposited
-        // and accounted in vaultBalance via topUpReserveBalance() function call
-        curStakedBalance = stakedBalance + assets - topUpBalance;
-
-        // Get current vault balance
-        curVaultBalance = asset.balanceOf(address(this));
-
-        // Update total assets
-        curTotalReserves = curStakedBalance + curVaultBalance;
-    }
-
-    function previewDeposit(uint256 assets) public view override returns (uint256) {
-        (, , uint256 curTotalReserves) = calculateDepositBalances(assets);
-
-        uint256 shares = totalSupply;
-        return shares == 0 ? assets : assets.mulDivDown(shares, curTotalReserves);
-    }
-
     /// @dev Redeems OLAS in exchange for stOLAS tokens.
     /// @param shares stOLAS amount.
     /// @param receiver Receiver account address.
@@ -210,13 +191,6 @@ contract stOLAS is ERC4626 {
         emit Withdraw(msg.sender, receiver, tokenOwner, assets, shares);
     }
 
-    function previewRedeem(uint256 shares) public view override returns (uint256) {
-        (, , , uint256 curTotalReserves) = calculateCurrentBalances();
-
-        uint256 assets = totalSupply;
-        return assets == 0 ? shares : shares.mulDivDown(curTotalReserves, assets);
-    }
-
     /// @dev Overrides mint function that is never used.
     function mint(uint256, address) public pure override returns (uint256) {
         return 0;
@@ -227,6 +201,21 @@ contract stOLAS is ERC4626 {
         return 0;
     }
 
+    /// @dev Updates total assets.
+    function updateTotalAssets() external returns (uint256) {
+        (uint256 curStakedBalance, uint256 curVaultBalance, uint256 curReserveBalance, uint256 curTotalReserves) =
+            calculateCurrentBalances();
+
+        vaultBalance = curVaultBalance;
+        totalReserves = curTotalReserves;
+
+        emit TotalReservesUpdated(curStakedBalance, curVaultBalance, curReserveBalance, curTotalReserves);
+
+        return curTotalReserves;
+    }
+
+    /// @dev Top-ups reserve balance via Depository.
+    /// @param amount OLAS amount.
     function topUpReserveBalance(uint256 amount) external {
         if (msg.sender != depository) {
             revert();
@@ -239,6 +228,7 @@ contract stOLAS is ERC4626 {
         emit ReserveBalanceTopUpped(amount);
     }
 
+    /// @dev Funds Depository with reserve balances.
     function fundDepository() external {
         if (msg.sender != depository) {
             revert();
@@ -254,6 +244,39 @@ contract stOLAS is ERC4626 {
         emit DepositoryFunded(curReserveBalance);
     }
 
+    /// @dev Calculates balances for deposit.
+    /// @param assets Deposited assets amount.
+    /// @return curStakedBalance Current staked balance.
+    /// @return curVaultBalance Current vault balance.
+    /// @return curTotalReserves Current total reserves.
+    function calculateDepositBalances(uint256 assets) public view
+        returns (uint256 curStakedBalance, uint256 curVaultBalance, uint256 curTotalReserves)
+    {
+        // topUpBalance is subtracted as it is passed as part of the assets value and already deposited
+        // and accounted in vaultBalance via topUpReserveBalance() function call
+        curStakedBalance = stakedBalance + assets - topUpBalance;
+
+        // Get current vault balance
+        curVaultBalance = asset.balanceOf(address(this));
+
+        // Update total assets
+        curTotalReserves = curStakedBalance + curVaultBalance;
+    }
+
+    /// @dev Previews deposit assets to shares amount.
+    /// @param assets Deposited assets amount.
+    function previewDeposit(uint256 assets) public view override returns (uint256) {
+        (, , uint256 curTotalReserves) = calculateDepositBalances(assets);
+
+        uint256 shares = totalSupply;
+        return shares == 0 ? assets : assets.mulDivDown(shares, curTotalReserves);
+    }
+
+    /// @dev Calculates current balances.
+    /// @return curStakedBalance Current staked balance.
+    /// @return curVaultBalance Current vault balance.
+    /// @return curReserveBalance Current reserve balance.
+    /// @return curTotalReserves Current total reserves.
     function calculateCurrentBalances() public view
         returns (uint256 curStakedBalance, uint256 curVaultBalance, uint256 curReserveBalance, uint256 curTotalReserves)
     {
@@ -268,16 +291,16 @@ contract stOLAS is ERC4626 {
         curTotalReserves = curStakedBalance + curVaultBalance;
     }
 
-    function updateTotalAssets() external {
-        (uint256 curStakedBalance, uint256 curVaultBalance, uint256 curReserveBalance, uint256 curTotalReserves) =
-            calculateCurrentBalances();
+    /// @dev Previews redeem shares to assets amount.
+    /// @param shares Redeemed shares amount.
+    function previewRedeem(uint256 shares) public view override returns (uint256) {
+        (, , , uint256 curTotalReserves) = calculateCurrentBalances();
 
-        vaultBalance = curVaultBalance;
-        totalReserves = curTotalReserves;
-
-        emit TotalReservesUpdated(curStakedBalance, curVaultBalance, curReserveBalance, curTotalReserves);
+        uint256 assets = totalSupply;
+        return assets == 0 ? shares : shares.mulDivDown(curTotalReserves, assets);
     }
-    
+
+    /// @dev Gets total assets amount.
     function totalAssets() public view override returns (uint256) {
         return totalReserves;
     }
