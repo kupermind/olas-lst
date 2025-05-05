@@ -72,6 +72,7 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
     event CreateAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig,
         address activityModule);
     event DeployAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig);
+    event NativeTokenReceived(uint256 amount);
 
     // Stake operation
     bytes32 public constant STAKE = 0x1bcc0f4c3fad314e585165815f94ecca9b96690a26d6417d7876448a9a867a69;
@@ -333,6 +334,9 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         emit DeployAndStake(stakingProxy, serviceId, multisig);
     }
 
+    /// @dev Deposits OLAS and stakes into specified staking proxy contract if deposit is enough for staking.
+    /// @param stakingProxy Staking proxy address.
+    /// @param amount OLAS amount.
     function stake(address stakingProxy, uint256 amount) external virtual {
         // Reentrancy guard
         if (_locked > 1) {
@@ -527,6 +531,9 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         _locked = 1;
     }
 
+    /// @dev Gets staked service Ids for a specific staking proxy.
+    /// @param stakingProxy Staking proxy address.
+    /// @return serviceIds Set of service Ids.
     function getStakedServiceIds(address stakingProxy) external view returns (uint256[] memory serviceIds) {
         // Get last staked service index
         uint256 lastStakedServiceIdx = mapLastStakedServiceIdxs[stakingProxy];
@@ -546,5 +553,7 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
     }
 
     /// @dev Receives native funds for mock Service Registry minimal payments.
-    receive() external payable {}
+    receive() external payable {
+        emit NativeTokenReceived(msg.value);
+    }
 }
