@@ -71,6 +71,10 @@ contract Treasury is Implementation, ERC6909 {
     // Reentrancy lock
     uint256 internal _locked;
 
+    /// @dev Treasury constructor.
+    /// @param _olas OLAS address.
+    /// @param _st stOLAS address.
+    /// @param _depository Depository address.
     constructor(address _olas, address _st, address _depository) {
         olas = _olas;
         st = _st;
@@ -88,6 +92,8 @@ contract Treasury is Implementation, ERC6909 {
         owner = msg.sender;
     }
 
+    /// @dev Changes withdraw delay value.
+    /// @param newWithdrawDelay New withdraw delay value in seconds.
     function changeWithdrawDelay(uint256 newWithdrawDelay) external {
         // Check for ownership
         if (msg.sender != owner) {
@@ -216,10 +222,15 @@ contract Treasury is Implementation, ERC6909 {
         _locked = 1;
     }
 
+    /// @dev Gets withdraw request Id by request Id and withdraw time.
+    /// @param requestId Withdraw request Id.
+    /// @param withdrawTime Withdraw time.
     function getWithdrawRequestId(uint256 requestId, uint256 withdrawTime) external pure returns (uint256) {
         return requestId | (withdrawTime << 64);
     }
 
+    /// @dev Gets withdraw request Id and time.
+    /// @param withdrawRequestId Combined withdrawRequestId value.
     function getWithdrawIdAndTime(uint256 withdrawRequestId) external pure returns (uint256, uint256) {
         return ((withdrawRequestId & type(uint64).max), (withdrawRequestId >> 64));
     }
