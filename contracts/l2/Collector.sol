@@ -44,9 +44,8 @@ contract Collector is Implementation {
     event ProtocolFactorUpdated(uint256 protocolFactor);
     event ActivityIncreased(uint256 activityChange);
 
-    // TODO adjust
     // Min olas balance to relay
-    uint256 public constant MIN_OLAS_BALANCE = 1;// ether;
+    uint256 public constant MIN_OLAS_BALANCE = 1 ether;
     // Max protocol factor
     uint256 public constant MAX_PROTOCOL_FACTOR = 10_000;
 
@@ -138,6 +137,4 @@ contract Collector is Implementation {
         // Send tokens to L1
         IBridge(l2StakingProcessor).relayToL1{value: msg.value}(l1St, amount, bridgePayload);
     }
-
-    // TODO withdraw
 }
