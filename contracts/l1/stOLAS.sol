@@ -37,6 +37,8 @@ contract stOLAS is ERC4626 {
     event OwnerUpdated(address indexed owner);
     event ManagersUpdated(address indexed treasury, address indexed depository);
     event TotalReservesUpdated(uint256 stakedBalance, uint256 vaultBalance, uint256 reserveBalance, uint256 totalReserves);
+    event ReserveBalanceTopUpped(uint256 amount);
+    event DepositoryFunded(uint256 amount);
 
     // Staked balance
     uint256 public stakedBalance;
@@ -234,7 +236,7 @@ contract stOLAS is ERC4626 {
         topUpBalance = amount;
         reserveBalance += amount;
 
-        // TODO event or Transfer event is enough?
+        emit ReserveBalanceTopUpped(amount);
     }
 
     function fundDepository() external {
@@ -249,7 +251,7 @@ contract stOLAS is ERC4626 {
             asset.transfer(msg.sender, curReserveBalance);
         }
 
-        // TODO event or Transfer event is enough?
+        emit DepositoryFunded(curReserveBalance);
     }
 
     function calculateCurrentBalances() public view
