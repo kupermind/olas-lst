@@ -124,9 +124,8 @@ contract Depository is Implementation {
     // Lock factor in 10_000 value
     uint256 public lockFactor;
 
-    // TODO Change to transient
     // Reentrancy lock
-    uint256 internal _locked;
+    bool transient _locked;
 
     // Mapping for staking model Id => staking model
     mapping(uint256 => StakingModel) public mapStakingModels;
@@ -173,7 +172,6 @@ contract Depository is Implementation {
         lockFactor = _lockFactor;
 
         owner = msg.sender;
-        _locked = 1;
     }
 
     /// @dev Changes Treasury contract address.
@@ -364,10 +362,10 @@ contract Depository is Implementation {
         uint256[] memory values
     ) external payable returns (uint256 stAmount, uint256[] memory amounts) {
         // Reentrancy guard
-        if (_locked > 1) {
+        if (_locked) {
             revert ReentrancyGuard();
         }
-        _locked = 2;
+        _locked = true;
 
         // Check for overflow
         if (stakeAmount > type(uint96).max) {
@@ -480,8 +478,6 @@ contract Depository is Implementation {
         }
 
         emit Deposit(msg.sender, stakeAmount, stAmount, chainIds, stakingProxies, amounts);
-
-        _locked = 1;
     }
 
     /// @dev Calculates amounts and initiates cross-chain unstake request for specified models by Treasury.
@@ -500,10 +496,10 @@ contract Depository is Implementation {
         uint256[] memory values
     ) external payable returns (uint256[] memory amounts) {
         // Reentrancy guard
-        if (_locked > 1) {
+        if (_locked) {
             revert ReentrancyGuard();
         }
-        _locked = 2;
+        _locked = true;
 
         // Check for Treasury access
         if (msg.sender != treasury) {
@@ -570,8 +566,6 @@ contract Depository is Implementation {
         }
 
         emit Unstake(msg.sender, unstakeAmount, chainIds, stakingProxies, amounts);
-
-        _locked = 1;
     }
 
     /// @dev Retires specified models.

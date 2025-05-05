@@ -67,9 +67,8 @@ contract Treasury is Implementation, ERC6909 {
     // Number of withdraw requests
     uint256 public numWithdrawRequests;
 
-    // TODO Change to transient
     // Reentrancy lock
-    uint256 internal _locked;
+    bool transient _locked;
 
     /// @dev Treasury constructor.
     /// @param _olas OLAS address.
@@ -122,10 +121,10 @@ contract Treasury is Implementation, ERC6909 {
         uint256[] memory values
     ) external payable returns (uint256 requestId, uint256 olasAmount) {
         // Reentrancy guard
-        if (_locked > 1) {
+        if (_locked) {
             revert ReentrancyGuard();
         }
-        _locked = 2;
+        _locked = true;
 
         // Check for zero value
         if (stAmount == 0) {
@@ -169,8 +168,6 @@ contract Treasury is Implementation, ERC6909 {
         }
 
         emit WithdrawRequestInitiated(msg.sender, requestId, stAmount, olasAmount, withdrawTime);
-
-        _locked = 1;
     }
 
     /// @dev Finalizes withdraw requests.
@@ -178,10 +175,10 @@ contract Treasury is Implementation, ERC6909 {
     /// @param amounts Token amounts corresponding to request Ids.
     function finalizeWithdrawRequests(uint256[] calldata requestIds, uint256[] calldata amounts) external {
         // Reentrancy guard
-        if (_locked > 1) {
+        if (_locked) {
             revert ReentrancyGuard();
         }
-        _locked = 2;
+        _locked = true;
 
         uint256 totalAmount;
         // Traverse all withdraw requests
@@ -218,8 +215,6 @@ contract Treasury is Implementation, ERC6909 {
         // The transfer overflow check is not needed since balances are in sync
         // OLAS has been redeemed when withdraw request was posted
         IToken(olas).transfer(msg.sender, totalAmount);
-
-        _locked = 1;
     }
 
     /// @dev Gets withdraw request Id by request Id and withdraw time.
