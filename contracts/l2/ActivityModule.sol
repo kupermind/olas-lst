@@ -9,7 +9,7 @@ interface ISafe {
     function nonce() external returns (uint256);
 
     /// @dev Marks a hash as approved. This can be used to validate a hash that is used by a signature.
-    ///  @param hashToApprove The hash that should be marked as approved for signatures that are verified by this contract.
+    /// @param hashToApprove The hash that should be marked as approved for signatures that are verified by this contract.
     function approveHash(bytes32 hashToApprove) external;
 
     /// @dev Allows to add a module to the whitelist.
@@ -58,9 +58,10 @@ interface ISafe {
 
 interface IStakingManager {
     /// @dev Claims specified service rewards.
+    /// @param stakingProxy Staking proxy address.
     /// @param serviceId Service Id.
     /// @return Staking reward.
-    function claim(uint256 serviceId) external returns (uint256);
+    function claim(address stakingProxy, uint256 serviceId) external returns (uint256);
 }
 
 // ERC20 token interface
@@ -197,7 +198,7 @@ contract ActivityModule {
 
     function claim() external {
         // Get staking reward
-        IStakingManager(stakingManager).claim(serviceId);
+        IStakingManager(stakingManager).claim(stakingProxy, serviceId);
 
         // Increases activity for the next staking epoch
         _increaseActivity(DEFAULT_ACTIVITY);

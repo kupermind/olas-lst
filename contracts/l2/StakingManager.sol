@@ -123,13 +123,10 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
     // Reentrancy lock
     uint256 internal _locked = 1;
 
-    mapping(uint256 => bool) public mapDeposits;
-    mapping(address => uint256) public balanceOf;
     mapping(address => uint256) public mapStakingProxyBalances;
     mapping(address => uint256[]) public mapStakedServiceIds;
     mapping(uint256 => address) public mapServiceIdActivityModules;
     mapping(address => uint256) public mapLastStakedServiceIdxs;
-    mapping(address => address) public mapActivityModuleStakingProxies;
 
     /// @dev StakerL2 constructor.
     /// @param _olas OLAS token address.
@@ -297,9 +294,6 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
 
         // Initialize activity module
         IActivityModule(activityModule).initialize(multisig, stakingProxy, serviceId);
-
-        // Record Activity Module <-> Staking Proxy correspondence
-        mapActivityModuleStakingProxies[activityModule] = stakingProxy;
 
         // Stake the service
         _stake(stakingProxy, serviceId, activityModule);
@@ -491,12 +485,13 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
     }
 
     /// @dev Claims specified service rewards.
+    /// @param stakingProxy Staking proxy address.
     /// @param serviceId Service Id.
     /// @return Staking reward.
-    function claim(uint256 serviceId) external returns (uint256) {
-        // Check that msg.sender is a valid Activity Module by getting its Staking Proxy address
-        address stakingProxy = mapActivityModuleStakingProxies[msg.sender];
-        if (stakingProxy == address(0)) {
+    function claim(address stakingProxy, uint256 serviceId) external returns (uint256) {
+        // Check that msg.sender is a valid Activity Module corresponding to its service Id
+        address activityModule = mapServiceIdActivityModules[serviceId];
+        if (msg.sender != activityModule) {
             revert UnauthorizedAccount(msg.sender);
         }
 
