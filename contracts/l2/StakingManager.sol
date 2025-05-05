@@ -124,9 +124,13 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
     // Reentrancy lock
     uint256 internal _locked = 1;
 
+    // Mapping of staking proxy address => current balance
     mapping(address => uint256) public mapStakingProxyBalances;
+    // Mapping of staking proxy address => set of staked service Ids
     mapping(address => uint256[]) public mapStakedServiceIds;
+    // Mapping of service Id => activity module proxy address
     mapping(uint256 => address) public mapServiceIdActivityModules;
+    // Mapping of staking proxy address => last staked service Id index in mapStakedServiceIds corresponding set
     mapping(address => uint256) public mapLastStakedServiceIdxs;
 
     /// @dev StakerL2 constructor.
@@ -180,6 +184,10 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         serviceRegistryTokenUtility = IService(serviceManager).serviceRegistryTokenUtility();
     }
 
+    /// @dev Initializes staking manager.
+    /// @param _safeMultisig Safe multisig contract address.
+    /// @param _safeSameAddressMultisig Safe same address multisig contract address.
+    /// @param _fallbackHandler Fallback handler for service multisigs.
     function initialize(
         address _safeMultisig,
         address _safeSameAddressMultisig,
