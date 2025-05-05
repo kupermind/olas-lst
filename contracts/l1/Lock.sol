@@ -175,24 +175,6 @@ contract Lock is Implementation {
         ve.call(increaseUnlockTimeData);
     }
 
-    function unlock(address account, uint256 amount) external {
-        /// TBD
-        // Check for ownership
-        if (msg.sender != owner) {
-            revert OwnerOnly(msg.sender, owner);
-        }
-
-        // TODO Never withdraw the full amount, i.e. neve close the treasury lock
-        IVEOLAS.LockedBalance memory lockedBalance = IVEOLAS(ve).mapLockedBalances(address(this));
-
-        // Withdraw veOLAS
-        IVEOLAS(ve).withdraw();
-
-        // TODO For testing purposes now
-        // Transfer OLAS
-        IToken(olas).transfer(account, amount);
-    }
-
     /// @dev Create a new proposal to change the protocol / contract parameters.
     /// @param targets The ordered list of target addresses for calls to be made during proposal execution.
     /// @param values The ordered list of values to be passed to the calls made during proposal execution.

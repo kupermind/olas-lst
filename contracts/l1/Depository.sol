@@ -539,9 +539,6 @@ contract Depository is Implementation {
                 revert ZeroAddress();
             }
 
-            // Approve OLAS for depositProcessor
-            IToken(olas).approve(depositProcessor, amounts[i]);
-
             // Transfer OLAS to its corresponding Staker on L2
             IDepositProcessor(depositProcessor).sendMessage{value: values[i]}(stakingProxies[i], amounts[i],
                 bridgePayloads[i], UNSTAKE);
