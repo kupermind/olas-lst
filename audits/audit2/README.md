@@ -76,6 +76,7 @@ grep -r TODO ./contracts/
 ./contracts/l1/Depository.sol:            // TODO correct with unstakeAmount vs totalAmount
 ./contracts/l1/Depository.sol:        // TODO correct msg.sender
 ```
+[x] Fixed
 
 ### function createAndActivateStakingModels. low issue
 ```
@@ -135,11 +136,13 @@ But why msg.sender can by owner?
 function deposit(uint256 assets, address receiver) public override returns (uint256 shares) {}
 We need a view function, returned correct shares based on actual calculation in deposit
 ```
+[x] Fixed
 
 ### Medium. previewRedeem(shares) not "view" version of redeem
 ```
 We need a view function for function redeem(uint256 shares, address receiver, address tokenOwner) public override returns (uint256 assets) {}
 ```
+[x] Fixed
 
 
 
