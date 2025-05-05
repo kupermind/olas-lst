@@ -517,35 +517,6 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         return IStaking(stakingProxy).claim(serviceId);
     }
 
-    /// @dev Drains specified tokens.
-    /// @param tokens Set of token addresses.
-    function drain(address[] memory tokens) external {
-        // Reentrancy guard
-        if (_locked > 1) {
-            revert ReentrancyGuard();
-        }
-        _locked = 2;
-
-        // Check for ownership
-        if (msg.sender != owner) {
-            revert OwnerOnly(msg.sender, owner);
-        }
-
-        for (uint256 i = 0; i < tokens.length; ++i) {
-            // Get token balance
-            uint256 balance = IToken(tokens[i]).balanceOf(address(this));
-
-            // Check for zero value
-            if (balance == 0) {
-                revert ZeroValue();
-            }
-
-            IToken(tokens[i]).transfer(collector, balance);
-        }
-
-        _locked = 1;
-    }
-
     /// @dev Gets staked service Ids for a specific staking proxy.
     /// @param stakingProxy Staking proxy address.
     /// @return serviceIds Set of service Ids.
