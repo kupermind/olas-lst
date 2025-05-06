@@ -70,17 +70,11 @@ grep -r TODO ./contracts/
 ./contracts/l1/concept/LiquidityManager._sol:            // TODO Check result?
 TODO is OK for unused LiquidityManager
 
-./contracts/l1/Treasury.sol:    // TODO Change to transient
-./contracts/l1/Depository.sol:    // TODO Change to transient
-// TODO Change to transient
-// Reentrancy lock
-uint256 internal _locked; - Very optional.
-
 ./contracts/l1/Depository.sol:    // TODO Activate via proofs
 ./contracts/l1/Depository.sol:    // TODO Deactivate staking models for good via proofs
 Please, comment as TODO for next version.
 ```
-[]
+[x] TODO for next trustless versions
 
 ### Named revert(). Low issue
 ```
@@ -101,7 +95,7 @@ function fundDepository() external {
                 revert();
             }
 ```
-[]
+[x] Fixed
 
 ### Unused StakingManager
 ```
@@ -124,7 +118,7 @@ error ServiceNotEvicted(address stakingProxy, uint256 serviceId);
     // Contributors proxy address
     address public immutable contributorsProxy;
 ```
-[]
+[x] Fixed
 
 ### Unused StakingTokenLocked
 ```
@@ -138,7 +132,7 @@ error UnauthorizedMultisig(address multisig);
 /// @param serviceId Service Id.
 error WrongServiceConfiguration(uint256 serviceId);
 ```
-[]
+[x] Fixed
 
 ### Question. Treasury. How is it used?
 ```

@@ -41,11 +41,6 @@ error ZeroValue();
 /// @dev The contract is already initialized.
 error AlreadyInitialized();
 
-/// @dev Wrong length of two arrays.
-/// @param numValues1 Number of values in a first array.
-/// @param numValues2 Number of values in a second array.
-error WrongArrayLength(uint256 numValues1, uint256 numValues2);
-
 /// @dev Value overflow.
 /// @param provided Overflow value.
 /// @param max Maximum possible value.
@@ -57,19 +52,6 @@ error UnauthorizedAccount(address account);
 
 /// @dev Caught reentrancy violation.
 error ReentrancyGuard();
-
-/// @dev Wrong staking instance.
-/// @param stakingProxy Staking proxy address.
-error WrongStakingInstance(address stakingProxy);
-
-/// @dev Request Id already processed.
-/// @param requestId Request Id.
-error AlreadyProcessed(uint256 requestId);
-
-/// @dev Service is not evicted.
-/// @param stakingProxy Staking proxy address.
-/// @param serviceId Service Id.
-error ServiceNotEvicted(address stakingProxy, uint256 serviceId);
 
 /// @title StakingManager - Smart contract for OLAS staking management
 contract StakingManager is Implementation, ERC721TokenReceiver {

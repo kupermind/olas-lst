@@ -23,6 +23,10 @@ interface IBridge {
     function messageSender() external view returns (address);
 }
 
+/// @dev Zero value only allowed
+error ZeroValueOnly();
+
+
 /// @title GnosisStakingProcessorL2 - Smart contract for processing tokens and data received on Gnosis L2, and tokens sent back to L1.
 contract GnosisStakingProcessorL2 is DefaultStakingProcessorL2 {
     // Bridge payload length
@@ -61,7 +65,7 @@ contract GnosisStakingProcessorL2 is DefaultStakingProcessorL2 {
     function relayToL1(address to, uint256 olasAmount, bytes memory) external virtual override payable {
         // msg.value must be zero
         if (msg.value > 0) {
-            revert();
+            revert ZeroValueOnly();
         }
 
         IToken(olas).approve(l2TokenRelayer, olasAmount);

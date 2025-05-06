@@ -12,12 +12,12 @@ error OwnerOnly(address sender, address owner);
 /// @dev Only `treasury` has a privilege, but the `sender` was provided.
 /// @param sender Sender address.
 /// @param treasury Required sender address as a treasury.
-error DepositoryOnly(address sender, address treasury);
+error TreasuryOnly(address sender, address treasury);
 
 /// @dev Only `depository` has a privilege, but the `sender` was provided.
 /// @param sender Sender address.
 /// @param depository Required sender address as a depository.
-error TreasuryOnly(address sender, address depository);
+error DepositoryOnly(address sender, address depository);
 
 /// @dev Provided zero address.
 error ZeroAddress();
@@ -218,7 +218,7 @@ contract stOLAS is ERC4626 {
     /// @param amount OLAS amount.
     function topUpReserveBalance(uint256 amount) external {
         if (msg.sender != depository) {
-            revert();
+            revert DepositoryOnly(msg.sender, depository);
         }
 
         asset.transferFrom(msg.sender, address(this), amount);
@@ -231,7 +231,7 @@ contract stOLAS is ERC4626 {
     /// @dev Funds Depository with reserve balances.
     function fundDepository() external {
         if (msg.sender != depository) {
-            revert();
+            revert DepositoryOnly(msg.sender, depository);
         }
 
         uint256 curReserveBalance = reserveBalance;

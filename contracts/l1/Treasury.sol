@@ -193,14 +193,14 @@ contract Treasury is Implementation, ERC6909 {
             uint256 numRequests = numWithdrawRequests;
             // This must never happen as otherwise token would not exist and none of it would be transferFrom-ed
             if (requestId >= numRequests) {
-                revert Overflow(requestId, numRequests);
+                revert Overflow(requestId, numRequests - 1);
             }
 
             // It is safe to just move 64 bits as there is a single withdrawTime value after that
             uint256 withdrawTime = requestIds[i] >> 64;
             // Check for earliest possible withdraw time
             if (withdrawTime > block.timestamp) {
-                revert();
+                revert Overflow(withdrawTime, block.timestamp);
             }
 
             // Burn withdraw tokens
