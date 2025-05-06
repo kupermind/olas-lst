@@ -63,6 +63,9 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
     event DeployAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig);
     event NativeTokenReceived(uint256 amount);
 
+    // Staking Manager version
+    string public constant VERSION = "0.1.0";
+
     // Stake operation
     bytes32 public constant STAKE = 0x1bcc0f4c3fad314e585165815f94ecca9b96690a26d6417d7876448a9a867a69;
     // Unstake operation

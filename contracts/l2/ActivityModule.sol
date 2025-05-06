@@ -99,6 +99,10 @@ error ManagerOnly(address sender, address manager);
 contract ActivityModule {
     event ActivityIncreased(uint256 activityChange);
 
+    // Activity Module version
+    string public constant VERSION = "0.1.0";
+
+    // Default activity increment
     uint256 public constant DEFAULT_ACTIVITY = 1;
 
     // OLAS token address

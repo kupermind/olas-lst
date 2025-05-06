@@ -56,7 +56,12 @@ contract Treasury is Implementation, ERC6909 {
     event WithdrawRequestExecuted(uint256 requestId, uint256 amount);
     event WithdrawAmountRequestedUpdated(uint256 withdrawAmountRequested);
 
+    // Treasury version
+    string public constant VERSION = "0.1.0";
+
+    // OLAS token address
     address public immutable olas;
+    // stOLAS token address
     address public immutable st;
     // Depository address
     address public immutable depository;
