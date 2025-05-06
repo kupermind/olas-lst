@@ -16,7 +16,8 @@ interface IDepositProcessor {
 interface ILock {
     /// @dev Increases lock amount and time.
     /// @param olasAmount OLAS amount.
-    function increaseLock(uint256 olasAmount) external;
+    /// @return True, if the unlock time has increased.
+    function increaseLock(uint256 olasAmount) external returns (bool);
 }
 
 interface IST {
@@ -83,7 +84,8 @@ contract Depository is Implementation {
 
     event TreasuryUpdated(address indexed treasury);
     event LockFactorUpdated(uint256 lockFactor);
-    event Locked(address indexed account, uint256 olasAmount, uint256 lockAmount, uint256 vaultBalance);
+    event Locked(address indexed account, uint256 olasAmount, uint256 lockAmount, uint256 vaultBalance,
+        bool unlockTimeIncreased);
     event SetDepositProcessorChainIds(address[] depositProcessors, uint256[] chainIds);
     event StakingModelsActivated(uint256[] chainIds, address[] stakingProxies, uint256[] stakeLimitPerSlots,
         uint256[] numSlots);
@@ -156,9 +158,9 @@ contract Depository is Implementation {
         IToken(olas).transfer(lock, lockAmount);
 
         // Increase lock
-        ILock(lock).increaseLock(lockAmount);
+        bool unlockTimeIncreased = ILock(lock).increaseLock(lockAmount);
 
-        emit Locked(msg.sender, olasAmount, lockAmount, remainder);
+        emit Locked(msg.sender, olasAmount, lockAmount, remainder, unlockTimeIncreased);
     }
 
     /// @dev Depository initializer.

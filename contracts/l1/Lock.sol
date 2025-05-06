@@ -164,16 +164,18 @@ contract Lock is Implementation {
 
     /// @dev Increases lock amount and time.
     /// @param olasAmount OLAS amount.
-    function increaseLock(uint256 olasAmount) external {
+    /// @return unlockTimeIncreased True, if the unlock time has increased.
+    function increaseLock(uint256 olasAmount) external returns (bool unlockTimeIncreased) {
         // Approve OLAS for veOLAS
         IToken(olas).approve(ve, olasAmount);
 
         // Increase lock amount
         IVEOLAS(ve).increaseAmount(olasAmount);
+
         // Increase unlock time to a maximum, if possible
         bytes memory increaseUnlockTimeData = abi.encodeCall(IVEOLAS.increaseUnlockTime, (MAX_LOCK_TIME));
         // Note: both success and failure are acceptable
-        ve.call(increaseUnlockTimeData);
+        (unlockTimeIncreased, ) = ve.call(increaseUnlockTimeData);
     }
 
     /// @dev Create a new proposal to change the protocol / contract parameters.
