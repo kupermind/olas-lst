@@ -39,6 +39,10 @@ interface IBridge {
         bytes calldata _extraData) external;
 }
 
+/// @dev Zero value only allowed
+error ZeroValueOnly();
+
+
 /// @title BaseStakingProcessorL2 - Smart contract for processing tokens and data received on Gnosis L2, and tokens sent back to L1.
 contract BaseStakingProcessorL2 is DefaultStakingProcessorL2 {
     // Token transfer gas limit for L1
@@ -74,10 +78,11 @@ contract BaseStakingProcessorL2 is DefaultStakingProcessorL2 {
         _receiveMessage(msg.sender, l1Processor, data);
     }
 
-    function relayToL1(address to, uint256 olasAmount) external virtual override payable {
+    /// @inheritdoc DefaultStakingProcessorL2
+    function relayToL1(address to, uint256 olasAmount, bytes memory) external virtual override payable {
         // msg.value must be zero
         if (msg.value > 0) {
-            revert();
+            revert ZeroValueOnly();
         }
 
         IToken(olas).approve(l2TokenRelayer, olasAmount);

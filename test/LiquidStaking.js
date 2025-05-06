@@ -49,6 +49,7 @@ describe("Liquid Staking", function () {
     const livenessRatio = "11111111111111"; // 1 transaction per 25 hours
     const maxNumServices = 100;
     const minStakingDeposit = regDeposit;
+    const fullStakeDeposit = regDeposit.mul(2);
     const timeForEmissions = oneDay * 30;
     let serviceParams = {
         maxNumServices,
@@ -69,7 +70,7 @@ describe("Liquid Staking", function () {
     const chainId = 31337;
     const gnosisChainId = 100;
     const stakingRewardsPerEpoch = ethers.BigNumber.from(serviceParams.rewardsPerSecond).mul(ethers.BigNumber.from(maxNumServices)).mul(timeForEmissions);
-    const stakingSupply = (regDeposit.mul(2)).mul(ethers.BigNumber.from(maxNumServices));
+    const stakingSupply = fullStakeDeposit.mul(ethers.BigNumber.from(maxNumServices));
     const bridgePayload = "0x";
 
     beforeEach(async function () {
@@ -167,7 +168,7 @@ describe("Liquid Staking", function () {
         await depository.deployed();
 
         const DepositoryProxy = await ethers.getContractFactory("Proxy");
-        initPayload = depository.interface.encodeFunctionData("initialize", [lockFactor, maxStakingLimit]);
+        initPayload = depository.interface.encodeFunctionData("initialize", [lockFactor]);
         const depositoryProxy = await DepositoryProxy.deploy(depository.address, initPayload);
         await depositoryProxy.deployed();
         depository = await ethers.getContractAt("Depository", depositoryProxy.address);
@@ -292,7 +293,8 @@ describe("Liquid Staking", function () {
         await stakingTokenInstance.deposit(stakingSupply);
 
         // Add model to L1
-        await depository.createAndActivateStakingModels([gnosisChainId], [stakingTokenAddress], [stakingSupply]);
+        await depository.createAndActivateStakingModels([gnosisChainId], [stakingTokenAddress], [fullStakeDeposit],
+            [maxNumServices]);
     });
 
     context("Staking", function () {
@@ -359,7 +361,7 @@ describe("Liquid Staking", function () {
 
             // Relay rewards to L1
             console.log("Calling relay tokens to L1 by agent or manually");
-            await collector.relayRewardTokens();
+            await collector.relayRewardTokens(bridgePayload);
 
             console.log("\nL1");
 
@@ -382,8 +384,8 @@ describe("Liquid Staking", function () {
             let res = await tx.wait();
             // Get withdraw request Id
             //console.log(res.logs);
-            let requestId = ethers.BigNumber.from(res.logs[6].topics[3]);
-            let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[6].data);
+            let requestId = ethers.BigNumber.from(res.logs[5].topics[3]);
+            let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
             let olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
             console.log("Withdraw requestId:", requestId.toString());
             console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
@@ -411,8 +413,8 @@ describe("Liquid Staking", function () {
             res = await tx.wait();
             // Get withdraw request Id
             //console.log(res.logs);
-            requestId = ethers.BigNumber.from(res.logs[6].topics[3]);
-            data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[6].data);
+            requestId = ethers.BigNumber.from(res.logs[5].topics[3]);
+            data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
             olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
             console.log("Withdraw requestId:", requestId.toString());
             console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
@@ -512,7 +514,7 @@ describe("Liquid Staking", function () {
 
             // Relay rewards to L1
             console.log("Calling relay tokens to L1 by agent or manually");
-            await collector.relayRewardTokens();
+            await collector.relayRewardTokens(bridgePayload);
 
             console.log("\nL1");
 
@@ -535,8 +537,8 @@ describe("Liquid Staking", function () {
             let res = await tx.wait();
             // Get withdraw request Id
             //console.log(res.logs);
-            let requestId = ethers.BigNumber.from(res.logs[6].topics[3]);
-            let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[6].data);
+            let requestId = ethers.BigNumber.from(res.logs[5].topics[3]);
+            let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
             let olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
             console.log("Withdraw requestId:", requestId.toString());
             console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
@@ -564,8 +566,8 @@ describe("Liquid Staking", function () {
             res = await tx.wait();
             // Get withdraw request Id
             //console.log(res.logs);
-            requestId = ethers.BigNumber.from(res.logs[6].topics[3]);
-            data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[6].data);
+            requestId = ethers.BigNumber.from(res.logs[5].topics[3]);
+            data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
             olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
             console.log("Withdraw requestId:", requestId.toString());
             console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
@@ -659,7 +661,7 @@ describe("Liquid Staking", function () {
 
             // Relay rewards to L1
             console.log("Calling relay tokens to L1 by agent or manually");
-            await collector.relayRewardTokens();
+            await collector.relayRewardTokens(bridgePayload);
 
             console.log("\nL1");
 
@@ -682,8 +684,8 @@ describe("Liquid Staking", function () {
             let res = await tx.wait();
             // Get withdraw request Id
             //console.log(res.logs);
-            let requestId = ethers.BigNumber.from(res.logs[6].topics[3]);
-            let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[6].data);
+            let requestId = ethers.BigNumber.from(res.logs[5].topics[3]);
+            let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
             let olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
             console.log("Withdraw requestId:", requestId.toString());
             console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
@@ -771,7 +773,7 @@ describe("Liquid Staking", function () {
 
             // Relay rewards to L1
             console.log("Calling relay tokens to L1 by agent or manually");
-            await collector.relayRewardTokens();
+            await collector.relayRewardTokens(bridgePayload);
 
             console.log("\nL1");
 
@@ -805,8 +807,8 @@ describe("Liquid Staking", function () {
             res = await tx.wait();
             // Get withdraw request Id
             //console.log(res.logs);
-            requestId = ethers.BigNumber.from(res.logs[6].topics[3]);
-            data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[6].data);
+            requestId = ethers.BigNumber.from(res.logs[5].topics[3]);
+            data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
             olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
             console.log("Withdraw requestId:", requestId.toString());
             console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
@@ -911,7 +913,7 @@ describe("Liquid Staking", function () {
 
             // Relay rewards to L1
             console.log("Calling relay tokens to L1 by agent or manually");
-            await collector.relayRewardTokens();
+            await collector.relayRewardTokens(bridgePayload);
 
             console.log("\nL1");
 
@@ -940,8 +942,8 @@ describe("Liquid Staking", function () {
                 let res = await tx.wait();
                 // Get withdraw request Id
                 //console.log(res.logs);
-                let requestId = ethers.BigNumber.from(res.logs[6].topics[3]);
-                let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[6].data);
+                let requestId = ethers.BigNumber.from(res.logs[5].topics[3]);
+                let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
                 let olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
                 console.log("Withdraw requestId:", requestId.toString());
                 console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
@@ -975,7 +977,10 @@ describe("Liquid Staking", function () {
             snapshot.restore();
         });
 
-        it.only("Multiple stakes-unstakes", async function () {
+        it("Multiple stakes-unstakes", async function () {
+            // Max timeout 1600 sec for coverage
+            this.timeout(1600000);
+
             // Take a snapshot of the current state of the blockchain
             const snapshot = await helpers.takeSnapshot();
 
@@ -1061,7 +1066,7 @@ describe("Liquid Staking", function () {
 
                 // Relay rewards to L1
                 console.log("Calling relay tokens to L1 by agent or manually");
-                await collector.relayRewardTokens();
+                await collector.relayRewardTokens(bridgePayload);
 
                 console.log("\nL1");
 
@@ -1088,8 +1093,8 @@ describe("Liquid Staking", function () {
                 let res = await tx.wait();
                 // Get withdraw request Id
                 //console.log(res.logs);
-                let requestId = ethers.BigNumber.from(res.logs[6].topics[3]);
-                let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[6].data);
+                let requestId = ethers.BigNumber.from(res.logs[5].topics[3]);
+                let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
                 let olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
                 console.log("Withdraw requestId:", requestId.toString());
                 console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
@@ -1135,8 +1140,8 @@ describe("Liquid Staking", function () {
                 let res = await tx.wait();
                 // Get withdraw request Id
                 //console.log(res.logs);
-                let requestId = ethers.BigNumber.from(res.logs[6].topics[3]);
-                let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[6].data);
+                let requestId = ethers.BigNumber.from(res.logs[5].topics[3]);
+                let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
                 let olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
                 console.log("Withdraw requestId:", requestId.toString());
                 console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());

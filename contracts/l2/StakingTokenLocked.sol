@@ -112,18 +112,10 @@ error ZeroValue();
 /// @param activityChecker Activity checker address.
 error ContractOnly(address activityChecker);
 
-/// @dev Agent Id is not correctly provided for the current routine.
-/// @param agentId Component Id.
-error WrongAgentId(uint256 agentId);
-
 /// @dev Wrong state of a service.
 /// @param state Service state.
 /// @param serviceId Service Id.
 error WrongServiceState(uint256 state, uint256 serviceId);
-
-/// @dev Multisig is not whitelisted.
-/// @param multisig Address of a multisig implementation.
-error UnauthorizedMultisig(address multisig);
 
 /// @dev The contract is already initialized.
 error AlreadyInitialized();
@@ -136,10 +128,6 @@ error MaxNumServicesReached(uint256 maxNumServices);
 /// @param provided Provided value is lower.
 /// @param expected Expected value.
 error LowerThan(uint256 provided, uint256 expected);
-
-/// @dev Required service configuration is wrong.
-/// @param serviceId Service Id.
-error WrongServiceConfiguration(uint256 serviceId);
 
 /// @dev Service is not unstaked.
 /// @param serviceId Service Id.
@@ -248,6 +236,7 @@ contract StakingTokenLocked is ERC721TokenReceiver {
     uint256 public emissionsAmount;
     // Timestamp of the last checkpoint
     uint256 public tsCheckpoint;
+
     // Mapping of serviceId => staking service info
     mapping (uint256 => ServiceInfo) public mapServiceInfo;
     // Set of currently staking serviceIds
@@ -631,7 +620,7 @@ contract StakingTokenLocked is ERC721TokenReceiver {
         emit ServiceUnstaked(epochCounter, serviceId, msg.sender, multisig, nonces, reward, availableRewards);
     }
 
-    /// @dev Claims rewards for the service without an additional checkpoint call.
+    /// @dev Claims service rewards with additional checkpoint call.
     /// @param serviceId Service Id.
     /// @return reward Staking reward.
     function claim(uint256 serviceId) external returns (uint256 reward) {
@@ -757,5 +746,11 @@ contract StakingTokenLocked is ERC721TokenReceiver {
     /// @return Staked service Ids.
     function getServiceIds() public view returns (uint256[] memory) {
         return setServiceIds;
+    }
+
+    /// @dev Gets number of staked service Ids.
+    /// @return Number of staked service Ids.
+    function getNumServiceIds() public view returns (uint256) {
+        return setServiceIds.length;
     }
 }

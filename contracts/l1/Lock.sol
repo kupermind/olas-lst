@@ -162,36 +162,20 @@ contract Lock is Implementation {
         emit OlasGovernorUpdated(_olasGovernor);
     }
 
-    // TODO lock full balance and make this ownerless?
     /// @dev Increases lock amount and time.
     /// @param olasAmount OLAS amount.
-    function increaseLock(uint256 olasAmount) external {
+    /// @return unlockTimeIncreased True, if the unlock time has increased.
+    function increaseLock(uint256 olasAmount) external returns (bool unlockTimeIncreased) {
         // Approve OLAS for veOLAS
         IToken(olas).approve(ve, olasAmount);
 
         // Increase lock amount
         IVEOLAS(ve).increaseAmount(olasAmount);
+
         // Increase unlock time to a maximum, if possible
         bytes memory increaseUnlockTimeData = abi.encodeCall(IVEOLAS.increaseUnlockTime, (MAX_LOCK_TIME));
-        ve.call(increaseUnlockTimeData);
-    }
-
-    function unlock(address account, uint256 amount) external {
-        /// TBD
-        // Check for ownership
-        if (msg.sender != owner) {
-            revert OwnerOnly(msg.sender, owner);
-        }
-
-        // TODO Never withdraw the full amount, i.e. neve close the treasury lock
-        IVEOLAS.LockedBalance memory lockedBalance = IVEOLAS(ve).mapLockedBalances(address(this));
-
-        // Withdraw veOLAS
-        IVEOLAS(ve).withdraw();
-
-        // TODO For testing purposes now
-        // Transfer OLAS
-        IToken(olas).transfer(account, amount);
+        // Note: both success and failure are acceptable
+        (unlockTimeIncreased, ) = ve.call(increaseUnlockTimeData);
     }
 
     /// @dev Create a new proposal to change the protocol / contract parameters.

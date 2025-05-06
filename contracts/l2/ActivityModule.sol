@@ -9,7 +9,7 @@ interface ISafe {
     function nonce() external returns (uint256);
 
     /// @dev Marks a hash as approved. This can be used to validate a hash that is used by a signature.
-    ///  @param hashToApprove The hash that should be marked as approved for signatures that are verified by this contract.
+    /// @param hashToApprove The hash that should be marked as approved for signatures that are verified by this contract.
     function approveHash(bytes32 hashToApprove) external;
 
     /// @dev Allows to add a module to the whitelist.
@@ -87,6 +87,9 @@ error ZeroValue();
 /// @dev The contract is already initialized.
 error AlreadyInitialized();
 
+/// @dev Caught reentrancy violation.
+error ReentrancyGuard();
+
 /// @dev Only `manager` has a privilege, but the `sender` was provided.
 /// @param sender Sender address.
 /// @param manager Required sender address as a manager.
@@ -95,6 +98,8 @@ error ManagerOnly(address sender, address manager);
 /// @title ActivityModule - Smart contract for multisig activity tracking
 contract ActivityModule {
     event ActivityIncreased(uint256 activityChange);
+
+    uint256 public constant DEFAULT_ACTIVITY = 1;
 
     // OLAS token address
     address public immutable olas;
@@ -112,6 +117,9 @@ contract ActivityModule {
     // Staking manager address
     address public stakingManager;
 
+    // Reentrancy lock
+    uint256 internal _locked;
+
     /// @dev ActivityModule constructor.
     /// @param _olas OLAS address.
     /// @param _collector Collector address.
@@ -120,14 +128,24 @@ contract ActivityModule {
         collector = _collector;
     }
 
+    /// @dev Increases module activity.
+    /// @param activityChange Activity change value.
     function _increaseActivity(uint256 activityChange) internal {
         activityNonce += activityChange;
 
         emit ActivityIncreased(activityChange);
     }
 
+    /// @dev Initializes activity module proxy.
+    /// @param _multisig Service multisig address.
+    /// @param _stakingProxy Staking proxy address.
+    /// @param _serviceId Service Id.
     function initialize(address _multisig, address _stakingProxy, uint256 _serviceId) external {
-        // TODO reentrancy check?
+        // Reentrancy guard
+        if (_locked > 1) {
+            revert ReentrancyGuard();
+        }
+        _locked = 2;
 
         if (multisig != address(0)) {
             revert AlreadyInitialized();
@@ -172,22 +190,26 @@ contract ActivityModule {
         // Execute multisig transaction
         ISafe(multisig).execTransaction(multisig, 0, data, ISafe.Operation.Call, 0, 0, 0, address(0),
             payable(address(0)), signature);
+
+        _locked = 1;
     }
 
+    /// @dev Increases initial module activity.
     function increaseInitialActivity() external {
         if (msg.sender != stakingManager) {
             revert ManagerOnly(msg.sender, stakingManager);
         }
 
-        _increaseActivity(1);
+        _increaseActivity(DEFAULT_ACTIVITY);
     }
 
+    /// @dev Claims corresponding service rewards.
     function claim() external {
-        // Get staking reward
+        // Claim staking reward
         IStakingManager(stakingManager).claim(stakingProxy, serviceId);
 
-        // Increases activity for the next staking epoch
-        _increaseActivity(1);
+        // Increase activity for the next staking epoch
+        _increaseActivity(DEFAULT_ACTIVITY);
 
         // Get multisig balance
         uint256 balance = IToken(olas).balanceOf(multisig);

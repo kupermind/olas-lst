@@ -44,12 +44,17 @@ error AlreadyInitialized();
 /// @param max Maximum possible value.
 error Overflow(uint256 provided, uint256 max);
 
+/// @dev Caught reentrancy violation.
+error ReentrancyGuard();
+
+
 /// @title Treasury - Smart contract for treasury
 contract Treasury is Implementation, ERC6909 {
     event WithdrawDelayUpdates(uint256 withdrawDelay);
     event WithdrawRequestInitiated(address indexed requester, uint256 indexed requestId, uint256 stAmount,
         uint256 olasAmount, uint256 withdrawTime);
     event WithdrawRequestExecuted(uint256 requestId, uint256 amount);
+    event WithdrawAmountRequestedUpdated(uint256 withdrawAmountRequested);
 
     address public immutable olas;
     address public immutable st;
@@ -63,6 +68,13 @@ contract Treasury is Implementation, ERC6909 {
     // Number of withdraw requests
     uint256 public numWithdrawRequests;
 
+    // Reentrancy lock
+    bool transient _locked;
+
+    /// @dev Treasury constructor.
+    /// @param _olas OLAS address.
+    /// @param _st stOLAS address.
+    /// @param _depository Depository address.
     constructor(address _olas, address _st, address _depository) {
         olas = _olas;
         st = _st;
@@ -80,6 +92,8 @@ contract Treasury is Implementation, ERC6909 {
         owner = msg.sender;
     }
 
+    /// @dev Changes withdraw delay value.
+    /// @param newWithdrawDelay New withdraw delay value in seconds.
     function changeWithdrawDelay(uint256 newWithdrawDelay) external {
         // Check for ownership
         if (msg.sender != owner) {
@@ -90,7 +104,6 @@ contract Treasury is Implementation, ERC6909 {
         emit WithdrawDelayUpdates(newWithdrawDelay);
     }
 
-    // TODO Move high level part to depository?
     /// @dev Requests withdraw of OLAS in exchange of provided stOLAS.
     /// @notice Vault reserves are used first. If there is a lack of OLAS reserves, the backup amount is requested
     ///         to be unstaked from other models.
@@ -108,6 +121,17 @@ contract Treasury is Implementation, ERC6909 {
         bytes[] memory bridgePayloads,
         uint256[] memory values
     ) external payable returns (uint256 requestId, uint256 olasAmount) {
+        // Reentrancy guard
+        if (_locked) {
+            revert ReentrancyGuard();
+        }
+        _locked = true;
+
+        // Check for zero value
+        if (stAmount == 0) {
+            revert ZeroValue();
+        }
+
         // Get stOLAS
         IToken(st).transferFrom(msg.sender, address(this), stAmount);
 
@@ -132,7 +156,9 @@ contract Treasury is Implementation, ERC6909 {
         _mint(msg.sender, requestId, olasAmount);
 
         // Update total withdraw amount requested
-        withdrawAmountRequested += olasAmount;
+        uint256 curWithdrawAmountRequested = withdrawAmountRequested;
+        curWithdrawAmountRequested += olasAmount;
+        withdrawAmountRequested = curWithdrawAmountRequested;
 
         // Get updated staked balance
         uint256 stakedBalanceAfter = IST(st).stakedBalance();
@@ -145,15 +171,19 @@ contract Treasury is Implementation, ERC6909 {
         }
 
         emit WithdrawRequestInitiated(msg.sender, requestId, stAmount, olasAmount, withdrawTime);
+        emit WithdrawAmountRequestedUpdated(curWithdrawAmountRequested);
     }
 
     /// @dev Finalizes withdraw requests.
     /// @param requestIds Withdraw request Ids.
     /// @param amounts Token amounts corresponding to request Ids.
-    function finalizeWithdrawRequests(
-        uint256[] calldata requestIds,
-        uint256[] calldata amounts
-    ) external {
+    function finalizeWithdrawRequests(uint256[] calldata requestIds, uint256[] calldata amounts) external {
+        // Reentrancy guard
+        if (_locked) {
+            revert ReentrancyGuard();
+        }
+        _locked = true;
+
         uint256 totalAmount;
         // Traverse all withdraw requests
         for (uint256 i = 0; i < requestIds.length; ++i) {
@@ -167,14 +197,14 @@ contract Treasury is Implementation, ERC6909 {
             uint256 numRequests = numWithdrawRequests;
             // This must never happen as otherwise token would not exist and none of it would be transferFrom-ed
             if (requestId >= numRequests) {
-                revert Overflow(requestId, numRequests);
+                revert Overflow(requestId, numRequests - 1);
             }
 
             // It is safe to just move 64 bits as there is a single withdrawTime value after that
             uint256 withdrawTime = requestIds[i] >> 64;
             // Check for earliest possible withdraw time
             if (withdrawTime > block.timestamp) {
-                revert();
+                revert Overflow(withdrawTime, block.timestamp);
             }
 
             // Burn withdraw tokens
@@ -185,18 +215,32 @@ contract Treasury is Implementation, ERC6909 {
             emit WithdrawRequestExecuted(requestIds[i], amounts[i]);
         }
 
+        // This must never happen
+        uint256 curWithdrawAmountRequested = withdrawAmountRequested;
+        if (totalAmount > curWithdrawAmountRequested) {
+            revert Overflow(totalAmount, curWithdrawAmountRequested);
+        }
+        // Update total withdraw amount requested
+        curWithdrawAmountRequested -= totalAmount;
+        withdrawAmountRequested = curWithdrawAmountRequested;
+
         // Transfer total amount of OLAS
         // The transfer overflow check is not needed since balances are in sync
         // OLAS has been redeemed when withdraw request was posted
         IToken(olas).transfer(msg.sender, totalAmount);
+
+        emit WithdrawAmountRequestedUpdated(curWithdrawAmountRequested);
     }
 
-    // TODO Withdraw by owner - any asset
-
+    /// @dev Gets withdraw request Id by request Id and withdraw time.
+    /// @param requestId Withdraw request Id.
+    /// @param withdrawTime Withdraw time.
     function getWithdrawRequestId(uint256 requestId, uint256 withdrawTime) external pure returns (uint256) {
         return requestId | (withdrawTime << 64);
     }
 
+    /// @dev Gets withdraw request Id and time.
+    /// @param withdrawRequestId Combined withdrawRequestId value.
     function getWithdrawIdAndTime(uint256 withdrawRequestId) external pure returns (uint256, uint256) {
         return ((withdrawRequestId & type(uint64).max), (withdrawRequestId >> 64));
     }

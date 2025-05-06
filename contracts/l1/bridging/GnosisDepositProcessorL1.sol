@@ -46,7 +46,7 @@ contract GnosisDepositProcessorL1 is DefaultDepositProcessorL1 {
         bytes32 operation
     ) internal override returns (uint256 sequence, uint256 leftovers) {
         // Transfer OLAS tokens
-        if (operation == STAKE && amount > 0) {
+        if (operation == STAKE) {
             // Approve tokens for the bridge contract
             IToken(olas).approve(l1TokenRelayer, amount);
 

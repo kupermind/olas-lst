@@ -20,7 +20,7 @@ interface IToken {
 abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
     event MessagePosted(uint256 indexed sequence, address indexed target, uint256 amount, bytes32 indexed batchHash);
     event L2StakerUpdated(address indexed l2StakingProcessor);
-    event LeftoversRefunded(address indexed sender, uint256 leftovers);
+    event LeftoversRefunded(address indexed sender, uint256 leftovers, bool success);
 
     // Stake operation
     bytes32 public constant STAKE = 0x1bcc0f4c3fad314e585165815f94ecca9b96690a26d6417d7876448a9a867a69;
@@ -124,6 +124,11 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
             revert ManagerOnly(l1Depository, msg.sender);
         }
 
+        // Check for zero value
+        if (operation == STAKE && amount == 0) {
+            revert ZeroValue();
+        }
+
         // Get the batch hash
         uint256 batchNonce = stakingBatchNonce;
         bytes32 batchHash = keccak256(abi.encode(batchNonce, block.chainid, address(this)));
@@ -135,9 +140,9 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
         if (leftovers > 0) {
             // If the call fails, ignore to avoid the attack that would prevent this function from executing
             // solhint-disable-next-line avoid-low-level-calls
-            tx.origin.call{value: leftovers}("");
+            (bool success, ) = tx.origin.call{value: leftovers}("");
 
-            emit LeftoversRefunded(tx.origin, leftovers);
+            emit LeftoversRefunded(tx.origin, leftovers, success);
         }
 
         // Increase the staking batch nonce

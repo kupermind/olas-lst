@@ -18,12 +18,12 @@ const main = async () => {
     const AddressZero = ethers.constants.AddressZero;
     const HashZero = ethers.constants.HashZero;
     const initSupply = "5" + "0".repeat(26);
-    const maxStakingLimit = ethers.utils.parseEther("20000");
     const gnosisChainId = 100;
     const baseChainId = 8453;
     const regDeposit = ethers.utils.parseEther("10000");
+    const fullStakeDeposit = regDeposit.mul(2);
     const maxNumServices = 100;
-    const stakingSupply = (regDeposit.mul(2)).mul(ethers.BigNumber.from(maxNumServices));
+    const stakingSupply = fullStakeDeposit.mul(ethers.BigNumber.from(maxNumServices));
 
     const globalsFile = "scripts/deployment/globals_ethereum_sepolia.json";
     const dataFromJSON = fs.readFileSync(globalsFile, "utf8");
@@ -114,7 +114,7 @@ const main = async () => {
 
 
     const DepositoryProxy = await ethers.getContractFactory("Proxy");
-    initPayload = depository.interface.encodeFunctionData("initialize", [parsedData.lockFactor, parsedData.maxStakingLimit]);
+    initPayload = depository.interface.encodeFunctionData("initialize", [parsedData.lockFactor]);
     const depositoryProxy = await DepositoryProxy.deploy(parsedData.depositoryAddress, initPayload);
     await depositoryProxy.deployed();
 
@@ -216,7 +216,8 @@ const main = async () => {
     //await baseDepositProcessorL1.setL2StakingProcessor(baseStakingProcessorL2Address);
 
     // Add model to L1
-    //await depository.createAndActivateStakingModels([gnosisChainId], [stakingTokenAddress], [stakingSupply]);
+    //await depository.createAndActivateStakingModels([gnosisChainId], [stakingTokenAddress], [fullStakeDeposit],
+    //    [maxNumServices]);
 };
 
 main()

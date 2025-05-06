@@ -30,6 +30,7 @@ Number of staked services:  100
       at listOnTimeout (node:internal/timers:573:17)
       at processTimers (node:internal/timers:514:7)
 ```
+[x] This happens sometimes on various platforms, but the CI works as expected
 
 ### A lof of ToDo for final version
 ```
@@ -75,11 +76,13 @@ grep -r TODO ./contracts/
 ./contracts/l1/Depository.sol:            // TODO correct with unstakeAmount vs totalAmount
 ./contracts/l1/Depository.sol:        // TODO correct msg.sender
 ```
+[x] Fixed
 
 ### function createAndActivateStakingModels. low issue
 ```
 size arrays
 ```
+[x] Fixed
 
 ### Missign Reentrance guard. low issue
 ```
@@ -91,6 +94,7 @@ function deposit(
         uint256[] memory values
     ) external payable returns (uint256 stAmount, uint256[] memory amounts) {
 ```
+[x] Fixed
 
 ### Maybe stakeAmount == 0 => revert in function deposit(
 ```
@@ -105,7 +109,8 @@ if (stakeAmount > 0) {
             stakeAmount = _increaseLock(stakeAmount);
         }
 else {revert()} ?
-```    
+``` 
+[x] False positive - the amount is assembled with the reserve balance on stOLAS
 
 ### Fix ToDo  function unstake(). Remove msg.sender == owner?
 ```
@@ -124,17 +129,20 @@ withdrawDiff always > 0
 unstakeAmount -> alwys if controlled only by Treasury.
 But why msg.sender can by owner?
 ```
+[x] Fixed
 
 ### Medium. previewDeposit(assets) not "view" version of deposit 
 ```
 function deposit(uint256 assets, address receiver) public override returns (uint256 shares) {}
 We need a view function, returned correct shares based on actual calculation in deposit
 ```
+[x] Fixed
 
 ### Medium. previewRedeem(shares) not "view" version of redeem
 ```
 We need a view function for function redeem(uint256 shares, address receiver, address tokenOwner) public override returns (uint256 assets) {}
 ```
+[x] Fixed
 
 
 

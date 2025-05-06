@@ -8,13 +8,24 @@ import {IService} from "../interfaces/IService.sol";
 import {IStaking} from "../interfaces/IStaking.sol";
 import {IToken, INFToken} from "../interfaces/IToken.sol";
 
+// Activity module interface
 interface IActivityModule {
+    /// @dev Initializes activity module proxy.
+    /// @param _multisig Service multisig address.
+    /// @param _stakingProxy Staking proxy address.
+    /// @param _serviceId Service Id.
     function initialize(address _multisig, address _stakingProxy, uint256 _serviceId) external;
+
+    /// @dev Increases initial module activity.
     function increaseInitialActivity() external;
 }
 
+// Bridge interface
 interface IBridge {
-    function relayToL1(address to, uint256 olasAmount) external payable;
+    /// @dev Relays OLAS to L1.
+    /// @param to Address to send tokens to.
+    /// @param olasAmount OLAS amount.
+    function relayToL1(address to, uint256 olasAmount, bytes memory) external payable;
 }
 
 // Multisig interface
@@ -24,20 +35,11 @@ interface IMultisig {
     function getOwners() external view returns (address[] memory);
 }
 
-interface ICollector {
-    function relayStakedTokens(uint256 amount) external payable;
-}
-
 /// @dev Zero value.
 error ZeroValue();
 
 /// @dev The contract is already initialized.
 error AlreadyInitialized();
-
-/// @dev Wrong length of two arrays.
-/// @param numValues1 Number of values in a first array.
-/// @param numValues2 Number of values in a second array.
-error WrongArrayLength(uint256 numValues1, uint256 numValues2);
 
 /// @dev Value overflow.
 /// @param provided Overflow value.
@@ -51,19 +53,6 @@ error UnauthorizedAccount(address account);
 /// @dev Caught reentrancy violation.
 error ReentrancyGuard();
 
-/// @dev Wrong staking instance.
-/// @param stakingProxy Staking proxy address.
-error WrongStakingInstance(address stakingProxy);
-
-/// @dev Request Id already processed.
-/// @param requestId Request Id.
-error AlreadyProcessed(uint256 requestId);
-
-/// @dev Service is not evicted.
-/// @param stakingProxy Staking proxy address.
-/// @param serviceId Service Id.
-error ServiceNotEvicted(address stakingProxy, uint256 serviceId);
-
 /// @title StakingManager - Smart contract for OLAS staking management
 contract StakingManager is Implementation, ERC721TokenReceiver {
     event StakingProcessorL2Updated(address indexed l2StakingProcessor);
@@ -72,6 +61,7 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
     event CreateAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig,
         address activityModule);
     event DeployAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig);
+    event NativeTokenReceived(uint256 amount);
 
     // Stake operation
     bytes32 public constant STAKE = 0x1bcc0f4c3fad314e585165815f94ecca9b96690a26d6417d7876448a9a867a69;
@@ -120,15 +110,16 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
 
     // Nonce
     uint256 internal _nonce;
-    // TODO change to transient bool
     // Reentrancy lock
     uint256 internal _locked = 1;
 
-    mapping(uint256 => bool) public mapDeposits;
-    mapping(address => uint256) public balanceOf;
+    // Mapping of staking proxy address => current balance
     mapping(address => uint256) public mapStakingProxyBalances;
+    // Mapping of staking proxy address => set of staked service Ids
     mapping(address => uint256[]) public mapStakedServiceIds;
+    // Mapping of service Id => activity module proxy address
     mapping(uint256 => address) public mapServiceIdActivityModules;
+    // Mapping of staking proxy address => last staked service Id index in mapStakedServiceIds corresponding set
     mapping(address => uint256) public mapLastStakedServiceIdxs;
 
     /// @dev StakerL2 constructor.
@@ -182,6 +173,10 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         serviceRegistryTokenUtility = IService(serviceManager).serviceRegistryTokenUtility();
     }
 
+    /// @dev Initializes staking manager.
+    /// @param _safeMultisig Safe multisig contract address.
+    /// @param _safeSameAddressMultisig Safe same address multisig contract address.
+    /// @param _fallbackHandler Fallback handler for service multisigs.
     function initialize(
         address _safeMultisig,
         address _safeSameAddressMultisig,
@@ -336,6 +331,9 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         emit DeployAndStake(stakingProxy, serviceId, multisig);
     }
 
+    /// @dev Deposits OLAS and stakes into specified staking proxy contract if deposit is enough for staking.
+    /// @param stakingProxy Staking proxy address.
+    /// @param amount OLAS amount.
     function stake(address stakingProxy, uint256 amount) external virtual {
         // Reentrancy guard
         if (_locked > 1) {
@@ -477,9 +475,12 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
 
         // Send OLAS to collector to initiate L1 transfer for all the balances at this time
         IToken(olas).transfer(l2StakingProcessor, amount);
-        // TODO Check on relays, but the majority of them does not require value
+
         // Send tokens to L1 Treasury and not stOLAS, since the redeem finalization is handled by Treasury
-        IBridge(l2StakingProcessor).relayToL1(l1Treasury, amount);
+        // Note that if any msg.value is needed for relay to L1, it must be handled in the corresponding
+        // Staking Processor L2 contract, since this function is called in the L1-L2-L1 tx and it is difficult
+        // to pre-calculate L2-L1 value before hand as bridging time varies and quotes might become outdated
+        IBridge(l2StakingProcessor).relayToL1(l1Treasury, amount, "");
 
         _locked = 1;
     }
@@ -489,40 +490,18 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
     /// @param serviceId Service Id.
     /// @return Staking reward.
     function claim(address stakingProxy, uint256 serviceId) external returns (uint256) {
-        // TODO Check that activityModule is eligible, i.e. created by address(this)
-        // TODO map of activityModule => staking proxy?
+        // Check that msg.sender is a valid Activity Module corresponding to its service Id
+        address activityModule = mapServiceIdActivityModules[serviceId];
+        if (msg.sender != activityModule) {
+            revert UnauthorizedAccount(msg.sender);
+        }
+
         return IStaking(stakingProxy).claim(serviceId);
     }
 
-    /// @dev Drains specified tokens.
-    /// @param tokens Set of token addresses.
-    function drain(address[] memory tokens) external {
-        // Reentrancy guard
-        if (_locked > 1) {
-            revert ReentrancyGuard();
-        }
-        _locked = 2;
-
-        // Check for ownership
-        if (msg.sender != owner) {
-            revert OwnerOnly(msg.sender, owner);
-        }
-
-        for (uint256 i = 0; i < tokens.length; ++i) {
-            // Get token balance
-            uint256 balance = IToken(tokens[i]).balanceOf(address(this));
-
-            // Check for zero value
-            if (balance == 0) {
-                revert ZeroValue();
-            }
-
-            IToken(tokens[i]).transfer(collector, balance);
-        }
-
-        _locked = 1;
-    }
-
+    /// @dev Gets staked service Ids for a specific staking proxy.
+    /// @param stakingProxy Staking proxy address.
+    /// @return serviceIds Set of service Ids.
     function getStakedServiceIds(address stakingProxy) external view returns (uint256[] memory serviceIds) {
         // Get last staked service index
         uint256 lastStakedServiceIdx = mapLastStakedServiceIdxs[stakingProxy];
@@ -542,5 +521,7 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
     }
 
     /// @dev Receives native funds for mock Service Registry minimal payments.
-    receive() external payable {}
+    receive() external payable {
+        emit NativeTokenReceived(msg.value);
+    }
 }

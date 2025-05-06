@@ -83,7 +83,7 @@ contract BaseDepositProcessorL1 is DefaultDepositProcessorL1 {
         bytes32 operation
     ) internal override returns (uint256 sequence, uint256 leftovers) {
         // Transfer OLAS tokens
-        if (operation == STAKE && amount > 0) {
+        if (operation == STAKE) {
             // Deposit OLAS
             // Approve tokens for the predicate bridge contract
             // Source: https://github.com/maticnetwork/pos-portal/blob/5fbd35ba9cdc8a07bf32d81d6d1f4ce745feabd6/flat/RootChainManager.sol#L2218
