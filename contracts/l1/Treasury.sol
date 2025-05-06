@@ -54,6 +54,7 @@ contract Treasury is Implementation, ERC6909 {
     event WithdrawRequestInitiated(address indexed requester, uint256 indexed requestId, uint256 stAmount,
         uint256 olasAmount, uint256 withdrawTime);
     event WithdrawRequestExecuted(uint256 requestId, uint256 amount);
+    event WithdrawAmountRequestedUpdated(uint256 withdrawAmountRequested);
 
     address public immutable olas;
     address public immutable st;
@@ -155,7 +156,9 @@ contract Treasury is Implementation, ERC6909 {
         _mint(msg.sender, requestId, olasAmount);
 
         // Update total withdraw amount requested
-        withdrawAmountRequested += olasAmount;
+        uint256 curWithdrawAmountRequested = withdrawAmountRequested;
+        curWithdrawAmountRequested += olasAmount;
+        withdrawAmountRequested = curWithdrawAmountRequested;
 
         // Get updated staked balance
         uint256 stakedBalanceAfter = IST(st).stakedBalance();
@@ -168,6 +171,7 @@ contract Treasury is Implementation, ERC6909 {
         }
 
         emit WithdrawRequestInitiated(msg.sender, requestId, stAmount, olasAmount, withdrawTime);
+        emit WithdrawAmountRequestedUpdated(curWithdrawAmountRequested);
     }
 
     /// @dev Finalizes withdraw requests.
@@ -211,10 +215,21 @@ contract Treasury is Implementation, ERC6909 {
             emit WithdrawRequestExecuted(requestIds[i], amounts[i]);
         }
 
+        // This must never happen
+        uint256 curWithdrawAmountRequested = withdrawAmountRequested;
+        if (totalAmount > curWithdrawAmountRequested) {
+            revert Overflow(totalAmount, curWithdrawAmountRequested);
+        }
+        // Update total withdraw amount requested
+        curWithdrawAmountRequested -= totalAmount;
+        withdrawAmountRequested = curWithdrawAmountRequested;
+
         // Transfer total amount of OLAS
         // The transfer overflow check is not needed since balances are in sync
         // OLAS has been redeemed when withdraw request was posted
         IToken(olas).transfer(msg.sender, totalAmount);
+
+        emit WithdrawAmountRequestedUpdated(curWithdrawAmountRequested);
     }
 
     /// @dev Gets withdraw request Id by request Id and withdraw time.

@@ -142,7 +142,7 @@ error WrongServiceConfiguration(uint256 serviceId);
     // Update total withdraw amount requested
     withdrawAmountRequested += olasAmount;
 ```
-[]
+[x] Corrected for tracking current withdrawAmountRequested across all requests
 
 
 

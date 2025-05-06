@@ -172,6 +172,7 @@ contract Lock is Implementation {
         IVEOLAS(ve).increaseAmount(olasAmount);
         // Increase unlock time to a maximum, if possible
         bytes memory increaseUnlockTimeData = abi.encodeCall(IVEOLAS.increaseUnlockTime, (MAX_LOCK_TIME));
+        // Note: both success and failure are acceptable
         ve.call(increaseUnlockTimeData);
     }
 
