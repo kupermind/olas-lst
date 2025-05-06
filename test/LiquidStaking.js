@@ -978,6 +978,7 @@ describe("Liquid Staking", function () {
         });
 
         it.only("Multiple stakes-unstakes", async function () {
+            this.timeout(1600000); // max timeout 1600 sec for coverage
             // Take a snapshot of the current state of the blockchain
             const snapshot = await helpers.takeSnapshot();
 
