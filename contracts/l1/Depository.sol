@@ -98,9 +98,13 @@ contract Depository is Implementation {
 
     // StakingModel struct
     struct StakingModel {
+        // Max available supply
         uint96 supply;
+        // Remaining supply
         uint96 remainder;
+        // Stake limit per slot as the deposit amount required for a single service stake
         uint96 stakeLimitPerSlot;
+        // Staking model status: Retired, Active, Inactive
         StakingModelStatus status;
     }
 
@@ -386,7 +390,7 @@ contract Depository is Implementation {
             // Get OLAS from sender
             IToken(olas).transferFrom(msg.sender, address(this), stakeAmount);
 
-            // Increase deposit amounts
+            // Increase total account deposit amount
             mapAccountDeposits[msg.sender] += stakeAmount;
 
             // Lock OLAS for veOLAS
