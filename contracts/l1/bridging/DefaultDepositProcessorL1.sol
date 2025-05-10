@@ -43,8 +43,6 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
     address public immutable l1TokenRelayer;
     // L1 message relayer bridging contract address
     address public immutable l1MessageRelayer;
-    // L2 target chain Id
-    uint256 public immutable l2TargetChainId;
     // L2 staker address, set by the deploying owner
     address public l2StakingProcessor;
     // Contract owner until the time when the l2StakingProcessor is set
@@ -60,34 +58,21 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
     /// @param _l1Depository L1 tokenomics depository address.
     /// @param _l1TokenRelayer L1 token relayer bridging contract address.
     /// @param _l1MessageRelayer L1 message relayer bridging contract address.
-    /// @param _l2TargetChainId L2 target chain Id.
     constructor(
         address _olas,
         address _l1Depository,
         address _l1TokenRelayer,
-        address _l1MessageRelayer,
-        uint256 _l2TargetChainId
+        address _l1MessageRelayer
     ) {
         // Check for zero addresses
         if (_l1Depository == address(0) || _l1TokenRelayer == address(0) || _l1MessageRelayer == address(0)) {
             revert ZeroAddress();
         }
 
-        // Check for zero value
-        if (_l2TargetChainId == 0) {
-            revert ZeroValue();
-        }
-
-        // Check for overflow value
-        if (_l2TargetChainId > MAX_CHAIN_ID) {
-            revert Overflow(_l2TargetChainId, MAX_CHAIN_ID);
-        }
-
         olas = _olas;
         l1Depository = _l1Depository;
         l1TokenRelayer = _l1TokenRelayer;
         l1MessageRelayer = _l1MessageRelayer;
-        l2TargetChainId = _l2TargetChainId;
         owner = msg.sender;
     }
 

@@ -40,7 +40,8 @@ const main = async () => {
         activityChecker: AddressZero
     };
     const gnosisChainId = 100;
-    const stakingSupply = (regDeposit.mul(2)).mul(ethers.BigNumber.from(maxNumServices));
+    const fullStakeDeposit = regDeposit.mul(2);
+    const stakingSupply = fullStakeDeposit.mul(ethers.BigNumber.from(maxNumServices));
 
     const globalsFile = "scripts/deployment/globals_gnosis_chiado.json";
     const dataFromJSON = fs.readFileSync(globalsFile, "utf8");
@@ -58,6 +59,8 @@ const main = async () => {
     deployer = new ethers.Wallet(account, provider);
     console.log("Deployer address:", deployer.address);
 
+    // Deploy Collector
+    console.log("Deploying Collector");
     const Collector = await ethers.getContractFactory("Collector");
     collector = await Collector.deploy(parsedData.olasAddress, parsedData.stOLASAddress);
     await collector.deployed();
@@ -70,8 +73,11 @@ const main = async () => {
         constructorArguments: [parsedData.olasAddress, parsedData.stOLASAddress],
     });
     parsedData.collectorAddress = collector.address;
+    console.log("Collector address:", collector.address);
     fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
 
+    // Deploy Collector Proxy
+    console.log("Deploying Collector Proxy");
     const CollectorProxy = await ethers.getContractFactory("Proxy");
     let initPayload = collector.interface.encodeFunctionData("initialize", []);
     const collectorProxy = await CollectorProxy.deploy(parsedData.collectorAddress, initPayload);
@@ -85,10 +91,12 @@ const main = async () => {
         constructorArguments: [collector.address, initPayload],
     });
     parsedData.collectorProxyAddress = collectorProxy.address;
+    console.log("Collector Proxy address:", collectorProxy.address);
     fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
     collector = await ethers.getContractAt("Collector", parsedData.collectorProxyAddress);
 
-
+    // Deploy ActivityModule
+    console.log("Deploying ActivityModule");
     const ActivityModule = await ethers.getContractFactory("ActivityModule");
     activityModule = await ActivityModule.deploy(parsedData.olasAddress, parsedData.collectorProxyAddress);
     await activityModule.deployed();
@@ -100,10 +108,12 @@ const main = async () => {
         address: activityModule.address,
         constructorArguments: [parsedData.olasAddress, parsedData.collectorProxyAddress],
     });
-    parsedData.activityModuleAddress = activityModule.address;
+    parsedData.activityModuleAddress = activityModule.address;  
+    console.log("ActivityModule address:", activityModule.address);
     fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
 
-
+    // Deploy Beacon
+    console.log("Deploying Beacon");
     const Beacon = await ethers.getContractFactory("Beacon");
     beacon = await Beacon.deploy(parsedData.activityModuleAddress);
     await beacon.deployed();
@@ -116,9 +126,11 @@ const main = async () => {
         constructorArguments: [parsedData.activityModuleAddress],
     });
     parsedData.beaconAddress = beacon.address;
+    console.log("Beacon address:", beacon.address);
     fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
 
-
+    // Deploy StakingManager
+    console.log("Deploying StakingManager");
     const StakingManager = await ethers.getContractFactory("StakingManager");
     stakingManager = await StakingManager.deploy(parsedData.olasAddress, parsedData.treasuryProxyAddress,
         parsedData.serviceManagerTokenAddress, parsedData.stakingFactoryAddress, parsedData.safeToL2SetupAddress,
@@ -135,9 +147,11 @@ const main = async () => {
             parsedData.beaconAddress, parsedData.collectorProxyAddress, agentId, defaultHash],
     });
     parsedData.stakingManagerAddress = stakingManager.address;
+    console.log("StakingManager address:", stakingManager.address);
     fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
 
     // Initialize stakingManager
+    console.log("Initializing stakingManagerProxy");
     const StakingManagerProxy = await ethers.getContractFactory("Proxy");
     initPayload = stakingManager.interface.encodeFunctionData("initialize", [parsedData.gnosisSafeMultisigImplementationAddress,
         parsedData.gnosisSafeSameAddressMultisigImplementationAddress, parsedData.fallbackHandlerAddress]);
@@ -152,6 +166,7 @@ const main = async () => {
         constructorArguments: [parsedData.stakingManagerAddress, initPayload],
     });
     parsedData.stakingManagerProxyAddress = stakingManagerProxy.address;
+    console.log("StakingManagerProxy address:", stakingManagerProxy.address);
     fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
     stakingManager = await ethers.getContractAt("StakingManager", parsedData.stakingManagerProxyAddress);
 
@@ -159,7 +174,8 @@ const main = async () => {
     // Fund staking manager with native to support staking creation
     await deployer.sendTransaction({to: stakingManager.address, value: ethers.utils.parseEther("0.000001")});
 
-
+    // Deploy GnosisStakingProcessorL2
+    console.log("Deploying GnosisStakingProcessorL2");
     const GnosisStakingProcessorL2 = await ethers.getContractFactory("GnosisStakingProcessorL2");
     gnosisStakingProcessorL2 = await GnosisStakingProcessorL2.deploy(parsedData.olasAddress,
         parsedData.stakingManagerProxyAddress, parsedData.gnosisOmniBridgeAddress, parsedData.gnosisAMBHomeAddress,
@@ -176,6 +192,7 @@ const main = async () => {
             parsedData.gnosisDepositProcessorL1Address, gnosisChainId],
     });
     parsedData.gnosisStakingProcessorL2Address = gnosisStakingProcessorL2.address;
+    console.log("GnosisStakingProcessorL2 address:", gnosisStakingProcessorL2.address);
     fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
 
 
@@ -187,7 +204,8 @@ const main = async () => {
     //stakingManager = await ethers.getContractAt("StakingManager", parsedData.stakingManagerProxyAddress);
     await stakingManager.changeStakingProcessorL2(parsedData.gnosisStakingProcessorL2Address);
 
-
+    // Deploy ActivityChecker
+    console.log("Deploying ActivityChecker");
     const ActivityChecker = await ethers.getContractFactory("ModuleActivityChecker");
     activityChecker = await ActivityChecker.deploy(livenessRatio);
     await activityChecker.deployed();
@@ -200,9 +218,11 @@ const main = async () => {
         constructorArguments: [livenessRatio],
     });
     parsedData.activityCheckerAddress = activityChecker.address;
+    console.log("ActivityChecker address:", activityChecker.address);
     fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
 
-
+    // Deploy StakingTokenLocked
+    console.log("Deploying StakingTokenLocked");
     const StakingTokenLocked = await ethers.getContractFactory("StakingTokenLocked");
     stakingTokenImplementation = await StakingTokenLocked.deploy();
     await stakingTokenImplementation.deployed();
@@ -215,6 +235,7 @@ const main = async () => {
         constructorArguments: [],
     });
     parsedData.stakingTokenImplementationAddress = stakingTokenImplementation.address;
+    console.log("StakingTokenLocked address:", stakingTokenImplementation.address);
     fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
 
 
@@ -228,7 +249,7 @@ const main = async () => {
     serviceParams.activityChecker = parsedData.activityCheckerAddress;
     serviceParams.stakingManager = parsedData.stakingManagerProxyAddress;
 
-
+    // Create staking contract instance
     stakingFactory = await ethers.getContractAt("StakingFactory", parsedData.stakingFactoryAddress);
     //stakingTokenImplementation = await ethers.getContractAt("StakingTokenLocked", parsedData.stakingTokenImplementationAddress);
     initPayload = stakingTokenImplementation.interface.encodeFunctionData("initialize", [serviceParams]);
@@ -237,6 +258,7 @@ const main = async () => {
     const res = await tx.wait();
     // Get staking contract instance address from the event
     parsedData.stakingTokenAddress = "0x" + res.logs[0].topics[2].slice(26);
+    console.log("StakingToken address:", parsedData.stakingTokenAddress);
     fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
 
     // Wait for half a minute for the transaction completion

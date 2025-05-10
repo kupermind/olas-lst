@@ -55,16 +55,14 @@ contract BaseDepositProcessorL1 is DefaultDepositProcessorL1 {
     /// @param _l1Dispenser L1 tokenomics dispenser address.
     /// @param _l1TokenRelayer L1 token relayer bridging contract address (OmniBridge).
     /// @param _l1MessageRelayer L1 message relayer bridging contract address (AMB Proxy Foreign).
-    /// @param _l2TargetChainId L2 target chain Id.
     /// @param _olasL2 OLAS token address on L2.
     constructor(
         address _olas,
         address _l1Dispenser,
         address _l1TokenRelayer,
         address _l1MessageRelayer,
-        uint256 _l2TargetChainId,
         address _olasL2
-    ) DefaultDepositProcessorL1(_olas, _l1Dispenser, _l1TokenRelayer, _l1MessageRelayer, _l2TargetChainId)
+    ) DefaultDepositProcessorL1(_olas, _l1Dispenser, _l1TokenRelayer, _l1MessageRelayer)
     {
         // Check for zero address
         if (_olasL2 == address(0)) {
