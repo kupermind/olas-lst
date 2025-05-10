@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.30;
 
 interface IUniswapV3 {
     /// @notice Creates a new pool if it does not exist, then initializes if not initialized

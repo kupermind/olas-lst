@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.30;
 
 import {ERC6909} from "../../lib/solmate/src/tokens/ERC6909.sol";
 import {Implementation, OwnerOnly, ZeroAddress} from "../Implementation.sol";

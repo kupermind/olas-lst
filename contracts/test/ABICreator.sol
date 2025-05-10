@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.30;
 
 // Getting ABIs for the Gnosis Safe master copy and proxy contracts
 import "@gnosis.pm/safe-contracts/contracts/GnosisSafe.sol";
