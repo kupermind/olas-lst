@@ -172,7 +172,9 @@ const main = async () => {
 
 
     // Fund staking manager with native to support staking creation
-    await deployer.sendTransaction({to: stakingManager.address, value: ethers.utils.parseEther("0.000001")});
+    console.log("Fund staking manager with native to support staking creation");
+    let tx = await deployer.sendTransaction({to: stakingManager.address, value: ethers.utils.parseEther("0.000001")});
+    await tx.wait();
 
     // Deploy GnosisStakingProcessorL2
     console.log("Deploying GnosisStakingProcessorL2");
@@ -197,11 +199,11 @@ const main = async () => {
 
 
     // changeStakingProcessorL2 for collector
-    //collector = await ethers.getContractAt("Collector", parsedData.collectorProxyAddress);
+    collector = await ethers.getContractAt("Collector", parsedData.collectorProxyAddress);
     await collector.changeStakingProcessorL2(parsedData.gnosisStakingProcessorL2Address);
 
     // changeStakingProcessorL2 for stakingManager
-    //stakingManager = await ethers.getContractAt("StakingManager", parsedData.stakingManagerProxyAddress);
+    stakingManager = await ethers.getContractAt("StakingManager", parsedData.stakingManagerProxyAddress);
     await stakingManager.changeStakingProcessorL2(parsedData.gnosisStakingProcessorL2Address);
 
     // Deploy ActivityChecker
@@ -253,7 +255,7 @@ const main = async () => {
     stakingFactory = await ethers.getContractAt("StakingFactory", parsedData.stakingFactoryAddress);
     //stakingTokenImplementation = await ethers.getContractAt("StakingTokenLocked", parsedData.stakingTokenImplementationAddress);
     initPayload = stakingTokenImplementation.interface.encodeFunctionData("initialize", [serviceParams]);
-    const tx = await stakingFactory.createStakingInstance(parsedData.stakingTokenImplementationAddress, initPayload,
+    tx = await stakingFactory.createStakingInstance(parsedData.stakingTokenImplementationAddress, initPayload,
         {gasLimit: 5000000});
     const res = await tx.wait();
     // Get staking contract instance address from the event
@@ -270,11 +272,11 @@ const main = async () => {
     });
 
     // Fund the staking contract
-    //olas = await ethers.getContractAt("ERC20Token", parsedData.olasAddress);
-    //const amount = regDeposit.mul(10);
-    //await olas.approve(parsedData.stakingTokenAddress, amount);
-    //stakingTokenInstance = await ethers.getContractAt("StakingTokenLocked", parsedData.stakingTokenAddress);
-    //await stakingTokenInstance.deposit(amount, { gasLimit: 300000 });
+    olas = await ethers.getContractAt("ERC20Token", parsedData.olasAddress);
+    const amount = regDeposit.mul(10);
+    await olas.approve(parsedData.stakingTokenAddress, amount);
+    stakingTokenInstance = await ethers.getContractAt("StakingTokenLocked", parsedData.stakingTokenAddress);
+    await stakingTokenInstance.deposit(amount, { gasLimit: 300000 });
 };
 
 main()
