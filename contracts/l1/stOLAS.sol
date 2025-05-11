@@ -304,4 +304,9 @@ contract stOLAS is ERC4626 {
     function totalAssets() public view override returns (uint256) {
         return totalReserves;
     }
+
+    /// @dev Gets total stake assets amount: currently staked and reserved for staking.
+    function totalStakeAssets() external view virtual returns (uint256) {
+        return stakedBalance + reserveBalance;
+    }
 }
