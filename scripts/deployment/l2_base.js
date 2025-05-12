@@ -259,7 +259,7 @@ const main = async () => {
 
     // Created staking contract instance
     stakingFactory = await ethers.getContractAt("StakingFactory", parsedData.stakingFactoryAddress);
-    //stakingTokenImplementation = await ethers.getContractAt("StakingTokenLocked", parsedData.stakingTokenImplementationAddress);
+    stakingTokenImplementation = await ethers.getContractAt("StakingTokenLocked", parsedData.stakingTokenImplementationAddress);
     initPayload = stakingTokenImplementation.interface.encodeFunctionData("initialize", [serviceParams]);
     tx = await stakingFactory.createStakingInstance(parsedData.stakingTokenImplementationAddress, initPayload,
         {gasLimit: 5000000});
