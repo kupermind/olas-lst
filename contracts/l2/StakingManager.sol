@@ -61,6 +61,7 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
     event CreateAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig,
         address activityModule);
     event DeployAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig);
+    event Claimed(address indexed activityModule, uint256 reward);
     event NativeTokenReceived(uint256 amount);
 
     // Staking Manager version
@@ -469,9 +470,9 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
 
             // Update last staked service Id
             mapLastStakedServiceIdxs[stakingProxy] = lastIdx;
-
-            emit StakingBalanceUpdated(UNSTAKE, stakingProxy, numUnstakes, balance);
         }
+
+        emit StakingBalanceUpdated(UNSTAKE, stakingProxy, numUnstakes, balance);
 
         // Update staking balance
         mapStakingProxyBalances[stakingProxy] = balance;
@@ -491,15 +492,17 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
     /// @dev Claims specified service rewards.
     /// @param stakingProxy Staking proxy address.
     /// @param serviceId Service Id.
-    /// @return Staking reward.
-    function claim(address stakingProxy, uint256 serviceId) external returns (uint256) {
+    /// @return reward Staking reward.
+    function claim(address stakingProxy, uint256 serviceId) external returns (uint256 reward) {
         // Check that msg.sender is a valid Activity Module corresponding to its service Id
         address activityModule = mapServiceIdActivityModules[serviceId];
         if (msg.sender != activityModule) {
             revert UnauthorizedAccount(msg.sender);
         }
 
-        return IStaking(stakingProxy).claim(serviceId);
+        reward = IStaking(stakingProxy).claim(serviceId);
+
+        emit Claimed(activityModule, reward);
     }
 
     /// @dev Gets staked service Ids for a specific staking proxy.

@@ -186,7 +186,7 @@ contract ActivityModule {
         }
 
         bytes32 txHash = ISafe(multisig).getTransactionHash(multisig, 0, data, ISafe.Operation.Call, 0, 0, 0,
-            address(0),address(0), nonce);
+            address(0), address(0), nonce);
 
         // Approve hash
         ISafe(multisig).approveHash(txHash);

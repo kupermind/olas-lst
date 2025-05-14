@@ -41,8 +41,9 @@ error Overflow(uint256 provided, uint256 max);
 
 /// @title Collector - Smart contract for collecting staking rewards
 contract Collector is Implementation {
+    event StakingProcessorUpdated(address indexed stakingProcessorL2);
     event ProtocolFactorUpdated(uint256 protocolFactor);
-    event ActivityIncreased(uint256 activityChange);
+    event RewardTokensRelayed(address indexed l1St, uint256 amount);
 
     // Min olas balance to relay
     uint256 public constant MIN_OLAS_BALANCE = 1 ether;
@@ -90,6 +91,7 @@ contract Collector is Implementation {
         }
 
         l2StakingProcessor = newStakingProcessorL2;
+        emit StakingProcessorUpdated(newStakingProcessorL2);
     }
 
     /// @dev Changes protocol factor value.
@@ -134,6 +136,8 @@ contract Collector is Implementation {
         // Update protocol balance
         curProtocolBalance += protocolAmount;
         protocolBalance = curProtocolBalance;
+
+        emit RewardTokensRelayed(l1St, amount);
 
         // Transfer tokens
         IToken(olas).transfer(l2StakingProcessor, amount);
