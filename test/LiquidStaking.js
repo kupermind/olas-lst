@@ -22,6 +22,7 @@ describe("Liquid Staking", function () {
     let stakingFactory;
     let stakingVerifier;
     let lock;
+    let distributor;
     let depository;
     let treasury;
     let collector;
@@ -163,12 +164,22 @@ describe("Liquid Staking", function () {
         // Governor address is irrelevant for testing
         await lock.setGovernorAndCreateFirstLock(deployer.address);
 
+        const Distributor = await ethers.getContractFactory("Distributor");
+        distributor = await Distributor.deploy(olas.address, st.address, lock.address);
+        await distributor.deployed();
+
+        const DistributorProxy = await ethers.getContractFactory("Proxy");
+        initPayload = distributor.interface.encodeFunctionData("initialize", [lockFactor]);
+        const distributorProxy = await DistributorProxy.deploy(distributor.address, initPayload);
+        await distributorProxy.deployed();
+        distributor = await ethers.getContractAt("Distributor", distributorProxy.address);
+
         const Depository = await ethers.getContractFactory("Depository");
-        depository = await Depository.deploy(olas.address, st.address, lock.address);
+        depository = await Depository.deploy(olas.address, st.address);
         await depository.deployed();
 
         const DepositoryProxy = await ethers.getContractFactory("Proxy");
-        initPayload = depository.interface.encodeFunctionData("initialize", [lockFactor]);
+        initPayload = depository.interface.encodeFunctionData("initialize", []);
         const depositoryProxy = await DepositoryProxy.deploy(depository.address, initPayload);
         await depositoryProxy.deployed();
         depository = await ethers.getContractAt("Depository", depositoryProxy.address);
@@ -200,7 +211,7 @@ describe("Liquid Staking", function () {
         await stakingFactory.deployed();
 
         const Collector = await ethers.getContractFactory("Collector");
-        collector = await Collector.deploy(olas.address, st.address);
+        collector = await Collector.deploy(olas.address, distributor.address);
         await collector.deployed();
 
         const CollectorProxy = await ethers.getContractFactory("Proxy");
@@ -365,6 +376,10 @@ describe("Liquid Staking", function () {
 
             console.log("\nL1");
 
+            // Distribute OLAS to veOLAS and stOLAS
+            console.log("Calling distribute obtained L2 to L1 OLAS to veOLAS and stOLAS by agent or manually");
+            await distributor.distribute();
+
             // Update st total assets
             console.log("Calling OLAS total assets on stOLAS update by agent or manually");
             await st.updateTotalAssets();
@@ -518,6 +533,10 @@ describe("Liquid Staking", function () {
 
             console.log("\nL1");
 
+            // Distribute OLAS to veOLAS and stOLAS
+            console.log("Calling distribute obtained L2 to L1 OLAS to veOLAS and stOLAS by agent or manually");
+            await distributor.distribute();
+
             // Update st total assets
             console.log("Calling OLAS total assets on stOLAS update by agent or manually");
             await st.updateTotalAssets();
@@ -665,6 +684,10 @@ describe("Liquid Staking", function () {
 
             console.log("\nL1");
 
+            // Distribute OLAS to veOLAS and stOLAS
+            console.log("Calling distribute obtained L2 to L1 OLAS to veOLAS and stOLAS by agent or manually");
+            await distributor.distribute();
+
             // Update st total assets
             console.log("Calling OLAS total assets on stOLAS update by agent or manually");
             await st.updateTotalAssets();
@@ -776,6 +799,10 @@ describe("Liquid Staking", function () {
             await collector.relayRewardTokens(bridgePayload);
 
             console.log("\nL1");
+
+            // Distribute OLAS to veOLAS and stOLAS
+            console.log("Calling distribute obtained L2 to L1 OLAS to veOLAS and stOLAS by agent or manually");
+            await distributor.distribute();
 
             // Update st total assets
             console.log("Calling OLAS total assets on stOLAS update by agent or manually");
@@ -916,6 +943,10 @@ describe("Liquid Staking", function () {
             await collector.relayRewardTokens(bridgePayload);
 
             console.log("\nL1");
+
+            // Distribute OLAS to veOLAS and stOLAS
+            console.log("Calling distribute obtained L2 to L1 OLAS to veOLAS and stOLAS by agent or manually");
+            await distributor.distribute();
 
             // Update st total assets
             console.log("Calling OLAS total assets on stOLAS update by agent or manually");
@@ -1069,6 +1100,10 @@ describe("Liquid Staking", function () {
                 await collector.relayRewardTokens(bridgePayload);
 
                 console.log("\nL1");
+
+                // Distribute OLAS to veOLAS and stOLAS
+                console.log("Calling distribute obtained L2 to L1 OLAS to veOLAS and stOLAS by agent or manually");
+                await distributor.distribute();
 
                 // Update st total assets
                 console.log("Calling OLAS total assets on stOLAS update by agent or manually");

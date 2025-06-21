@@ -13,13 +13,6 @@ interface IDepositProcessor {
     function sendMessage(address target, uint256 amount, bytes memory bridgePayload, bytes32 operation) external payable;
 }
 
-interface ILock {
-    /// @dev Increases lock amount and time.
-    /// @param olasAmount OLAS amount.
-    /// @return True, if the unlock time has increased.
-    function increaseLock(uint256 olasAmount) external returns (bool);
-}
-
 interface IST {
     /// @dev Deposits OLAS in exchange for stOLAS tokens.
     /// @param assets OLAS amount.
@@ -74,6 +67,8 @@ error UnauthorizedAccount(address account);
 
 /// @dev Caught reentrancy violation.
 error ReentrancyGuard();
+
+
 /// @title Depository - Smart contract for the stOLAS Depository.
 contract Depository is Implementation {
     enum StakingModelStatus {
@@ -83,9 +78,6 @@ contract Depository is Implementation {
     }
 
     event TreasuryUpdated(address indexed treasury);
-    event LockFactorUpdated(uint256 lockFactor);
-    event Locked(address indexed account, uint256 olasAmount, uint256 lockAmount, uint256 vaultBalance,
-        bool unlockTimeIncreased);
     event SetDepositProcessorChainIds(address[] depositProcessors, uint256[] chainIds);
     event StakingModelsActivated(uint256[] chainIds, address[] stakingProxies, uint256[] stakeLimitPerSlots,
         uint256[] numSlots);
@@ -114,17 +106,11 @@ contract Depository is Implementation {
     bytes32 public constant STAKE = 0x1bcc0f4c3fad314e585165815f94ecca9b96690a26d6417d7876448a9a867a69;
     // Unstake operation
     bytes32 public constant UNSTAKE = 0x8ca9a95e41b5eece253c93f5b31eed1253aed6b145d8a6e14d913fdf8e732293;
-    // Max lock factor
-    uint256 public constant MAX_LOCK_FACTOR = 10_000;
 
     // OLAS contract address
     address public immutable olas;
     // stOLAS contract address
     address public immutable st;
-    // veOLAS contract address
-    address public immutable ve;
-    // Lock contract address
-    address public immutable lock;
 
     // Treasury contract address
     address public treasury;
@@ -146,38 +132,17 @@ contract Depository is Implementation {
     // Set of staking model Ids
     uint256[] public setStakingModelIds;
 
-    constructor(address _olas, address _st, address _lock) {
+    constructor(address _olas, address _st) {
         olas = _olas;
         st = _st;
-        lock = _lock;
-    }
-
-    /// @dev Increases veOLAS lock.
-    /// @param olasAmount OLAS amount to get lock part from.
-    /// @return remainder veOLAS locked amount.
-    function _increaseLock(uint256 olasAmount) internal returns (uint256 remainder) {
-        // Get treasury veOLAS lock amount
-        uint256 lockAmount = (olasAmount * lockFactor) / MAX_LOCK_FACTOR;
-        remainder = olasAmount - lockAmount;
-
-        // Approve OLAS for Lock
-        IToken(olas).transfer(lock, lockAmount);
-
-        // Increase lock
-        bool unlockTimeIncreased = ILock(lock).increaseLock(lockAmount);
-
-        emit Locked(msg.sender, olasAmount, lockAmount, remainder, unlockTimeIncreased);
     }
 
     /// @dev Depository initializer.
-    /// @param _lockFactor Lock factor value.
-    function initialize(uint256 _lockFactor) external{
+    function initialize() external{
         // Check for already initialized
         if (owner != address(0)) {
             revert AlreadyInitialized();
         }
-
-        lockFactor = _lockFactor;
 
         owner = msg.sender;
     }
@@ -337,23 +302,6 @@ contract Depository is Implementation {
         emit ChangeModelStatuses(chainIds, stakingProxies, statuses);
     }
 
-    /// @dev Changes lock factor value.
-    /// @param newLockFactor New lock factor value.
-    function changeLockFactor(uint256 newLockFactor) external {
-        // Check for ownership
-        if (msg.sender != owner) {
-            revert OwnerOnly(msg.sender, owner);
-        }
-
-        // Check for zero value
-        if (newLockFactor == 0) {
-            revert ZeroValue();
-        }
-
-        lockFactor = newLockFactor;
-        emit LockFactorUpdated(newLockFactor);
-    }
-
     /// @dev Calculates amounts and initiates cross-chain stake request for specified models.
     /// @param stakeAmount Total incoming amount to stake.
     /// @param chainIds Set of chain Ids with staking proxies.
@@ -392,9 +340,6 @@ contract Depository is Implementation {
 
             // Increase total account deposit amount
             mapAccountDeposits[msg.sender] += stakeAmount;
-
-            // Lock OLAS for veOLAS
-            stakeAmount = _increaseLock(stakeAmount);
         }
 
         // Remainder is stake amount plus reserve balance

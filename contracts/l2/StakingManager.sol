@@ -60,7 +60,8 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         uint256 balance);
     event CreateAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig,
         address activityModule);
-    event DeployAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig);
+    event DeployAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig,
+        address activityModule);
     event Claimed(address indexed activityModule, uint256 reward);
     event NativeTokenReceived(uint256 amount);
 
@@ -332,7 +333,7 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         // Stake the service
         _stake(stakingProxy, serviceId, instances[0]);
 
-        emit DeployAndStake(stakingProxy, serviceId, multisig);
+        emit DeployAndStake(stakingProxy, serviceId, multisig, instances[0]);
     }
 
     /// @dev Deposits OLAS and stakes into specified staking proxy contract if deposit is enough for staking.

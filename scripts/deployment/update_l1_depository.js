@@ -27,7 +27,7 @@ const main = async () => {
 
     // Deploy new depository implementation
     const Depository = await ethers.getContractFactory("Depository");
-    depository = await Depository.deploy(parsedData.olasAddress, parsedData.stOLASAddress, parsedData.lockProxyAddress);
+    depository = await Depository.deploy(parsedData.olasAddress, parsedData.stOLASAddress);
     await depository.deployed();
 
     // Wait for half a minute for the transaction completion
@@ -35,7 +35,7 @@ const main = async () => {
 
     await hre.run("verify:verify", {
         address: depository.address,
-        constructorArguments: [parsedData.olasAddress, parsedData.stOLASAddress, parsedData.lockProxyAddress],
+        constructorArguments: [parsedData.olasAddress, parsedData.stOLASAddress],
     });
     parsedData.depositoryAddress = depository.address;
     fs.writeFileSync(globalsFile, JSON.stringify(parsedData));

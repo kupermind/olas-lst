@@ -43,7 +43,7 @@ error Overflow(uint256 provided, uint256 max);
 contract Collector is Implementation {
     event StakingProcessorUpdated(address indexed stakingProcessorL2);
     event ProtocolFactorUpdated(uint256 protocolFactor);
-    event RewardTokensRelayed(address indexed l1St, uint256 amount);
+    event RewardTokensRelayed(address indexed l1FundDistributor, uint256 amount);
 
     // Min olas balance to relay
     uint256 public constant MIN_OLAS_BALANCE = 1 ether;
@@ -52,8 +52,8 @@ contract Collector is Implementation {
 
     // OLAS contract address
     address public immutable olas;
-    // stOLAS contract address on L1
-    address public immutable l1St;
+    // FundDistributor contract address on L1
+    address public immutable l1FundDistributor;
 
     // Protocol balance
     uint256 public protocolBalance;
@@ -63,10 +63,10 @@ contract Collector is Implementation {
     address public l2StakingProcessor;
 
     /// @param _olas OLAS address on L2.
-    /// @param _l1St stOLAS address on L1.
-    constructor(address _olas, address _l1St) {
+    /// @param _l1FundDistributor FundDistributor contract address on L1.
+    constructor(address _olas, address _l1FundDistributor) {
         olas = _olas;
-        l1St = _l1St;
+        l1FundDistributor = _l1FundDistributor;
     }
 
     /// @dev Initializes collector.
@@ -137,12 +137,12 @@ contract Collector is Implementation {
         curProtocolBalance += protocolAmount;
         protocolBalance = curProtocolBalance;
 
-        emit RewardTokensRelayed(l1St, amount);
+        emit RewardTokensRelayed(l1FundDistributor, amount);
 
         // Transfer tokens
         IToken(olas).transfer(l2StakingProcessor, amount);
 
         // Send tokens to L1
-        IBridge(l2StakingProcessor).relayToL1{value: msg.value}(l1St, amount, bridgePayload);
+        IBridge(l2StakingProcessor).relayToL1{value: msg.value}(l1FundDistributor, amount, bridgePayload);
     }
 }

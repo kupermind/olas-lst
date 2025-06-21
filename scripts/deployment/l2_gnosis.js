@@ -62,7 +62,7 @@ const main = async () => {
     // Deploy Collector
     console.log("Deploying Collector");
     const Collector = await ethers.getContractFactory("Collector");
-    collector = await Collector.deploy(parsedData.olasAddress, parsedData.stOLASAddress);
+    collector = await Collector.deploy(parsedData.olasAddress, parsedData.distributorAddress);
     await collector.deployed();
 
     // Wait for half a minute for the transaction completion
@@ -70,7 +70,7 @@ const main = async () => {
 
     await hre.run("verify:verify", {
         address: collector.address,
-        constructorArguments: [parsedData.olasAddress, parsedData.stOLASAddress],
+        constructorArguments: [parsedData.olasAddress, parsedData.distributorAddress],
     });
     parsedData.collectorAddress = collector.address;
     console.log("Collector address:", collector.address);
