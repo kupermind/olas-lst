@@ -20,7 +20,8 @@ interface IActivityModule {
     function increaseInitialActivity() external;
 
     /// @dev Drains unclaimed rewards after service unstake.
-    function drain() external;
+    /// @return balance Amount drained.
+    function drain() external returns (uint256 balance);
 }
 
 // Bridge interface
@@ -470,16 +471,10 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
                 IService(serviceManager).terminate(serviceId);
                 IService(serviceManager).unbond(serviceId);
 
-                // Get the service multisig
-                (, address multisig, , , , , ) = IService(serviceRegistry).mapServices(serviceId);
-
-                // Check if there are multisig funds left
-                if (IToken(olas).balanceOf(multisig) > 0) {
-                    // Get activityModule
-                    address activityModule = mapServiceIdActivityModules[serviceId];
-                    // Drain unclaimed rewards
-                    IActivityModule(activityModule).drain();
-                }
+                // Get activityModule
+                address activityModule = mapServiceIdActivityModules[serviceId];
+                // Drain funds, if anything is left on a multisig
+                IActivityModule(activityModule).drain();
 
                 lastIdx--;
             }

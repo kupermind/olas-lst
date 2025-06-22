@@ -98,6 +98,7 @@ error ManagerOnly(address sender, address manager);
 /// @title ActivityModule - Smart contract for multisig activity tracking
 contract ActivityModule {
     event ActivityIncreased(uint256 activityChange);
+    event Drained(uint256 balance);
 
     // Activity Module version
     string public constant VERSION = "0.1.0";
@@ -133,20 +134,21 @@ contract ActivityModule {
     }
 
     /// @dev Drains unclaimed rewards after service unstake.
-    function _drain() internal {
+    /// @return balance Amount drained.
+    function _drain() internal returns (uint256 balance) {
         // Get multisig balance
-        uint256 balance = IToken(olas).balanceOf(multisig);
+        balance = IToken(olas).balanceOf(multisig);
 
         // Check for zero balance
-        if (balance == 0) {
-            revert ZeroValue();
+        if (balance > 0) {
+            // Encode olas transfer function call
+            bytes memory data = abi.encodeCall(IToken.transfer, (collector, balance));
+
+            // Send collected funds to collector
+            ISafe(multisig).execTransactionFromModule(olas, 0, data, ISafe.Operation.Call);
+
+            emit Drained(balance);
         }
-
-        // Encode olas transfer function call
-        bytes memory data = abi.encodeCall(IToken.transfer, (collector, balance));
-
-        // Send collected funds to collector
-        ISafe(multisig).execTransactionFromModule(olas, 0, data, ISafe.Operation.Call);
     }
 
     /// @dev Increases module activity.
@@ -225,24 +227,28 @@ contract ActivityModule {
     }
 
     /// @dev Claims corresponding service rewards.
-    function claim() external {
+    /// @return claimed Amount claimed.
+    function claim() external returns (uint256 claimed) {
         // Claim staking reward
         IStakingManager(stakingManager).claim(stakingProxy, serviceId);
 
-        // Increase activity for the next staking epoch
-        _increaseActivity(DEFAULT_ACTIVITY);
-
         // Drain claimed funds
-       _drain();
+        claimed = _drain();
+        // Check for successful claim, otherwise the activity does not count
+        if (claimed > 0) {
+            // Increase activity for the next staking epoch
+            _increaseActivity(DEFAULT_ACTIVITY);
+        }
     }
 
     /// @dev Drains unclaimed rewards after service unstake.
-    function drain() external {
+    /// @return balance Amount drained.
+    function drain() external returns (uint256 balance) {
         if (msg.sender != stakingManager) {
             revert ManagerOnly(msg.sender, stakingManager);
         }
 
         // Drain funds
-        _drain();
+        balance = _drain();
     }
 }
