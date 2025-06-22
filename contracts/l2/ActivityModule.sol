@@ -132,6 +132,23 @@ contract ActivityModule {
         collector = _collector;
     }
 
+    /// @dev Drains unclaimed rewards after service unstake.
+    function _drain() internal {
+        // Get multisig balance
+        uint256 balance = IToken(olas).balanceOf(multisig);
+
+        // Check for zero balance
+        if (balance == 0) {
+            revert ZeroValue();
+        }
+
+        // Encode olas transfer function call
+        bytes memory data = abi.encodeCall(IToken.transfer, (collector, balance));
+
+        // Send collected funds to collector
+        ISafe(multisig).execTransactionFromModule(olas, 0, data, ISafe.Operation.Call);
+    }
+
     /// @dev Increases module activity.
     /// @param activityChange Activity change value.
     function _increaseActivity(uint256 activityChange) internal {
@@ -215,18 +232,17 @@ contract ActivityModule {
         // Increase activity for the next staking epoch
         _increaseActivity(DEFAULT_ACTIVITY);
 
-        // Get multisig balance
-        uint256 balance = IToken(olas).balanceOf(multisig);
+        // Drain claimed funds
+       _drain();
+    }
 
-        // Check for zero balance
-        if (balance == 0) {
-            revert ZeroValue();
+    /// @dev Drains unclaimed rewards after service unstake.
+    function drain() external {
+        if (msg.sender != stakingManager) {
+            revert ManagerOnly(msg.sender, stakingManager);
         }
 
-        // Encode olas transfer function call
-        bytes memory data = abi.encodeCall(IToken.transfer, (collector, balance));
-
-        // Send collected funds to collector
-        ISafe(multisig).execTransactionFromModule(olas, 0, data, ISafe.Operation.Call);
+        // Drain funds
+        _drain();
     }
 }

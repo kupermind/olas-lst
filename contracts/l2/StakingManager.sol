@@ -18,6 +18,9 @@ interface IActivityModule {
 
     /// @dev Increases initial module activity.
     function increaseInitialActivity() external;
+
+    /// @dev Drains unclaimed rewards after service unstake.
+    function drain() external;
 }
 
 // Bridge interface
@@ -317,8 +320,9 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         // Activate registration (1 wei as a deposit wrapper)
         IService(serviceManager).activateRegistration{value: 1}(serviceId);
 
-        // Get multisig owners = activityModule
-        address[] memory instances = IMultisig(multisig).getOwners();
+        // Get multisig instances = activityModule
+        address[] memory instances = new address[](NUM_AGENT_INSTANCES);
+        instances[0] = mapServiceIdActivityModules[serviceId];
         // Get agent Ids
         uint32[] memory agentIds = new uint32[](NUM_AGENT_INSTANCES);
         agentIds[0] = uint32(agentId);
@@ -465,6 +469,17 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
                 IStaking(stakingProxy).unstake(serviceId);
                 IService(serviceManager).terminate(serviceId);
                 IService(serviceManager).unbond(serviceId);
+
+                // Get the service multisig
+                (, address multisig, , , , , ) = IService(serviceRegistry).mapServices(serviceId);
+
+                // Check if there are multisig funds left
+                if (IToken(olas).balanceOf(multisig) > 0) {
+                    // Get activityModule
+                    address activityModule = mapServiceIdActivityModules[serviceId];
+                    // Drain unclaimed rewards
+                    IActivityModule(activityModule).drain();
+                }
 
                 lastIdx--;
             }
