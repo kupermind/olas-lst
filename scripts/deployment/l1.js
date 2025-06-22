@@ -40,7 +40,7 @@ const main = async () => {
     const account = ethers.utils.HDNode.fromMnemonic(process.env.TESTNET_MNEMONIC).derivePath("m/44'/60'/0'/0/0");
     deployer = new ethers.Wallet(account, provider);
     console.log("Deployer address:", deployer.address);
-
+/*
     // Get OLAS contract
     olas = await ethers.getContractAt("ERC20Token", parsedData.olasAddress);
     //Mint tokens to the deployer
@@ -106,7 +106,7 @@ const main = async () => {
     // Set governor and create first lock
     console.log("Set governor and create first lock");
     await lock.setGovernorAndCreateFirstLock(parsedData.olasGovernorAddress, {gasLimit: 500000});
-
+*/
     // Deploy Distributor
     console.log("Deploying Distributor");
     const Distributor = await ethers.getContractFactory("Distributor");
@@ -142,6 +142,7 @@ const main = async () => {
     console.log("Distributor Proxy address:", distributorProxy.address);
     fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
     distributor = await ethers.getContractAt("Distributor", parsedData.distributorProxyAddress);
+    return;
 
     // Deploy Depository
     console.log("Deploying Depository");
