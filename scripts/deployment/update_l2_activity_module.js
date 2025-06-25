@@ -4,11 +4,11 @@ const { ethers } = require("hardhat");
 const fs = require("fs");
 
 const main = async () => {
-    let collector;
+    let activityModule;
     let deployer;
 
-    const globalsFile = "scripts/deployment/globals_gnosis_chiado.json";
-    //const globalsFile = "scripts/deployment/globals_base_sepolia.json";
+    //const globalsFile = "scripts/deployment/globals_gnosis_chiado.json";
+    const globalsFile = "scripts/deployment/globals_base_sepolia.json";
     const dataFromJSON = fs.readFileSync(globalsFile, "utf8");
     let parsedData = JSON.parse(dataFromJSON);
 
@@ -26,24 +26,24 @@ const main = async () => {
     console.log("Deployer address:", deployer.address);
 
 
-    // Deploy new collector implementation
-    const Collector = await ethers.getContractFactory("Collector");
-    collector = await Collector.deploy(parsedData.olasAddress, parsedData.distributorProxyAddress);
-    await collector.deployed();
+    // Deploy new activity module implementation
+    const ActivityModule = await ethers.getContractFactory("ActivityModule");
+    activityModule = await ActivityModule.deploy(parsedData.olasAddress, parsedData.collectorProxyAddress);
+    await activityModule.deployed();
 
     // Wait for half a minute for the transaction completion
     await new Promise(r => setTimeout(r, 30000));
 
     await hre.run("verify:verify", {
-        address: collector.address,
-        constructorArguments: [parsedData.olasAddress, parsedData.distributorProxyAddress],
+        address: activityModule.address,
+        constructorArguments: [parsedData.olasAddress, parsedData.collectorProxyAddress],
     });
-    parsedData.collectorAddress = collector.address;
+    parsedData.activityModuleAddress = activityModule.address;
     fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
 
-    // Change collector implementation
-    const collectorProxy = await ethers.getContractAt("Collector", parsedData.collectorProxyAddress);
-    await collectorProxy.changeImplementation(parsedData.collectorAddress);
+    // Change activityModule implementation in beacon
+    const beacon = await ethers.getContractAt("Beacon", parsedData.beaconAddress);
+    await beacon.changeImplementation(parsedData.activityModuleAddress);
 };
 
 main()

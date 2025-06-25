@@ -48,7 +48,7 @@ contract Beacon {
     function changeImplementation(address newImplementation) external {
         // Check for ownership
         if (msg.sender != owner) {
-
+            revert OwnerOnly(msg.sender, owner);
         }
 
         // Check for zero address
