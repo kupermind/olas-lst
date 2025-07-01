@@ -4,7 +4,13 @@
   "description": "Set of OLAS-LST contracts",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "coverage": "node --max-old-space-size=8192 node_modules/.bin/hardhat coverage",
+    "coverage:fast": "node --max-old-space-size=4096 node_modules/.bin/hardhat coverage --testfiles test/LiquidStakingOptimized.js",
+    "coverage:minimal": "node --max-old-space-size=2048 node_modules/.bin/hardhat coverage --testfiles test/LiquidStakingOptimized.js",
+    "coverage:script": "node scripts/run-coverage.js",
+    "test": "hardhat test",
+    "test:fast": "hardhat test test/LiquidStakingOptimized.js",
+    "test:original": "hardhat test test/LiquidStaking.js"
   },
   "repository": {
     "type": "git",
