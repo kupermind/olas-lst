@@ -10,7 +10,7 @@ try {
         process.env.NODE_OPTIONS : "--max-old-space-size=8192";
     
     // Run optimized test coverage
-    const command = `node ${maxOldSpaceSize} node_modules/.bin/hardhat coverage --testfiles test/LiquidStakingOptimized.js`;
+    const command = `./scripts/optimize-test.sh && node ${maxOldSpaceSize} node_modules/.bin/hardhat coverage --testfiles test/LiquidStakingOptimized.js`;
     
     console.log(`Executing: ${command}`);
     execSync(command, { 

@@ -5,11 +5,11 @@
   "main": "index.js",
   "scripts": {
     "coverage": "node --max-old-space-size=8192 node_modules/.bin/hardhat coverage",
-    "coverage:fast": "node --max-old-space-size=4096 node_modules/.bin/hardhat coverage --testfiles test/LiquidStakingOptimized.js",
-    "coverage:minimal": "node --max-old-space-size=2048 node_modules/.bin/hardhat coverage --testfiles test/LiquidStakingOptimized.js",
+    "coverage:fast": "./scripts/optimize-test.sh && node --max-old-space-size=4096 node_modules/.bin/hardhat coverage --testfiles test/LiquidStakingOptimized.js",
+    "coverage:minimal": "./scripts/optimize-test.sh && node --max-old-space-size=2048 node_modules/.bin/hardhat coverage --testfiles test/LiquidStakingOptimized.js",
     "coverage:script": "node scripts/run-coverage.js",
     "test": "hardhat test",
-    "test:fast": "hardhat test test/LiquidStakingOptimized.js",
+    "test:fast": "./scripts/optimize-test.sh && hardhat test test/LiquidStakingOptimized.js",
     "test:original": "hardhat test test/LiquidStaking.js"
   },
   "repository": {

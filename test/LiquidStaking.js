@@ -48,10 +48,10 @@ describe("Liquid Staking", function () {
     const livenessPeriod = oneDay; // 24 hours
     const initSupply = "5" + "0".repeat(26);
     const livenessRatio = "11111111111111"; // 1 transaction per 25 hours
-    const maxNumServices = 100;
+    const maxNumServices = 10;
     const minStakingDeposit = regDeposit;
     const fullStakeDeposit = regDeposit.mul(2);
-    const timeForEmissions = 30 * oneDay;
+    const timeForEmissions = 7 * oneDay;
     let serviceParams = {
         maxNumServices,
         rewardsPerSecond: "5" + "0".repeat(14),

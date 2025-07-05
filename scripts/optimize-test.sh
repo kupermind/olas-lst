@@ -1,19 +1,18 @@
 #!/bin/bash
 
-FILE="test/LiquidStaking.js"
+FILE="test/LiquidStaking"
 case "$(uname -s)" in
    Darwin)
      # Reduce maxNumServices from 100 to 10
-     sed -i.bu "s/maxNumServices = 100/maxNumServices = 10/g" $FILE
      # Reduce timeForEmission from 30 days to 7 days
-     sed -i.bu "s/timeForEmissions = oneDay * 30/timeForEmissions = oneDay * 7" $FILE
+     sed -e "s/maxNumServices = 100/maxNumServices = 10/g" -e "s/timeForEmissions = 30/timeForEmissions = 7/g" ${FILE}.js > ${FILE}Optimized.js
+
      ;;
 
    Linux)
      # Reduce maxNumServices from 100 to 10
-     sed -i "s/maxNumServices = 100/maxNumServices = 10/g" $FILE
      # Reduce timeForEmission from 30 days to 7 days
-     sed -i "s/timeForEmissions = oneDay * 30/timeForEmissions = oneDay * 7" $FILE
+     sed -e "s/maxNumServices = 100/maxNumServices = 10/g" -e "s/timeForEmissions = 30/timeForEmissions = 7/g" ${FILE}.js > ${FILE}Optimized.js
      ;;
 
    *)
