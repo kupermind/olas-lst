@@ -281,6 +281,7 @@ function requestToWithdraw(
     emit WithdrawAmountRequestedUpdated(curWithdrawAmountRequested);
 }
 ```
+[x] Fixed
 
 ## Impact
 
