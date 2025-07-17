@@ -386,15 +386,15 @@ contract Depository is Implementation {
 
             if (amounts[i] > stakingModel.remainder) {
                 amounts[i] = stakingModel.remainder;
-                remainder -= amounts[i];
                 // Update staking model remainder
                 mapStakingModels[stakingModelId].remainder = 0;
             } else {
                 // Update staking model remainder
                 mapStakingModels[stakingModelId].remainder = stakingModel.remainder - uint96(amounts[i]);
-                remainder -= amounts[i];
             }
 
+            // Adjust remainder
+            remainder -= amounts[i];
             // Increase actual stake amount
             actualStakeAmount += amounts[i];
 
