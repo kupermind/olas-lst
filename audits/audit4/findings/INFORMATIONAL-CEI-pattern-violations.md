@@ -226,6 +226,7 @@ function deposit(
     emit Deposit(msg.sender, stakeAmount, stAmount, chainIds, stakingProxies, amounts);
 }
 ```
+[x] Fixed
 
 ### 2. Fix Treasury.sol requestToWithdraw() function
 

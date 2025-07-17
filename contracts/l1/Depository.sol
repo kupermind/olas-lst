@@ -334,14 +334,6 @@ contract Depository is Implementation {
             revert WrongArrayLength();
         }
 
-        if (stakeAmount > 0) {
-            // Increase total account deposit amount
-            mapAccountDeposits[msg.sender] += stakeAmount;
-
-            // Get OLAS from sender
-            IToken(olas).transferFrom(msg.sender, address(this), stakeAmount);
-        }
-
         // Remainder is stake amount plus reserve balance
         uint256 remainder = IST(st).reserveBalance();
         // Pull OLAS reserve balance from stOLAS
@@ -398,6 +390,24 @@ contract Depository is Implementation {
             // Increase actual stake amount
             actualStakeAmount += amounts[i];
 
+            if (remainder == 0) {
+                break;
+            }
+        }
+
+        // Deposit provided stake amount
+        if (stakeAmount > 0) {
+            // Increase total account deposit amount
+            mapAccountDeposits[msg.sender] += stakeAmount;
+
+            // Get OLAS from sender
+            IToken(olas).transferFrom(msg.sender, address(this), stakeAmount);
+        }
+
+        // Send funds to staking relevant deposit processors
+        for (uint256 i = 0; i < chainIds.length; ++i) {
+            if (amounts[i] == 0) continue;
+
             // Get Deposit Processor address
             address depositProcessor = mapChainIdDepositProcessors[chainIds[i]];
             // Check for zero address
@@ -411,10 +421,6 @@ contract Depository is Implementation {
             // Transfer OLAS to its corresponding Staker on L2
             IDepositProcessor(depositProcessor).sendMessage{value: values[i]}(stakingProxies[i], amounts[i],
                 bridgePayloads[i], STAKE);
-
-            if (remainder == 0) {
-                break;
-            }
         }
 
         // If there are OLAS leftovers, transfer (back) to stOLAS
