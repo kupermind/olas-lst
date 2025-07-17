@@ -140,6 +140,15 @@ contract Treasury is Implementation, ERC6909 {
         // Get stOLAS
         IToken(st).transferFrom(msg.sender, address(this), stAmount);
 
+        // Get current staked balance
+        uint256 stakedBalanceBefore = IST(st).stakedBalance();
+
+        // Redeem OLAS and burn stOLAS tokens
+        olasAmount = IST(st).redeem(stAmount, address(this), address(this));
+
+        // Get updated staked balance
+        uint256 stakedBalanceAfter = IST(st).stakedBalance();
+
         // Calculate withdraw time
         uint256 withdrawTime = block.timestamp + withdrawDelay;
 
@@ -151,12 +160,6 @@ contract Treasury is Implementation, ERC6909 {
         // requestId occupies first 64 bits, withdrawTime occupies next bits as they both fit well in uint256
         requestId |= withdrawTime << 64;
 
-        // Get current staked balance
-        uint256 stakedBalanceBefore = IST(st).stakedBalance();
-
-        // Redeem OLAS and burn stOLAS tokens
-        olasAmount = IST(st).redeem(stAmount, address(this), address(this));
-
         // Mint request tokens
         _mint(msg.sender, requestId, olasAmount);
 
@@ -164,9 +167,6 @@ contract Treasury is Implementation, ERC6909 {
         uint256 curWithdrawAmountRequested = withdrawAmountRequested;
         curWithdrawAmountRequested += olasAmount;
         withdrawAmountRequested = curWithdrawAmountRequested;
-
-        // Get updated staked balance
-        uint256 stakedBalanceAfter = IST(st).stakedBalance();
 
         // If withdraw amount is bigger than the current one, need to unstake
         if (stakedBalanceBefore > stakedBalanceAfter) {
