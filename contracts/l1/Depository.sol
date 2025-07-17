@@ -335,11 +335,11 @@ contract Depository is Implementation {
         }
 
         if (stakeAmount > 0) {
-            // Get OLAS from sender
-            IToken(olas).transferFrom(msg.sender, address(this), stakeAmount);
-
             // Increase total account deposit amount
             mapAccountDeposits[msg.sender] += stakeAmount;
+
+            // Get OLAS from sender
+            IToken(olas).transferFrom(msg.sender, address(this), stakeAmount);
         }
 
         // Remainder is stake amount plus reserve balance

@@ -545,14 +545,25 @@ contract StakingTokenLocked is ERC721TokenReceiver {
         // ServiceInfo struct will be an empty one since otherwise the safeTransferFrom above would fail
         sInfo.multisig = service.multisig;
         sInfo.owner = msg.sender;
-        // This function might revert if it's incorrectly implemented, however this is not a protocol's responsibility
-        // It is safe to revert in this place
-        uint256[] memory nonces = IActivityChecker(activityChecker).getMultisigNonces(service.multisig);
-        sInfo.nonces = nonces;
         sInfo.tsStart = block.timestamp;
 
         // Add the service Id to the set of staked services
         setServiceIds.push(serviceId);
+
+        // Get multisig nonces
+        // Use staticcall for view functions to prevent state changes
+        bytes memory data = abi.encodeCall(IActivityChecker.getMultisigNonces, (service.multisig));
+        (bool success, bytes memory returnData) = activityChecker.staticcall(data);
+
+        uint256[] memory nonces;
+        if (success) {
+            nonces = abi.decode(returnData, (uint256[]));
+        } else {
+            // This must never happen
+            revert ZeroValue();
+        }
+
+        sInfo.nonces = nonces;
 
         // Transfer the service for staking
         IService(serviceRegistry).safeTransferFrom(msg.sender, address(this), serviceId);

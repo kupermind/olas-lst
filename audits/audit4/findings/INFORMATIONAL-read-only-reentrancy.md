@@ -25,6 +25,8 @@ IService(serviceRegistry).safeTransferFrom(msg.sender, address(this), serviceId)
 ```
 
 **Impact**: An attacker could potentially manipulate the activity checker contract to return unexpected nonces, affecting reward calculations and service state.
+[x] Fixed
+
 
 ### 2. StakingTokenLocked.sol - Service Registry Calls
 
@@ -42,22 +44,26 @@ IService.Service memory service = IService(serviceRegistry).getService(serviceId
 ```
 
 **Impact**: The service registry could be manipulated to return incorrect service data or token information.
+[x] Both are external
+
 
 ### 3. Depository.sol - Treasury Calls
 
 **Location**: `contracts/l1/Depository.sol:200-250`
 
-**Issue**: The `deposit()` function makes external calls to treasury contract before updating local state.
+**Issue**: The `deposit()` function makes external calls to olas contract before updating local state.
 
 ```solidity
-// External call to treasury
-uint256 stAmount = ITreasury(treasury).processAndMintStToken(msg.sender, stakeAmount);
+// Get OLAS from sender
+IToken(olas).transferFrom(msg.sender, address(this), stakeAmount);
 
 // State updates after external call
 mapAccountDeposits[msg.sender] += stakeAmount;
 ```
 
 **Impact**: The treasury contract could be manipulated to affect deposit calculations.
+[x] Fixed
+
 
 ## Proof of Concept
 
@@ -81,6 +87,8 @@ contract MaliciousActivityChecker {
     }
 }
 ```
+[x] Not relevant
+
 
 ## Recommended Fixes
 
@@ -105,6 +113,8 @@ function stake(uint256 serviceId) external {
     IService(serviceRegistry).safeTransferFrom(msg.sender, address(this), serviceId);
 }
 ```
+[x] Fixed
+
 
 ### 2. Add Reentrancy Guards
 
@@ -116,6 +126,8 @@ modifier nonReentrant() {
     _locked = false;
 }
 ```
+[x] Already in place
+
 
 ### 3. Use Static Calls for View Functions
 
@@ -124,4 +136,4 @@ modifier nonReentrant() {
 bytes memory data = abi.encodeWithSelector(IActivityChecker.getMultisigNonces.selector, multisig);
 (bool success, bytes memory returnData) = activityChecker.staticcall(data);
 ```
-
+[x] Fixed

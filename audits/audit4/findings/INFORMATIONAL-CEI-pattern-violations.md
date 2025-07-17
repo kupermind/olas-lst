@@ -185,7 +185,7 @@ function deposit(
         IToken(olas).transferFrom(msg.sender, address(this), stakeAmount);
     }
 
-    // 6. EFFECTS - ВСЕ обновления состояния ПОСЛЕ всех внешних вызовов
+    // 6. EFFECTS - ВСЕ обновления состояния ДО всех внешних вызовов
     if (stakeAmount > 0) {
         mapAccountDeposits[msg.sender] += stakeAmount;
     }
