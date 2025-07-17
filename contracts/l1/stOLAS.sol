@@ -19,6 +19,11 @@ error TreasuryOnly(address sender, address treasury);
 /// @param depository Required sender address as a depository.
 error DepositoryOnly(address sender, address depository);
 
+/// @dev Only `distributor` has a privilege, but the `sender` was provided.
+/// @param sender Sender address.
+/// @param distributor Required sender address as a distributor.
+error DistributorOnly(address sender, address distributor);
+
 /// @dev Provided zero address.
 error ZeroAddress();
 
@@ -35,9 +40,10 @@ contract stOLAS is ERC4626 {
     using FixedPointMathLib for uint256;
 
     event OwnerUpdated(address indexed owner);
-    event ManagersUpdated(address indexed treasury, address indexed depository);
+    event ManagersUpdated(address indexed treasury, address indexed depository, address indexed dstributor);
     event TotalReservesUpdated(uint256 stakedBalance, uint256 vaultBalance, uint256 reserveBalance, uint256 totalReserves);
     event ReserveBalanceTopUpped(uint256 amount);
+    event VaultBalanceTopUpped(uint256 amount);
     event DepositoryFunded(uint256 amount);
 
     // Staked balance
@@ -57,6 +63,8 @@ contract stOLAS is ERC4626 {
     address public treasury;
     // Depository address
     address public depository;
+    // Distributor address
+    address public distributor;
 
     /// @dev stOLAS constructor.
     /// @param _olas OLAS token address.
@@ -82,18 +90,20 @@ contract stOLAS is ERC4626 {
     /// @dev Changes various managing contract addresses.
     /// @param newTreasury New treasury address.
     /// @param newDepository New depository address.
-    function changeManagers(address newTreasury, address newDepository) external {
+    /// @param newDistributor New distributor address.
+    function changeManagers(address newTreasury, address newDepository, address newDistributor) external {
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);
         }
 
-        if (newTreasury == address(0) || newDepository == address(0)) {
+        if (newTreasury == address(0) || newDepository == address(0) || newDistributor == address(0)) {
             revert ZeroAddress();
         }
 
         treasury = newTreasury;
         depository = newDepository;
-        emit ManagersUpdated(newTreasury, newDepository);
+        distributor = newDistributor;
+        emit ManagersUpdated(newTreasury, newDepository, newDistributor);
     }
 
     /// @dev Deposits OLAS in exchange for stOLAS tokens.
@@ -224,8 +234,22 @@ contract stOLAS is ERC4626 {
         asset.transferFrom(msg.sender, address(this), amount);
         topUpBalance = amount;
         reserveBalance += amount;
+        vaultBalance += amount;
 
         emit ReserveBalanceTopUpped(amount);
+    }
+
+    /// @dev Top-ups vault balance via Distributor.
+    /// @param amount OLAS amount.
+    function topUpVaultBalance(uint256 amount) external {
+        if (msg.sender != distributor) {
+            revert DistributorOnly(msg.sender, distributor);
+        }
+
+        asset.transferFrom(msg.sender, address(this), amount);
+        vaultBalance += amount;
+
+        emit VaultBalanceTopUpped(amount);
     }
 
     /// @dev Funds Depository with reserve balances.
@@ -237,6 +261,7 @@ contract stOLAS is ERC4626 {
         uint256 curReserveBalance = reserveBalance;
         if (curReserveBalance > 0) {
             reserveBalance = 0;
+            vaultBalance -= curReserveBalance;
             totalReserves -= curReserveBalance;
             asset.transfer(msg.sender, curReserveBalance);
         }
@@ -257,7 +282,7 @@ contract stOLAS is ERC4626 {
         curStakedBalance = stakedBalance + assets - topUpBalance;
 
         // Get current vault balance
-        curVaultBalance = asset.balanceOf(address(this));
+        curVaultBalance = vaultBalance;
 
         // Update total assets
         curTotalReserves = curStakedBalance + curVaultBalance;
@@ -285,7 +310,7 @@ contract stOLAS is ERC4626 {
         curReserveBalance = reserveBalance;
 
         // Current vault balance
-        curVaultBalance = asset.balanceOf(address(this));
+        curVaultBalance = vaultBalance;
 
         // Total reserves
         curTotalReserves = curStakedBalance + curVaultBalance;
