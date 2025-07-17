@@ -58,7 +58,7 @@ All files                       |    75.05 |    35.28 |    64.29 |    64.57 |   
 
 ### ERC4626 check
 [MEDIUM-balance-of-manipulation.md](findings/MEDIUM-balance-of-manipulation.md)
-[]
+[x] Fixed
 
 ## Notes
 ### Doc for fix coverage issue
