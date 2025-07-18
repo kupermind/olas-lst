@@ -124,7 +124,10 @@ module.exports = {
             chainId: 919,
         },
         hardhat: {
-            allowUnlimitedContractSize: true
+            allowUnlimitedContractSize: true,
+            mocha: {
+                timeout: 120000,
+            }
         },
     },
     etherscan: {
@@ -266,5 +269,25 @@ module.exports = {
         path: "./docs",
         clear: true,
         runOnCompile: true,
+    },
+    solidityCoverage: {
+        measureStatementCoverage: true,
+        measureFunctionCoverage: true,
+        measureBranchCoverage: false,
+        measureLineCoverage: true,
+        skipFiles: [
+            "test/",
+            "lib/",
+            "interfaces/",
+            "l1/bridging/",
+            "l2/bridging/"
+        ],
+        excludeContracts: [
+            "Mock",
+            "Test",
+            "ABICreator",
+            "BridgeRelayer",
+            "SafeToL2Setup"
+        ]
     }
 };

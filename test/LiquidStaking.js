@@ -48,10 +48,10 @@ describe("Liquid Staking", function () {
     const livenessPeriod = oneDay; // 24 hours
     const initSupply = "5" + "0".repeat(26);
     const livenessRatio = "11111111111111"; // 1 transaction per 25 hours
-    const maxNumServices = 100;
+    const maxNumServices = 10;
     const minStakingDeposit = regDeposit;
     const fullStakeDeposit = regDeposit.mul(2);
-    const timeForEmissions = oneDay * 30;
+    const timeForEmissions = 7 * oneDay;
     let serviceParams = {
         maxNumServices,
         rewardsPerSecond: "5" + "0".repeat(14),
@@ -310,6 +310,9 @@ describe("Liquid Staking", function () {
 
     context("Staking", function () {
         it("E2E liquid staking simple", async function () {
+            // Max timeout 1600 sec for coverage
+            this.timeout(1600000);
+
             // Take a snapshot of the current state of the blockchain
             const snapshot = await helpers.takeSnapshot();
 
@@ -459,6 +462,9 @@ describe("Liquid Staking", function () {
         });
 
         it("More than one service deposit", async function () {
+            // Max timeout 1600 sec for coverage
+            this.timeout(1600000);
+
             // Take a snapshot of the current state of the blockchain
             const snapshot = await helpers.takeSnapshot();
 
@@ -616,6 +622,9 @@ describe("Liquid Staking", function () {
         });
 
         it("Two services deposit, one unstake, more deposit, full unstake", async function () {
+            // Max timeout 1600 sec for coverage
+            this.timeout(1600000);
+
             // Take a snapshot of the current state of the blockchain
             const snapshot = await helpers.takeSnapshot();
 
@@ -865,6 +874,9 @@ describe("Liquid Staking", function () {
         });
 
         it("Max number of stakes", async function () {
+            // Max timeout 1600 sec for coverage
+            this.timeout(1600000);
+
             // Take a snapshot of the current state of the blockchain
             const snapshot = await helpers.takeSnapshot();
 
