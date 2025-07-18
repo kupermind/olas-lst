@@ -4,7 +4,6 @@ module.exports = {
         "test/BridgeRelayer.sol",
         "test/MockActivityChecker.sol",
         "test/MockVE.sol",
-        "test/SafeToL2Setup.sol",
-        "l1/stOLAS.sol"
+        "test/SafeToL2Setup.sol"
     ]
 };
