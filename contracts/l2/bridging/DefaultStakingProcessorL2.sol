@@ -11,7 +11,10 @@ interface IStakingManager {
     /// @notice Unstakes services if needed to satisfy withdraw requests.
     ///         Call this to unstake definitely terminated staking contracts - deactivated on L1 and / or ran out of funds.
     ///         The majority of discovered chains does not need any value to process token bridge transfer.
-    function unstake(address stakingProxy, uint256 amount) external;
+    /// @param stakingProxy Staking proxy address.
+    /// @param amount Unstake amount.
+    /// @param operation Unstake operation type.
+    function unstake(address stakingProxy, uint256 amount, bytes32 operation) external;
 }
 
 // Necessary ERC20 token interface
@@ -185,7 +188,7 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
             }
         } else if (operation == UNSTAKE) {
             // This is a low level call since it must never revert
-            bytes memory unstakeData = abi.encodeCall(IStakingManager.unstake, (target, amount));
+            bytes memory unstakeData = abi.encodeCall(IStakingManager.unstake, (target, amount, operation));
             (bool success, ) = stakingManager.call(unstakeData);
 
             if (!success) {
@@ -289,7 +292,7 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
                 revert InsufficientBalance(olasBalance, amount);
             }
         } else if (operation == UNSTAKE) {
-            IStakingManager(stakingManager).unstake(target, amount);
+            IStakingManager(stakingManager).unstake(target, amount, operation);
         } else {
             // Must never happen
             revert OperationNotFound(operation);

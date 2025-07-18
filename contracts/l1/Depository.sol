@@ -106,6 +106,8 @@ contract Depository is Implementation {
     bytes32 public constant STAKE = 0x1bcc0f4c3fad314e585165815f94ecca9b96690a26d6417d7876448a9a867a69;
     // Unstake operation
     bytes32 public constant UNSTAKE = 0x8ca9a95e41b5eece253c93f5b31eed1253aed6b145d8a6e14d913fdf8e732293;
+    // Unstake-retired operation
+    bytes32 public constant UNSTAKE_RETIRED = 0x9065ad15d9673159e4597c86084aff8052550cec93c5a6e44b3f1dba4c8731b3;
 
     // OLAS contract address
     address public immutable olas;
@@ -135,6 +137,37 @@ contract Depository is Implementation {
     constructor(address _olas, address _st) {
         olas = _olas;
         st = _st;
+    }
+
+    function _operationSendMessage(
+        uint256[] memory chainIds,
+        address[] memory stakingProxies,
+        uint256[] memory amounts,
+        bytes[] memory bridgePayloads,
+        uint256[] memory values,
+        bytes32 operation
+    ) private {
+        for (uint256 i = 0; i < chainIds.length; ++i) {
+            if (amounts[i] == 0) continue;
+
+            // Get corresponding deposit processor
+            address depositProcessor = mapChainIdDepositProcessors[chainIds[i]];
+
+            // Check for zero address
+            if (depositProcessor == address(0)) {
+                revert ZeroAddress();
+            }
+
+            // Stake related only
+            if (operation == STAKE) {
+                // Transfer OLAS to depositProcessor
+                IToken(olas).transfer(depositProcessor, amounts[i]);
+            }
+
+            // Perform operation on corresponding Staker on L2
+            IDepositProcessor(depositProcessor).sendMessage{value: values[i]}(stakingProxies[i], amounts[i],
+                bridgePayloads[i], operation);
+        }
     }
 
     /// @dev Depository initializer.
@@ -404,24 +437,8 @@ contract Depository is Implementation {
             IToken(olas).transferFrom(msg.sender, address(this), stakeAmount);
         }
 
-        // Send funds to staking relevant deposit processors
-        for (uint256 i = 0; i < chainIds.length; ++i) {
-            if (amounts[i] == 0) continue;
-
-            // Get Deposit Processor address
-            address depositProcessor = mapChainIdDepositProcessors[chainIds[i]];
-            // Check for zero address
-            if (depositProcessor == address(0)) {
-                revert ZeroAddress();
-            }
-
-            // Approve OLAS for depositProcessor
-            IToken(olas).transfer(depositProcessor, amounts[i]);
-
-            // Transfer OLAS to its corresponding Staker on L2
-            IDepositProcessor(depositProcessor).sendMessage{value: values[i]}(stakingProxies[i], amounts[i],
-                bridgePayloads[i], STAKE);
-        }
+        // Send funds to staking via relevant deposit processors
+        _operationSendMessage(chainIds, stakingProxies, amounts, bridgePayloads, values, STAKE);
 
         // If there are OLAS leftovers, transfer (back) to stOLAS
         if (stakeAmount > actualStakeAmount) {
@@ -503,17 +520,6 @@ contract Depository is Implementation {
                 unstakeAmount = 0;
             }
 
-            // Transfer OLAS via the bridge
-            address depositProcessor = mapChainIdDepositProcessors[chainIds[i]];
-            // Check for zero address
-            if (depositProcessor == address(0)) {
-                revert ZeroAddress();
-            }
-
-            // Transfer OLAS to its corresponding Staker on L2
-            IDepositProcessor(depositProcessor).sendMessage{value: values[i]}(stakingProxies[i], amounts[i],
-                bridgePayloads[i], UNSTAKE);
-
             if (unstakeAmount == 0) {
                 break;
             }
@@ -523,6 +529,75 @@ contract Depository is Implementation {
         if (unstakeAmount > 0) {
             revert Overflow(unstakeAmount, 0);
         }
+
+        // Request unstake via relevant deposit processors
+        _operationSendMessage(chainIds, stakingProxies, amounts, bridgePayloads, values, UNSTAKE);
+
+        emit Unstake(msg.sender, unstakeAmount, chainIds, stakingProxies, amounts);
+    }
+
+    /// @dev Calculates amounts and initiates cross-chain unstake request for specified retired models.
+    /// @notice This action deducts reserves from their staked part and get them back as assets reserved for staking.
+    /// @param chainIds Set of chain Ids with staking proxies.
+    /// @param stakingProxies Set of staking proxies corresponding to each chain Id.
+    /// @param bridgePayloads Bridge payloads corresponding to each chain Id.
+    /// @param values Value amounts for each bridge interaction, if applicable.
+    /// @return amounts Corresponding OLAS amounts for each staking proxy.
+    function unstakeForRetire(
+        uint256[] memory chainIds,
+        address[] memory stakingProxies,
+        bytes[] memory bridgePayloads,
+        uint256[] memory values
+    ) external payable returns (uint256[] memory amounts) {
+        // Reentrancy guard
+        if (_locked) {
+            revert ReentrancyGuard();
+        }
+        _locked = true;
+
+        // Check array lengths
+        if (chainIds.length == 0 || chainIds.length != stakingProxies.length ||
+            chainIds.length != bridgePayloads.length || chainIds.length != values.length) {
+            revert WrongArrayLength();
+        }
+
+        uint256 unstakeAmount;
+
+        // Allocate arrays of max possible size
+        amounts = new uint256[](chainIds.length);
+
+        // Traverse and collect retired models amounts
+        for (uint256 i = 0; i < chainIds.length; ++i) {
+            // Push a pair of key defining variables into one key: chainId | stakingProxy
+            // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
+            uint256 stakingModelId = uint256(uint160(stakingProxies[i]));
+            stakingModelId |= chainIds[i] << 160;
+
+            StakingModel memory stakingModel = mapStakingModels[stakingModelId];
+            // Check for retired model status
+            if (stakingModel.status != StakingModelStatus.Retired) {
+                revert WrongStakingModel(stakingModelId);
+            }
+
+            // Check for model existence and remainder as Staking Proxy must not be fully unstaked
+            if (stakingModel.supply == 0 || stakingModel.remainder == stakingModel.supply) {
+                revert WrongStakingModel(stakingModelId);
+            }
+
+            // Adjust unstaking amount to not overflow the max allowed one
+            amounts[i] = stakingModel.supply - stakingModel.remainder;
+            if (amounts[i] > stakingModel.stakeLimitPerSlot) {
+                amounts[i] = stakingModel.stakeLimitPerSlot;
+            }
+
+            // Update staking model remainder
+            mapStakingModels[stakingModelId].remainder += uint96(amounts[i]);
+
+            unstakeAmount += amounts[i];
+        }
+
+        // Request unstake for retired models via relevant deposit processors
+        _operationSendMessage(chainIds, stakingProxies, amounts, bridgePayloads, values, UNSTAKE_RETIRED);
 
         emit Unstake(msg.sender, unstakeAmount, chainIds, stakingProxies, amounts);
     }
