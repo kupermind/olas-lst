@@ -4,19 +4,20 @@ const { ethers } = require("hardhat");
 const fs = require("fs");
 
 const main = async () => {
-    let depository;
+    let collector;
     let deployer;
 
-    const globalsFile = "scripts/deployment/globals_ethereum_sepolia.json";
+    const globalsFile = "scripts/deployment/globals_gnosis_chiado.json";
+    //const globalsFile = "scripts/deployment/globals_base_sepolia.json";
     const dataFromJSON = fs.readFileSync(globalsFile, "utf8");
     let parsedData = JSON.parse(dataFromJSON);
 
     // Setting up providers and wallets
-    const ALCHEMY_API_KEY_SEPOLIA = process.env.ALCHEMY_API_KEY_SEPOLIA;
-    const networkURL = parsedData.networkURL + ALCHEMY_API_KEY_SEPOLIA;
+    const networkURL = parsedData.networkURL;
     const provider = new ethers.providers.JsonRpcProvider(networkURL);
     await provider.getBlockNumber().then((result) => {
-        console.log("Current block number sepolia: " + result);
+        console.log("Network:", parsedData.networkURL);
+        console.log("Current block number: ", result);
     });
 
     // Get the EOA
@@ -25,24 +26,24 @@ const main = async () => {
     console.log("Deployer address:", deployer.address);
 
 
-    // Deploy new depository implementation
-    const Depository = await ethers.getContractFactory("Depository");
-    depository = await Depository.deploy(parsedData.olasAddress, parsedData.stOLASAddress);
-    await depository.deployed();
+    // Deploy new collector implementation
+    const Collector = await ethers.getContractFactory("Collector");
+    collector = await Collector.deploy(parsedData.olasAddress, parsedData.distributorProxyAddress);
+    await collector.deployed();
 
     // Wait for half a minute for the transaction completion
     await new Promise(r => setTimeout(r, 30000));
 
     await hre.run("verify:verify", {
-        address: depository.address,
-        constructorArguments: [parsedData.olasAddress, parsedData.stOLASAddress],
+        address: collector.address,
+        constructorArguments: [parsedData.olasAddress, parsedData.distributorProxyAddress],
     });
-    parsedData.depositoryAddress = depository.address;
+    parsedData.collectorAddress = collector.address;
     fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
 
-    // Change depository implementation
-    const depositoryProxy = await ethers.getContractAt("Depository", parsedData.depositoryProxyAddress);
-    await depositoryProxy.changeImplementation(parsedData.depositoryAddress);
+    // Change collector implementation
+    const collectorProxy = await ethers.getContractAt("Collector", parsedData.collectorProxyAddress);
+    await collectorProxy.changeImplementation(parsedData.collectorAddress);
 };
 
 main()

@@ -18,6 +18,10 @@ interface IActivityModule {
 
     /// @dev Increases initial module activity.
     function increaseInitialActivity() external;
+
+    /// @dev Drains unclaimed rewards after service unstake.
+    /// @return balance Amount drained.
+    function drain() external returns (uint256 balance);
 }
 
 // Bridge interface
@@ -60,7 +64,8 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         uint256 balance);
     event CreateAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig,
         address activityModule);
-    event DeployAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig);
+    event DeployAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig,
+        address activityModule);
     event Claimed(address indexed activityModule, uint256 reward);
     event NativeTokenReceived(uint256 amount);
 
@@ -316,8 +321,9 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         // Activate registration (1 wei as a deposit wrapper)
         IService(serviceManager).activateRegistration{value: 1}(serviceId);
 
-        // Get multisig owners = activityModule
-        address[] memory instances = IMultisig(multisig).getOwners();
+        // Get multisig instances = activityModule
+        address[] memory instances = new address[](NUM_AGENT_INSTANCES);
+        instances[0] = mapServiceIdActivityModules[serviceId];
         // Get agent Ids
         uint32[] memory agentIds = new uint32[](NUM_AGENT_INSTANCES);
         agentIds[0] = uint32(agentId);
@@ -332,7 +338,7 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         // Stake the service
         _stake(stakingProxy, serviceId, instances[0]);
 
-        emit DeployAndStake(stakingProxy, serviceId, multisig);
+        emit DeployAndStake(stakingProxy, serviceId, multisig, instances[0]);
     }
 
     /// @dev Deposits OLAS and stakes into specified staking proxy contract if deposit is enough for staking.
@@ -464,6 +470,11 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
                 IStaking(stakingProxy).unstake(serviceId);
                 IService(serviceManager).terminate(serviceId);
                 IService(serviceManager).unbond(serviceId);
+
+                // Get activityModule
+                address activityModule = mapServiceIdActivityModules[serviceId];
+                // Drain funds, if anything is left on a multisig
+                IActivityModule(activityModule).drain();
 
                 lastIdx--;
             }

@@ -98,6 +98,7 @@ error ManagerOnly(address sender, address manager);
 /// @title ActivityModule - Smart contract for multisig activity tracking
 contract ActivityModule {
     event ActivityIncreased(uint256 activityChange);
+    event Drained(uint256 balance);
 
     // Activity Module version
     string public constant VERSION = "0.1.0";
@@ -130,6 +131,24 @@ contract ActivityModule {
     constructor(address _olas, address _collector) {
         olas = _olas;
         collector = _collector;
+    }
+
+    /// @dev Drains unclaimed rewards after service unstake.
+    /// @return balance Amount drained.
+    function _drain() internal returns (uint256 balance) {
+        // Get multisig balance
+        balance = IToken(olas).balanceOf(multisig);
+
+        // Check for zero balance
+        if (balance > 0) {
+            // Encode olas transfer function call
+            bytes memory data = abi.encodeCall(IToken.transfer, (collector, balance));
+
+            // Send collected funds to collector
+            ISafe(multisig).execTransactionFromModule(olas, 0, data, ISafe.Operation.Call);
+
+            emit Drained(balance);
+        }
     }
 
     /// @dev Increases module activity.
@@ -208,25 +227,28 @@ contract ActivityModule {
     }
 
     /// @dev Claims corresponding service rewards.
-    function claim() external {
+    /// @return claimed Amount claimed.
+    function claim() external returns (uint256 claimed) {
         // Claim staking reward
         IStakingManager(stakingManager).claim(stakingProxy, serviceId);
 
-        // Increase activity for the next staking epoch
-        _increaseActivity(DEFAULT_ACTIVITY);
+        // Drain claimed funds
+        claimed = _drain();
+        // Check for successful claim, otherwise the activity does not count
+        if (claimed > 0) {
+            // Increase activity for the next staking epoch
+            _increaseActivity(DEFAULT_ACTIVITY);
+        }
+    }
 
-        // Get multisig balance
-        uint256 balance = IToken(olas).balanceOf(multisig);
-
-        // Check for zero balance
-        if (balance == 0) {
-            revert ZeroValue();
+    /// @dev Drains unclaimed rewards after service unstake.
+    /// @return balance Amount drained.
+    function drain() external returns (uint256 balance) {
+        if (msg.sender != stakingManager) {
+            revert ManagerOnly(msg.sender, stakingManager);
         }
 
-        // Encode olas transfer function call
-        bytes memory data = abi.encodeCall(IToken.transfer, (collector, balance));
-
-        // Send collected funds to collector
-        ISafe(multisig).execTransactionFromModule(olas, 0, data, ISafe.Operation.Call);
+        // Drain funds
+        balance = _drain();
     }
 }

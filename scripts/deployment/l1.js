@@ -8,6 +8,7 @@ const main = async () => {
     let ve;
     let st;
     let lock;
+    let distributor;
     let depository;
     let treasury;
     let gnosisDepositProcessorL1;
@@ -106,10 +107,46 @@ const main = async () => {
     console.log("Set governor and create first lock");
     await lock.setGovernorAndCreateFirstLock(parsedData.olasGovernorAddress, {gasLimit: 500000});
 
+    // Deploy Distributor
+    console.log("Deploying Distributor");
+    const Distributor = await ethers.getContractFactory("Distributor");
+    distributor = await Distributor.deploy(parsedData.olasAddress, parsedData.stOLASAddress, parsedData.lockProxyAddress);
+    await distributor.deployed();
+
+    // Wait for half a minute for the transaction completion
+    await new Promise(r => setTimeout(r, 30000));
+
+    await hre.run("verify:verify", {
+        address: distributor.address,
+        constructorArguments: [parsedData.olasAddress, parsedData.stOLASAddress, parsedData.lockProxyAddress],
+    });
+    parsedData.distributorAddress = distributor.address;
+    console.log("Distributor address:", distributor.address);
+    fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
+
+    // Deploy Distributor Proxy
+    console.log("Deploying Distributor Proxy");
+    const DistributorProxy = await ethers.getContractFactory("Proxy");
+    initPayload = distributor.interface.encodeFunctionData("initialize", [parsedData.lockFactor]);
+    const distributorProxy = await DistributorProxy.deploy(parsedData.distributorAddress, initPayload);
+    await distributorProxy.deployed();
+
+    // Wait for half a minute for the transaction completion
+    await new Promise(r => setTimeout(r, 30000));
+
+    await hre.run("verify:verify", {
+        address: distributorProxy.address,
+        constructorArguments: [distributor.address, initPayload],
+    });
+    parsedData.distributorProxyAddress = distributorProxy.address;
+    console.log("Distributor Proxy address:", distributorProxy.address);
+    fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
+    distributor = await ethers.getContractAt("Distributor", parsedData.distributorProxyAddress);
+
     // Deploy Depository
     console.log("Deploying Depository");
     const Depository = await ethers.getContractFactory("Depository");
-    depository = await Depository.deploy(parsedData.olasAddress, parsedData.stOLASAddress, parsedData.lockProxyAddress);
+    depository = await Depository.deploy(parsedData.olasAddress, parsedData.stOLASAddress);
     await depository.deployed();
 
     // Wait for half a minute for the transaction completion
@@ -117,7 +154,7 @@ const main = async () => {
 
     await hre.run("verify:verify", {
         address: depository.address,
-        constructorArguments: [parsedData.olasAddress, parsedData.stOLASAddress, parsedData.lockProxyAddress],
+        constructorArguments: [parsedData.olasAddress, parsedData.stOLASAddress],
     });
     parsedData.depositoryAddress = depository.address;
     console.log("Depository address:", depository.address);
@@ -126,7 +163,7 @@ const main = async () => {
     // Deploy Depository Proxy
     console.log("Deploying Depository Proxy");
     const DepositoryProxy = await ethers.getContractFactory("Proxy");
-    initPayload = depository.interface.encodeFunctionData("initialize", [parsedData.lockFactor]);
+    initPayload = depository.interface.encodeFunctionData("initialize", []);
     const depositoryProxy = await DepositoryProxy.deploy(parsedData.depositoryAddress, initPayload);
     await depositoryProxy.deployed();
 
