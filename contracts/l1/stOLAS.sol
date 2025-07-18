@@ -170,9 +170,9 @@ contract stOLAS is ERC4626 {
         // Update total assets
         uint256 transferAmount;
 
-        uint256 valutAndReserveBalance = curVaultBalance + curReserveBalance;
+        uint256 vaultAndReserveBalance = curVaultBalance + curReserveBalance;
         // Shuffle balances depending on how many tokens are requested for redeem
-        if (valutAndReserveBalance >= assets) {
+        if (vaultAndReserveBalance >= assets) {
             // Vault and reserves have enough assets to cover requested amount
             transferAmount = assets;
 
@@ -181,13 +181,13 @@ contract stOLAS is ERC4626 {
                 curReserveBalance -= assets;
             } else {
                 // Otherwise fully utilize reserve balance and use the rest from vault balance
-                curVaultBalance = valutAndReserveBalance - assets;
+                curVaultBalance = vaultAndReserveBalance - assets;
                 curReserveBalance = 0;
             }
         } else {
             // If vault and reserve does not have enough balance, use it all and take rest from staked
-            transferAmount = valutAndReserveBalance;
-            uint256 remainingAmount = assets - valutAndReserveBalance;
+            transferAmount = vaultAndReserveBalance;
+            uint256 remainingAmount = assets - vaultAndReserveBalance;
             
             // Check for overflow, must never happen
             if (remainingAmount > curStakedBalance) {
