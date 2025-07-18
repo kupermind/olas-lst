@@ -50,7 +50,7 @@ contract stOLAS is ERC4626 {
     uint256 public stakedBalance;
     // Vault balance
     uint256 public vaultBalance;
-    // Reserve balance
+    // Reserve balance (part of Vault balance)
     uint256 public reserveBalance;
     // Total OLAS reserves that include staked and vault balance
     uint256 public totalReserves;
