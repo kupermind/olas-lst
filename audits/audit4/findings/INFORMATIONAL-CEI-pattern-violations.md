@@ -185,7 +185,7 @@ function deposit(
         IToken(olas).transferFrom(msg.sender, address(this), stakeAmount);
     }
 
-    // 6. EFFECTS - ВСЕ обновления состояния ПОСЛЕ всех внешних вызовов
+    // 6. EFFECTS - ВСЕ обновления состояния ДО всех внешних вызовов
     if (stakeAmount > 0) {
         mapAccountDeposits[msg.sender] += stakeAmount;
     }
@@ -226,6 +226,7 @@ function deposit(
     emit Deposit(msg.sender, stakeAmount, stAmount, chainIds, stakingProxies, amounts);
 }
 ```
+[x] Fixed
 
 ### 2. Fix Treasury.sol requestToWithdraw() function
 
@@ -280,6 +281,7 @@ function requestToWithdraw(
     emit WithdrawAmountRequestedUpdated(curWithdrawAmountRequested);
 }
 ```
+[x] Fixed
 
 ## Impact
 
