@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
-
+import "hardhat/console.sol";
 import {ERC20, ERC4626, FixedPointMathLib} from  "../../lib/solmate/src/tokens/ERC4626.sol";
 import {IToken} from "../l2/ActivityModule.sol";
 
@@ -301,6 +301,10 @@ contract stOLAS is ERC4626 {
     }
 
     /// @dev Previews deposit assets to shares amount.
+    /// @notice This function can only be used for a strict amount of provided assets value.
+    ///       It might not correlate with the Depository's `deposit()` function since the provided amount
+    ///       could be changed due to other input parameters. For accurate correspondence with the Depository's
+    ///       `deposit()` function use its static call directly.
     /// @param assets Deposited assets amount.
     function previewDeposit(uint256 assets) public view override returns (uint256) {
         (, , , uint256 curTotalReserves) = calculateDepositBalances(assets);

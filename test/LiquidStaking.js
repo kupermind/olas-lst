@@ -327,8 +327,10 @@ describe("Liquid Staking", function () {
 
             // Stake OLAS on L1
             console.log("User deposits OLAS for stOLAS");
+            let previewAmount = await st.previewDeposit(olasAmount);
             await depository.deposit(olasAmount, [gnosisChainId], [stakingTokenInstance.address], [bridgePayload], [0]);
             let stBalance = await st.balanceOf(deployer.address);
+            expect(stBalance).to.equal(previewAmount);
             console.log("User stOLAS balance now:", stBalance.toString());
             let stTotalAssets = await st.totalAssets();
             console.log("OLAS total assets on stOLAS:", stTotalAssets.toString());
@@ -397,6 +399,7 @@ describe("Liquid Staking", function () {
             let stAmount = collectorBalance.div(10);
             // Request withdraw
             console.log("User requests withdraw of small amount of stOLAS:", stAmount.toString());
+            previewAmount = await st.previewRedeem(stAmount);
             let tx = await treasury.requestToWithdraw(stAmount, [gnosisChainId], [stakingTokenInstance.address],
                 [bridgePayload], [0]);
             let res = await tx.wait();
@@ -405,6 +408,7 @@ describe("Liquid Staking", function () {
             let requestId = ethers.BigNumber.from(res.logs[5].topics[3]);
             let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
             let olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
+            expect(olasWithdrawAmount).to.equal(previewAmount);
             console.log("Withdraw requestId:", requestId.toString());
             console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
 
@@ -426,6 +430,7 @@ describe("Liquid Staking", function () {
             // Request withdraw of all the remaining stOLAS
             stBalance = await st.balanceOf(deployer.address);
             console.log("User requests withdraw of all remaining stOLAS:", stBalance.toString());
+            previewAmount = await st.previewRedeem(stBalance);
             tx = await treasury.requestToWithdraw(stBalance, [gnosisChainId], [stakingTokenInstance.address],
                 [bridgePayload], [0]);
             res = await tx.wait();
@@ -434,6 +439,7 @@ describe("Liquid Staking", function () {
             requestId = ethers.BigNumber.from(res.logs[5].topics[3]);
             data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
             olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
+            expect(olasWithdrawAmount).to.equal(previewAmount);
             console.log("Withdraw requestId:", requestId.toString());
             console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
             console.log("OLAS is not enough on L1, sending request to L2 to unstake and transfer back to L1");
@@ -479,8 +485,10 @@ describe("Liquid Staking", function () {
 
             // Stake OLAS on L1
             console.log("User deposits OLAS for stOLAS");
+            let previewAmount = await st.previewDeposit(olasAmount);
             await depository.deposit(olasAmount, [gnosisChainId], [stakingTokenInstance.address], [bridgePayload], [0]);
             let stBalance = await st.balanceOf(deployer.address);
+            expect(stBalance).to.equal(previewAmount);
             console.log("User stOLAS balance now:", stBalance.toString());
             let stTotalAssets = await st.totalAssets();
             console.log("OLAS total assets on stOLAS:", stTotalAssets.toString());
@@ -557,6 +565,7 @@ describe("Liquid Staking", function () {
             let stAmount = stBalance.div(2);
             // Request withdraw
             console.log("User requests withdraw of half of stOLAS:", stAmount.toString());
+            previewAmount = await st.previewRedeem(stAmount);
             let tx = await treasury.requestToWithdraw(stAmount, [gnosisChainId], [stakingTokenInstance.address],
                 [bridgePayload], [0]);
             let res = await tx.wait();
@@ -565,6 +574,7 @@ describe("Liquid Staking", function () {
             let requestId = ethers.BigNumber.from(res.logs[5].topics[3]);
             let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
             let olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
+            expect(olasWithdrawAmount).to.equal(previewAmount);
             console.log("Withdraw requestId:", requestId.toString());
             console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
 
@@ -586,6 +596,7 @@ describe("Liquid Staking", function () {
             // Request withdraw of all the remaining stOLAS
             stBalance = await st.balanceOf(deployer.address);
             console.log("User requests withdraw of all remaining stOLAS:", stBalance.toString());
+            previewAmount = await st.previewRedeem(stBalance);
             tx = await treasury.requestToWithdraw(stBalance, [gnosisChainId], [stakingTokenInstance.address],
                 [bridgePayload], [0]);
             res = await tx.wait();
@@ -594,6 +605,7 @@ describe("Liquid Staking", function () {
             requestId = ethers.BigNumber.from(res.logs[5].topics[3]);
             data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
             olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
+            expect(olasWithdrawAmount).to.equal(previewAmount);
             console.log("Withdraw requestId:", requestId.toString());
             console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
             console.log("OLAS is not enough on L1, sending request to L2 to unstake and transfer back to L1");
@@ -639,8 +651,10 @@ describe("Liquid Staking", function () {
 
             // Stake OLAS on L1
             console.log("User deposits OLAS for stOLAS");
+            let previewAmount = await st.previewDeposit(olasAmount);
             await depository.deposit(olasAmount, [gnosisChainId], [stakingTokenInstance.address], [bridgePayload], [0]);
             let stBalance = await st.balanceOf(deployer.address);
+            expect(stBalance).to.equal(previewAmount);
             console.log("User stOLAS balance now:", stBalance.toString());
             let stTotalAssets = await st.totalAssets();
             console.log("OLAS total assets on stOLAS:", stTotalAssets.toString());
@@ -711,6 +725,7 @@ describe("Liquid Staking", function () {
             let stAmount = stBalance.div(2);
             // Request withdraw
             console.log("User requests withdraw of half of stOLAS:", stAmount.toString());
+            previewAmount = await st.previewRedeem(stAmount);
             let tx = await treasury.requestToWithdraw(stAmount, [gnosisChainId], [stakingTokenInstance.address],
                 [bridgePayload], [0]);
             let res = await tx.wait();
@@ -719,6 +734,7 @@ describe("Liquid Staking", function () {
             let requestId = ethers.BigNumber.from(res.logs[5].topics[3]);
             let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
             let olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
+            expect(olasWithdrawAmount).to.equal(previewAmount);
             console.log("Withdraw requestId:", requestId.toString());
             console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
 
@@ -750,7 +766,15 @@ describe("Liquid Staking", function () {
             await olas.approve(depository.address, olasAmount);
 
             console.log("User deposits OLAS for stOLAS");
+            // Note that previewDeposit and actual deposit() from Depository might not be exact
+            // as balances could change in the deposit() function depending on the number of provided staking contracts
+            // and over-funding with unlimited olasAmount parameter
+            //previewAmount = await st.previewDeposit(olasAmount);
+            //balanceBefore = await st.balanceOf(deployer.address);
             await depository.deposit(olasAmount, [gnosisChainId], [stakingTokenInstance.address], [bridgePayload], [0]);
+            //balanceAfter = await st.balanceOf(deployer.address);
+            //balanceDiff = balanceAfter.sub(balanceBefore);
+            //expect(balanceDiff).to.equal(previewAmount);
             stBalance = await st.balanceOf(deployer.address);
             console.log("User stOLAS balance now:", stBalance.toString());
             stTotalAssets = await st.totalAssets();
@@ -839,6 +863,7 @@ describe("Liquid Staking", function () {
             let stakingInstances = new Array(numUnstakes).fill(stakingTokenInstance.address);
             let bridgePayloads = new Array(numUnstakes).fill(bridgePayload);
             let values = new Array(numUnstakes).fill(0);
+            previewAmount = await st.previewRedeem(stBalance);
             tx = await treasury.requestToWithdraw(stBalance, chainIds, stakingInstances,bridgePayloads, values);
             res = await tx.wait();
             // Get withdraw request Id
@@ -846,6 +871,7 @@ describe("Liquid Staking", function () {
             requestId = ethers.BigNumber.from(res.logs[5].topics[3]);
             data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
             olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
+            expect(olasWithdrawAmount).to.equal(previewAmount);
             console.log("Withdraw requestId:", requestId.toString());
             console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
             console.log("OLAS is not enough on L1, sending request to L2 to unstake and transfer back to L1");
@@ -981,6 +1007,7 @@ describe("Liquid Staking", function () {
             bridgePayloads = new Array(numUnstakes).fill(bridgePayload);
             values = new Array(numUnstakes).fill(0);
             for (let i = 0; i < numIters; i++) {
+                const previewAmount = await st.previewRedeem(stAmount);
                 let tx = await treasury.requestToWithdraw(stAmount, chainIds, stakingInstances, bridgePayloads, values);
                 let res = await tx.wait();
                 // Get withdraw request Id
@@ -988,6 +1015,7 @@ describe("Liquid Staking", function () {
                 let requestId = ethers.BigNumber.from(res.logs[5].topics[3]);
                 let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
                 let olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
+                expect(olasWithdrawAmount).to.equal(previewAmount);
                 console.log("Withdraw requestId:", requestId.toString());
                 console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
 
@@ -1051,7 +1079,6 @@ describe("Liquid Staking", function () {
                 // Stake OLAS on L1
                 console.log("User deposits OLAS for stOLAS");
                 await depository.deposit(olasAmount.mul(numStakes), chainIds, stakingInstances, bridgePayloads, values);
-
                 let stBalance = await st.balanceOf(deployer.address);
                 console.log("User stOLAS balance now:", stBalance.toString());
                 let stTotalAssets = await st.totalAssets();
@@ -1136,6 +1163,7 @@ describe("Liquid Staking", function () {
                 values = new Array(numUnstakes).fill(0);
                 // Request withdraw
                 console.log("User requests withdraw of half of stOLAS:", stAmount.toString());
+                const previewAmount = await st.previewRedeem(stAmount);
                 let tx = await treasury.requestToWithdraw(stAmount, chainIds, stakingInstances, bridgePayloads, values);
                 let res = await tx.wait();
                 // Get withdraw request Id
@@ -1143,6 +1171,7 @@ describe("Liquid Staking", function () {
                 let requestId = ethers.BigNumber.from(res.logs[5].topics[3]);
                 let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
                 let olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
+                expect(olasWithdrawAmount).to.equal(previewAmount);
                 console.log("Withdraw requestId:", requestId.toString());
                 console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
 
@@ -1183,6 +1212,7 @@ describe("Liquid Staking", function () {
                 const values = new Array(numUnstakes).fill(0);
                 // Request withdraw
                 console.log("User requests partial withdraw of stOLAS:", stAmount.toString());
+                const previewAmount = await st.previewRedeem(stAmount);
                 let tx = await treasury.requestToWithdraw(stAmount, chainIds, stakingInstances, bridgePayloads, values);
                 let res = await tx.wait();
                 // Get withdraw request Id
@@ -1190,6 +1220,7 @@ describe("Liquid Staking", function () {
                 let requestId = ethers.BigNumber.from(res.logs[5].topics[3]);
                 let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
                 let olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
+                expect(olasWithdrawAmount).to.equal(previewAmount);
                 console.log("Withdraw requestId:", requestId.toString());
                 console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
 
