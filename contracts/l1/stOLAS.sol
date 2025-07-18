@@ -46,13 +46,13 @@ contract stOLAS is ERC4626 {
     event VaultBalanceTopUpped(uint256 amount);
     event DepositoryFunded(uint256 amount);
 
-    // Staked balance
+    // Staked balance: funds allocated for staking contracts on different chains
     uint256 public stakedBalance;
-    // Vault balance
+    // Vault balance: Distributor and other possible deposits
     uint256 public vaultBalance;
-    // Reserve balance (part of Vault balance)
+    // Reserve balance: Depository incoming funds that are still not utilized
     uint256 public reserveBalance;
-    // Total OLAS reserves that include staked and vault balance
+    // Total OLAS reserves that include staked, vault and reserve balance
     uint256 public totalReserves;
     // Top-up reserve balance in on-going deposit
     uint256 transient topUpBalance;
@@ -120,10 +120,12 @@ contract stOLAS is ERC4626 {
             revert ZeroValue();
         }
 
-        // Calculate and update all balances and total reserves
-        (uint256 curStakedBalance, uint256 curVaultBalance, uint256 curTotalReserves) = calculateDepositBalances(assets);
+        // Get all balances and update total reserves
+        (uint256 curStakedBalance, uint256 curVaultBalance, uint256 curReserveBalance, uint256 curTotalReserves) =
+            calculateDepositBalances(assets);
+
+        // Record updated balances
         stakedBalance = curStakedBalance;
-        vaultBalance = curVaultBalance;
         totalReserves = curTotalReserves;
 
         // Calculate shares
@@ -137,7 +139,7 @@ contract stOLAS is ERC4626 {
 
         _mint(receiver, shares);
 
-        emit TotalReservesUpdated(curStakedBalance, curVaultBalance, reserveBalance, curTotalReserves);
+        emit TotalReservesUpdated(curStakedBalance, curVaultBalance, curReserveBalance, curTotalReserves);
         emit Deposit(msg.sender, receiver, assets, shares);
     }
 
@@ -168,31 +170,41 @@ contract stOLAS is ERC4626 {
         // Update total assets
         uint256 transferAmount;
 
+        uint256 valutAndReserveBalance = curVaultBalance + curReserveBalance;
         // Shuffle balances depending on how many tokens are requested for redeem
-        if (curVaultBalance >= assets) {
-            // If vault has enough balance, use it first
+        if (valutAndReserveBalance >= assets) {
+            // Vault and reserves have enough assets to cover requested amount
             transferAmount = assets;
-            curVaultBalance -= assets;
-            curReserveBalance = curReserveBalance > assets ? curReserveBalance - assets : 0;
+
+            // Check if reserve balance can fully cover requested amount
+            if (curReserveBalance >= assets) {
+                curReserveBalance -= assets;
+            } else {
+                // Otherwise fully utilize reserve balance and use the rest from vault balance
+                curVaultBalance = valutAndReserveBalance - assets;
+                curReserveBalance = 0;
+            }
         } else {
-            // If vault doesn't have enough, use all vault balance and take rest from staked
-            transferAmount = curVaultBalance;
-            uint256 remainingAmount = assets - curVaultBalance;
+            // If vault and reserve does not have enough balance, use it all and take rest from staked
+            transferAmount = valutAndReserveBalance;
+            uint256 remainingAmount = assets - valutAndReserveBalance;
             
             // Check for overflow, must never happen
             if (remainingAmount > curStakedBalance) {
                 revert Overflow(remainingAmount, curStakedBalance);
             }
-            
+
+            // Update required values: vault and reserve balances are depleted, staking balance refund will be requested
             curStakedBalance -= remainingAmount;
             stakedBalance = curStakedBalance;
             curVaultBalance = 0;
             curReserveBalance = 0;
         }
 
+        // Recalculate balances
         reserveBalance = curReserveBalance;
         vaultBalance = curVaultBalance;
-        curTotalReserves = curStakedBalance + curVaultBalance;
+        curTotalReserves = curStakedBalance + curVaultBalance + curReserveBalance;
         totalReserves = curTotalReserves;
 
         asset.transfer(receiver, transferAmount);
@@ -216,7 +228,6 @@ contract stOLAS is ERC4626 {
         (uint256 curStakedBalance, uint256 curVaultBalance, uint256 curReserveBalance, uint256 curTotalReserves) =
             calculateCurrentBalances();
 
-        vaultBalance = curVaultBalance;
         totalReserves = curTotalReserves;
 
         emit TotalReservesUpdated(curStakedBalance, curVaultBalance, curReserveBalance, curTotalReserves);
@@ -234,7 +245,6 @@ contract stOLAS is ERC4626 {
         asset.transferFrom(msg.sender, address(this), amount);
         topUpBalance = amount;
         reserveBalance += amount;
-        vaultBalance += amount;
 
         emit ReserveBalanceTopUpped(amount);
     }
@@ -261,7 +271,6 @@ contract stOLAS is ERC4626 {
         uint256 curReserveBalance = reserveBalance;
         if (curReserveBalance > 0) {
             reserveBalance = 0;
-            vaultBalance -= curReserveBalance;
             totalReserves -= curReserveBalance;
             asset.transfer(msg.sender, curReserveBalance);
         }
@@ -273,25 +282,28 @@ contract stOLAS is ERC4626 {
     /// @param assets Deposited assets amount.
     /// @return curStakedBalance Current staked balance.
     /// @return curVaultBalance Current vault balance.
+    /// @return curReserveBalance Current reserve balance.
     /// @return curTotalReserves Current total reserves.
     function calculateDepositBalances(uint256 assets) public view
-        returns (uint256 curStakedBalance, uint256 curVaultBalance, uint256 curTotalReserves)
+        returns (uint256 curStakedBalance, uint256 curVaultBalance, uint256 curReserveBalance, uint256 curTotalReserves)
     {
         // topUpBalance is subtracted as it is passed as part of the assets value and already deposited
-        // and accounted in vaultBalance via topUpReserveBalance() function call
+        // and accounted in reserveBalance via topUpReserveBalance() function call
         curStakedBalance = stakedBalance + assets - topUpBalance;
 
         // Get current vault balance
         curVaultBalance = vaultBalance;
+        // Current reserve balance
+        curReserveBalance = reserveBalance;
 
         // Update total assets
-        curTotalReserves = curStakedBalance + curVaultBalance;
+        curTotalReserves = curStakedBalance + curVaultBalance + reserveBalance;
     }
 
     /// @dev Previews deposit assets to shares amount.
     /// @param assets Deposited assets amount.
     function previewDeposit(uint256 assets) public view override returns (uint256) {
-        (, , uint256 curTotalReserves) = calculateDepositBalances(assets);
+        (, , , uint256 curTotalReserves) = calculateDepositBalances(assets);
 
         uint256 shares = totalSupply;
         return shares == 0 ? assets : assets.mulDivDown(shares, curTotalReserves);
@@ -305,15 +317,15 @@ contract stOLAS is ERC4626 {
     function calculateCurrentBalances() public view
         returns (uint256 curStakedBalance, uint256 curVaultBalance, uint256 curReserveBalance, uint256 curTotalReserves)
     {
-        // Get staked and reserve balances
+        // Current staked balance
         curStakedBalance = stakedBalance;
-        curReserveBalance = reserveBalance;
-
         // Current vault balance
         curVaultBalance = vaultBalance;
+        // Current reserve balance
+        curReserveBalance = reserveBalance;
 
         // Total reserves
-        curTotalReserves = curStakedBalance + curVaultBalance;
+        curTotalReserves = curStakedBalance + curVaultBalance + curReserveBalance;
     }
 
     /// @dev Previews redeem shares to assets amount.
