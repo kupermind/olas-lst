@@ -73,6 +73,9 @@ describe("Liquid Staking", function () {
     const stakingRewardsPerEpoch = ethers.BigNumber.from(serviceParams.rewardsPerSecond).mul(ethers.BigNumber.from(maxNumServices)).mul(timeForEmissions);
     const stakingSupply = fullStakeDeposit.mul(ethers.BigNumber.from(maxNumServices));
     const bridgePayload = "0x";
+    const rewardOperation = "0x0b9821ae606ebc7c79bf3390bdd3dc93e1b4a7cda27aad60646e7b88ff55b001";
+    const unstakeOperation = "0x8ca9a95e41b5eece253c93f5b31eed1253aed6b145d8a6e14d913fdf8e732293";
+    const unstakeRetiredOperation = "0x9065ad15d9673159e4597c86084aff8052550cec93c5a6e44b3f1dba4c8731b3";
 
     beforeEach(async function () {
         signers = await ethers.getSigners();
@@ -211,7 +214,7 @@ describe("Liquid Staking", function () {
         await stakingFactory.deployed();
 
         const Collector = await ethers.getContractFactory("Collector");
-        collector = await Collector.deploy(olas.address, distributor.address);
+        collector = await Collector.deploy(olas.address);
         await collector.deployed();
 
         const CollectorProxy = await ethers.getContractFactory("Proxy");
@@ -229,9 +232,8 @@ describe("Liquid Staking", function () {
         await beacon.deployed();
 
         const StakingManager = await ethers.getContractFactory("StakingManager");
-        stakingManager = await StakingManager.deploy(olas.address, treasury.address, serviceManager.address,
-            stakingFactory.address, safeModuleInitializer.address, gnosisSafeL2.address, beacon.address,
-            collector.address, agentId, defaultHash);
+        stakingManager = await StakingManager.deploy(olas.address, serviceManager.address, stakingFactory.address,
+            safeModuleInitializer.address, gnosisSafeL2.address, beacon.address, collector.address, agentId, defaultHash);
         await stakingManager.deployed();
 
         // Initialize stakingManager
@@ -306,6 +308,10 @@ describe("Liquid Staking", function () {
         // Add model to L1
         await depository.createAndActivateStakingModels([gnosisChainId], [stakingTokenAddress], [fullStakeDeposit],
             [maxNumServices]);
+
+        // Set
+        await collector.setOperationReceivers([rewardOperation, unstakeOperation],
+            [distributor.address, treasury.address]);
     });
 
     context("Staking", function () {
@@ -377,7 +383,7 @@ describe("Liquid Staking", function () {
 
             // Relay rewards to L1
             console.log("Calling relay tokens to L1 by agent or manually");
-            await collector.relayRewardTokens(bridgePayload);
+            await collector.relayTokens(rewardOperation, bridgePayload);
 
             console.log("\nL1");
 
@@ -443,6 +449,10 @@ describe("Liquid Staking", function () {
             console.log("Withdraw requestId:", requestId.toString());
             console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
             console.log("OLAS is not enough on L1, sending request to L2 to unstake and transfer back to L1");
+
+            // Relay rewards to L1
+            console.log("Calling relay tokens to L1 by agent or manually");
+            await collector.relayTokens(unstakeOperation, bridgePayload);
 
             console.log("\nL1");
 
@@ -543,7 +553,7 @@ describe("Liquid Staking", function () {
 
             // Relay rewards to L1
             console.log("Calling relay tokens to L1 by agent or manually");
-            await collector.relayRewardTokens(bridgePayload);
+            await collector.relayTokens(rewardOperation, bridgePayload);
 
             console.log("\nL1");
 
@@ -609,6 +619,9 @@ describe("Liquid Staking", function () {
             console.log("Withdraw requestId:", requestId.toString());
             console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
             console.log("OLAS is not enough on L1, sending request to L2 to unstake and transfer back to L1");
+
+            // Deliver unstaked tokens from L2 to L1
+            await collector.relayTokens(unstakeOperation, bridgePayload);
 
             console.log("\nL1");
 
@@ -703,7 +716,7 @@ describe("Liquid Staking", function () {
 
             // Relay rewards to L1
             console.log("Calling relay tokens to L1 by agent or manually");
-            await collector.relayRewardTokens(bridgePayload);
+            await collector.relayTokens(rewardOperation, bridgePayload);
 
             console.log("\nL1");
 
@@ -829,7 +842,7 @@ describe("Liquid Staking", function () {
 
             // Relay rewards to L1
             console.log("Calling relay tokens to L1 by agent or manually");
-            await collector.relayRewardTokens(bridgePayload);
+            await collector.relayTokens(rewardOperation, bridgePayload);
 
             console.log("\nL1");
 
@@ -978,7 +991,7 @@ describe("Liquid Staking", function () {
 
             // Relay rewards to L1
             console.log("Calling relay tokens to L1 by agent or manually");
-            await collector.relayRewardTokens(bridgePayload);
+            await collector.relayTokens(rewardOperation, bridgePayload);
 
             console.log("\nL1");
 
@@ -1136,7 +1149,7 @@ describe("Liquid Staking", function () {
 
                 // Relay rewards to L1
                 console.log("Calling relay tokens to L1 by agent or manually");
-                await collector.relayRewardTokens(bridgePayload);
+                await collector.relayTokens(rewardOperation, bridgePayload);
 
                 console.log("\nL1");
 

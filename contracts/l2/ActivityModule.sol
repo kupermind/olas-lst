@@ -3,6 +3,10 @@ pragma solidity ^0.8.30;
 
 import {IStaking} from "../interfaces/IStaking.sol";
 
+interface ICollector {
+    function topUpBalance(uint256 amount, bytes32 operation) external;
+}
+
 interface ISafe {
     enum Operation {Call, DelegateCall}
 
@@ -66,11 +70,11 @@ interface IStakingManager {
 
 // ERC20 token interface
 interface IToken {
-    /// @dev Transfers the token amount.
-    /// @param to Address to transfer to.
-    /// @param amount The amount to transfer.
+    /// @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
+    /// @param spender Account address that will be able to transfer tokens on behalf of the caller.
+    /// @param amount Token amount.
     /// @return True if the function execution is successful.
-    function transfer(address to, uint256 amount) external returns (bool);
+    function approve(address spender, uint256 amount) external returns (bool);
 
     /// @dev Gets the amount of tokens owned by a specified account.
     /// @param account Account address.
@@ -103,6 +107,8 @@ contract ActivityModule {
     // Activity Module version
     string public constant VERSION = "0.1.0";
 
+    // Reward transfer operation
+    bytes32 public constant REWARD = 0x0b9821ae606ebc7c79bf3390bdd3dc93e1b4a7cda27aad60646e7b88ff55b001;
     // Default activity increment
     uint256 public constant DEFAULT_ACTIVITY = 1;
 
@@ -141,11 +147,17 @@ contract ActivityModule {
 
         // Check for zero balance
         if (balance > 0) {
-            // Encode olas transfer function call
-            bytes memory data = abi.encodeCall(IToken.transfer, (collector, balance));
+            // Encode OLAS approve function call
+            bytes memory data = abi.encodeCall(IToken.approve, (collector, balance));
+
+            // Approve collected funds for collector
+            ISafe(multisig).execTransactionFromModule(olas, 0, data, ISafe.Operation.Call);
+
+            // Encode collector top-up function call
+            data = abi.encodeCall(ICollector.topUpBalance, (balance, REWARD));
 
             // Send collected funds to collector
-            ISafe(multisig).execTransactionFromModule(olas, 0, data, ISafe.Operation.Call);
+            ISafe(multisig).execTransactionFromModule(collector, 0, data, ISafe.Operation.Call);
 
             emit Drained(balance);
         }

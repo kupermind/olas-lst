@@ -61,6 +61,8 @@ contract Collector is Implementation {
     event ProtocolBalanceUpdated(uint256 protocolBalance);
     event TokensRelayed(address indexed l1Distributor, uint256 amount);
 
+    // Reward transfer operation
+    bytes32 public constant REWARD = 0x0b9821ae606ebc7c79bf3390bdd3dc93e1b4a7cda27aad60646e7b88ff55b001;
     // Min olas balance to relay
     uint256 public constant MIN_OLAS_BALANCE = 1 ether;
     // Max protocol factor
@@ -68,8 +70,6 @@ contract Collector is Implementation {
 
     // OLAS contract address
     address public immutable olas;
-    // Distributor contract address on L1
-    address public immutable l1Distributor;
 
     // Protocol balance
     uint256 public protocolBalance;
@@ -85,10 +85,8 @@ contract Collector is Implementation {
     mapping(bytes32 => ReceiverBalance) public mapOperationReceiverBalances;
 
     /// @param _olas OLAS address on L2.
-    /// @param _l1Distributor Distributor contract address on L1.
-    constructor(address _olas, address _l1Distributor) {
+    constructor(address _olas) {
         olas = _olas;
-        l1Distributor = _l1Distributor;
     }
 
     /// @dev Initializes collector.
@@ -214,7 +212,7 @@ contract Collector is Implementation {
         }
 
         // Rewards are subject to a protocol fee
-        if (receiver == l1Distributor) {
+        if (operation == REWARD) {
             uint256 protocolAmount = (olasBalance * protocolFactor) / MAX_PROTOCOL_FACTOR;
             olasBalance -= protocolAmount;
 

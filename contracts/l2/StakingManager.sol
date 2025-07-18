@@ -98,8 +98,6 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
     address public immutable serviceManager;
     // OLAS token address
     address public immutable olas;
-    // Treasury address on L1
-    address public immutable l1Treasury;
     // Service registry address
     address public immutable serviceRegistry;
     // Service registry token utility address
@@ -140,7 +138,6 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
 
     /// @dev StakerL2 constructor.
     /// @param _olas OLAS token address.
-    /// @param _l1Treasury Treasury address on L1.
     /// @param _serviceManager Service manager address.
     /// @param _stakingFactory Staking factory address.
     /// @param _safeModuleInitializer Safe module initializer address.
@@ -151,7 +148,6 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
     /// @param _configHash Contributor service config hash.
     constructor(
         address _olas,
-        address _l1Treasury,
         address _serviceManager,
         address _stakingFactory,
         address _safeModuleInitializer,
@@ -162,9 +158,9 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         bytes32 _configHash
     ) {
         // Check for zero addresses
-        if (_olas == address(0) || _l1Treasury == address(0) || _serviceManager == address(0) ||
-            _stakingFactory == address(0) || _safeModuleInitializer ==address(0) || _safeL2 == address(0) ||
-            _beacon ==address(0) || _collector == address(0))
+        if (_olas == address(0) || _serviceManager == address(0) || _stakingFactory == address(0) ||
+            _safeModuleInitializer ==address(0) || _safeL2 == address(0) || _beacon ==address(0) ||
+            _collector == address(0))
         {
             revert ZeroAddress();
         }
@@ -178,7 +174,6 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         configHash = _configHash;
 
         olas = _olas;
-        l1Treasury = _l1Treasury;
         serviceManager = _serviceManager;
         stakingFactory = _stakingFactory;
         safeModuleInitializer = _safeModuleInitializer;
@@ -434,7 +429,7 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         }
         _locked = 2;
 
-        // Check for treasury requesting withdraw
+        // Check for l2StakingProcessor to be a sender
         if (msg.sender != l2StakingProcessor) {
             revert UnauthorizedAccount(msg.sender);
         }
