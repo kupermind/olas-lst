@@ -11,6 +11,12 @@ interface ILock {
     function increaseLock(uint256 olasAmount) external returns (bool);
 }
 
+interface IST {
+    /// @dev Top-ups vault balance via Distributor.
+    /// @param amount OLAS amount.
+    function topUpVaultBalance(uint256 amount) external;
+}
+
 /// @dev Zero value.
 error ZeroValue();
 
@@ -124,7 +130,9 @@ contract Distributor is Implementation {
             olasAmount = _increaseLock(olasAmount);
 
             // Transfer OLAS to stOLAS
-            IToken(olas).transfer(st, olasAmount);
+            IToken(olas).approve(st, olasAmount);
+
+            IST(st).topUpVaultBalance(olasAmount);
 
             emit Distributed(msg.sender, st, olasAmount);
         }

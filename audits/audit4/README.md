@@ -45,16 +45,20 @@ File                            |  % Stmts | % Branch |  % Funcs |  % Lines |Unc
 All files                       |    75.05 |    35.28 |    64.29 |    64.57 |                |
 --------------------------------|----------|----------|----------|----------|----------------|
 ```
-[]
+[x] Noted
 
 ## Issue (to discussion)
 ### CEI pattern 
 [audits\audit4\findings\INFORMATIONAL-CEI-pattern-violations.md](audits\audit4\findings\INFORMATIONAL-CEI-pattern-violations.md)
-[]
+[x] Fixed
 
 ### Read-only reentrancy
 [audits\audit4\findings\INFORMATIONAL-read-only-reentrancy.md](audits\audit4\findings\INFORMATIONAL-read-only-reentrancy.md)
-[]
+[x] Fixed
+
+### ERC4626 check
+[MEDIUM-balance-of-manipulation.md](findings/MEDIUM-balance-of-manipulation.md)
+[x] Fixed
 
 ## Notes
 ### Doc for fix coverage issue
