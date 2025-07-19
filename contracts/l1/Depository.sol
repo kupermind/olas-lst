@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
-import "hardhat/console.sol";
+
 import {Implementation, OwnerOnly, ZeroAddress} from "../Implementation.sol";
 import {IToken} from "../interfaces/IToken.sol";
 
@@ -329,8 +329,7 @@ contract Depository is Implementation {
             if (mapStakingModels[stakingModelId].supply == 0) {
                 revert WrongStakingModel(stakingModelId);
             }
-//console.log("status:", uint8(statuses[i]));
-//console.log("stakingModelId:", stakingModelId);
+
             mapStakingModels[stakingModelId].status = statuses[i];
         }
 
@@ -629,7 +628,6 @@ contract Depository is Implementation {
             StakingModel memory stakingModel = mapStakingModels[stakingModelId];
             // Check for retired model status
             if (stakingModel.status != StakingModelStatus.Retired) {
-                //console.log(uint8(stakingModel.status));
                 revert WrongStakingModel(stakingModelId);
             }
 
