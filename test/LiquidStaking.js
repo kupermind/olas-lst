@@ -16,6 +16,7 @@ describe("Liquid Staking", function () {
     let gnosisSafeProxyFactory;
     let safeModuleInitializer;
     let fallbackHandler;
+    let multiSend;
     let gnosisSafeMultisig;
     let gnosisSafeSameAddressMultisig;
     let activityChecker;
@@ -144,6 +145,10 @@ describe("Liquid Staking", function () {
         const bytecode = await ethers.provider.getCode(gnosisSafeProxy.address);
         bytecodeHash = ethers.utils.keccak256(bytecode);
 
+        const MultiSend = await ethers.getContractFactory("MultiSendCallOnly");
+        multiSend = await MultiSend.deploy();
+        await multiSend.deployed();
+
         const GnosisSafeMultisig = await ethers.getContractFactory("GnosisSafeMultisig");
         gnosisSafeMultisig = await GnosisSafeMultisig.deploy(gnosisSafe.address, gnosisSafeProxyFactory.address);
         await gnosisSafeMultisig.deployed();
@@ -235,7 +240,7 @@ describe("Liquid Staking", function () {
         collector = await ethers.getContractAt("Collector", collectorProxy.address);
 
         const ActivityModule = await ethers.getContractFactory("ActivityModule");
-        activityModule = await ActivityModule.deploy(olas.address, collector.address);
+        activityModule = await ActivityModule.deploy(olas.address, collector.address, multiSend.address);
         await activityModule.deployed();
 
         const Beacon = await ethers.getContractFactory("Beacon");

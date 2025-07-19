@@ -7,6 +7,23 @@ interface ICollector {
     function topUpBalance(uint256 amount, bytes32 operation) external;
 }
 
+/// @dev Safe multi send interface
+interface IMultiSend {
+    /// @dev Sends multiple transactions and reverts all if one fails.
+    /// @param transactions Encoded transactions. Each transaction is encoded as a packed bytes of
+    ///                     operation has to be uint8(0) in this version (=> 1 byte),
+    ///                     to as a address (=> 20 bytes),
+    ///                     value as a uint256 (=> 32 bytes),
+    ///                     payload length as a uint256 (=> 32 bytes),
+    ///                     payload as bytes.
+    ///                     see abi.encodePacked for more information on packed encoding
+    /// @notice The code is for most part the same as the normal MultiSend (to keep compatibility),
+    ///         but reverts if a transaction tries to use a delegatecall.
+    /// @notice This method is payable as delegatecalls keep the msg.value from the previous call
+    ///         If the calling method (e.g. execTransaction) received ETH this would revert otherwise
+    function multiSend(bytes memory transactions) external payable;
+}
+
 interface ISafe {
     enum Operation {Call, DelegateCall}
 
@@ -116,6 +133,8 @@ contract ActivityModule {
     address public immutable olas;
     // Rewards collector address
     address public immutable collector;
+    // Multisend contract address
+    address public immutable multiSend;
 
     // Activity tracker
     uint256 public activityNonce;
@@ -134,9 +153,11 @@ contract ActivityModule {
     /// @dev ActivityModule constructor.
     /// @param _olas OLAS address.
     /// @param _collector Collector address.
-    constructor(address _olas, address _collector) {
+    /// @param _multiSend Multisend contract address.
+    constructor(address _olas, address _collector, address _multiSend) {
         olas = _olas;
         collector = _collector;
+        multiSend = _multiSend;
     }
 
     /// @dev Drains unclaimed rewards after service unstake.
@@ -149,15 +170,20 @@ contract ActivityModule {
         if (balance > 0) {
             // Encode OLAS approve function call
             bytes memory data = abi.encodeCall(IToken.approve, (collector, balance));
-
-            // Approve collected funds for collector
-            ISafe(multisig).execTransactionFromModule(olas, 0, data, ISafe.Operation.Call);
+            // MultiSend payload with the packed data of (operation, multisig address, value(0), payload length, payload)
+            bytes memory msPayload = abi.encodePacked(ISafe.Operation.Call, olas, uint256(0), data.length, data);
 
             // Encode collector top-up function call
             data = abi.encodeCall(ICollector.topUpBalance, (balance, REWARD));
+            // Concatenate multi send payload with the packed data of (operation, multisig address, value(0), payload length, payload)
+            msPayload = bytes.concat(msPayload, abi.encodePacked(ISafe.Operation.Call, collector, uint256(0),
+                data.length, data));
 
-            // Send collected funds to collector
-            ISafe(multisig).execTransactionFromModule(collector, 0, data, ISafe.Operation.Call);
+            // Multisend call to execute all the payloads
+            msPayload = abi.encodeCall(IMultiSend.multiSend, (msPayload));
+
+            // Execute module call
+            ISafe(multisig).execTransactionFromModule(multiSend, 0, msPayload, ISafe.Operation.DelegateCall);
 
             emit Drained(balance);
         }
