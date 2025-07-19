@@ -310,8 +310,8 @@ describe("Liquid Staking", function () {
             [maxNumServices]);
 
         // Set
-        await collector.setOperationReceivers([rewardOperation, unstakeOperation],
-            [distributor.address, treasury.address]);
+        await collector.setOperationReceivers([rewardOperation, unstakeOperation, unstakeRetiredOperation],
+            [distributor.address, treasury.address, distributor.address]);
     });
 
     context("Staking", function () {
@@ -382,7 +382,7 @@ describe("Liquid Staking", function () {
             console.log("Collector balance:", collectorBalance.toString());
 
             // Relay rewards to L1
-            console.log("Calling relay tokens to L1 by agent or manually");
+            console.log("Calling relay rewards tokens to L1 by agent or manually");
             await collector.relayTokens(rewardOperation, bridgePayload);
 
             console.log("\nL1");
@@ -450,8 +450,8 @@ describe("Liquid Staking", function () {
             console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
             console.log("OLAS is not enough on L1, sending request to L2 to unstake and transfer back to L1");
 
-            // Relay rewards to L1
-            console.log("Calling relay tokens to L1 by agent or manually");
+            // Relay unstaked tokens to L1
+            console.log("Calling relay usntaked tokens to L1 by agent or manually");
             await collector.relayTokens(unstakeOperation, bridgePayload);
 
             console.log("\nL1");
@@ -552,7 +552,7 @@ describe("Liquid Staking", function () {
             console.log("Collector balance:", collectorBalance.toString());
 
             // Relay rewards to L1
-            console.log("Calling relay tokens to L1 by agent or manually");
+            console.log("Calling relay rewards tokens to L1 by agent or manually");
             await collector.relayTokens(rewardOperation, bridgePayload);
 
             console.log("\nL1");
@@ -715,7 +715,7 @@ describe("Liquid Staking", function () {
             console.log("Collector balance:", collectorBalance.toString());
 
             // Relay rewards to L1
-            console.log("Calling relay tokens to L1 by agent or manually");
+            console.log("Calling relay rewards tokens to L1 by agent or manually");
             await collector.relayTokens(rewardOperation, bridgePayload);
 
             console.log("\nL1");
@@ -841,7 +841,7 @@ describe("Liquid Staking", function () {
             console.log("Collector balance:", collectorBalance.toString());
 
             // Relay rewards to L1
-            console.log("Calling relay tokens to L1 by agent or manually");
+            console.log("Calling relay rewards tokens to L1 by agent or manually");
             await collector.relayTokens(rewardOperation, bridgePayload);
 
             console.log("\nL1");
@@ -888,6 +888,10 @@ describe("Liquid Staking", function () {
             console.log("Withdraw requestId:", requestId.toString());
             console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
             console.log("OLAS is not enough on L1, sending request to L2 to unstake and transfer back to L1");
+
+            // Relay unstaked tokens to L1
+            console.log("Calling relay unstaked tokens to L1 by agent or manually");
+            await collector.relayTokens(unstakeOperation, bridgePayload);
 
             console.log("\nL1");
 
@@ -990,7 +994,7 @@ describe("Liquid Staking", function () {
             console.log("Collector balance:", collectorBalance.toString());
 
             // Relay rewards to L1
-            console.log("Calling relay tokens to L1 by agent or manually");
+            console.log("Calling relay rewards tokens to L1 by agent or manually");
             await collector.relayTokens(rewardOperation, bridgePayload);
 
             console.log("\nL1");
@@ -1031,6 +1035,14 @@ describe("Liquid Staking", function () {
                 expect(olasWithdrawAmount).to.equal(previewAmount);
                 console.log("Withdraw requestId:", requestId.toString());
                 console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
+
+                // Relay unstaked tokens to L1
+                const receiverBalance = await collector.mapOperationReceiverBalances(unstakeOperation);
+                const minOlasBalance = await collector.MIN_OLAS_BALANCE();
+                if (receiverBalance.balance.gte(minOlasBalance)) {
+                    console.log("Calling relay unstaked tokens to L1 by agent or manually");
+                    await collector.relayTokens(unstakeOperation, bridgePayload);
+                }
 
                 // Finalize withdraw
                 console.log("User to finalize withdraw request after withdraw cool down period");
@@ -1148,7 +1160,7 @@ describe("Liquid Staking", function () {
                 console.log("Collector balance:", collectorBalance.toString());
 
                 // Relay rewards to L1
-                console.log("Calling relay tokens to L1 by agent or manually");
+                console.log("Calling relay rewards tokens to L1 by agent or manually");
                 await collector.relayTokens(rewardOperation, bridgePayload);
 
                 console.log("\nL1");
@@ -1187,6 +1199,14 @@ describe("Liquid Staking", function () {
                 expect(olasWithdrawAmount).to.equal(previewAmount);
                 console.log("Withdraw requestId:", requestId.toString());
                 console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
+
+                // Relay unstaked tokens to L1
+                const receiverBalance = await collector.mapOperationReceiverBalances(unstakeOperation);
+                const minOlasBalance = await collector.MIN_OLAS_BALANCE();
+                if (receiverBalance.balance.gte(minOlasBalance)) {
+                    console.log("Calling relay unstaked tokens to L1 by agent or manually");
+                    await collector.relayTokens(unstakeOperation, bridgePayload);
+                }
 
                 // Finalize withdraw
                 console.log("User to finalize withdraw request after withdraw cool down period");
@@ -1237,6 +1257,14 @@ describe("Liquid Staking", function () {
                 console.log("Withdraw requestId:", requestId.toString());
                 console.log("User is minted ERC6909 tokens corresponding to number of OLAS:", olasWithdrawAmount.toString());
 
+                // Relay unstaked tokens to L1
+                const receiverBalance = await collector.mapOperationReceiverBalances(unstakeOperation);
+                const minOlasBalance = await collector.MIN_OLAS_BALANCE();
+                if (receiverBalance.balance.gte(minOlasBalance)) {
+                    console.log("Calling relay unstaked tokens to L1 by agent or manually");
+                    await collector.relayTokens(unstakeOperation, bridgePayload);
+                }
+
                 // Finalize withdraw
                 console.log("User to finalize withdraw request after withdraw cool down period");
                 const requestBalance = await treasury.balanceOf(deployer.address, requestId);
@@ -1271,6 +1299,101 @@ describe("Liquid Staking", function () {
             let stakeBalanceRemainder = await stakingManager.mapStakingProxyBalances(stakingTokenInstance.address);
             stakedBalanceL2 = stakedBalanceL2.add(stakeBalanceRemainder);
             expect(stakedBalanceL1).to.equal(stakedBalanceL2);
+
+            // Restore a previous state of blockchain
+            snapshot.restore();
+        });
+
+        it("Retire models", async function () {
+            // Max timeout 1600 sec for coverage
+            this.timeout(1600000);
+
+            // Take a snapshot of the current state of the blockchain
+            const snapshot = await helpers.takeSnapshot();
+
+            console.log("L1");
+
+            // Get OLAS amount to stake - want to cover 19 and 20 full staked services: 2 * 20 * minStakingDeposit - veOLAS lock
+            //let olasAmount = minStakingDeposit.mul(40);
+            let olasAmount = (minStakingDeposit.mul(3)).sub(1);
+
+            // Approve OLAS for depository
+            console.log("User approves OLAS for depository:", olasAmount.toString());
+            await olas.approve(depository.address, initSupply);
+
+            // Stake OLAS on L1
+            console.log("User deposits OLAS for stOLAS");
+            let numIters = 10;
+            const numStakes = 18;
+            let chainIds = new Array(numStakes).fill(gnosisChainId);
+            let stakingInstances = new Array(numStakes).fill(stakingTokenInstance.address);
+            let bridgePayloads = new Array(numStakes).fill(bridgePayload);
+            let values = new Array(numStakes).fill(0);
+            for (let i = 0; i < numIters; i++) {
+                await depository.deposit(olasAmount.mul(numStakes), chainIds, stakingInstances, bridgePayloads, values);
+            }
+
+            let stBalance = await st.balanceOf(deployer.address);
+            console.log("User stOLAS balance now:", stBalance.toString());
+            let stTotalAssets = await st.totalAssets();
+            console.log("OLAS total assets on stOLAS:", stTotalAssets.toString());
+
+            // Try to close a model without setting it to retired
+            await expect(
+                depository.closeRetiredStakingModels([gnosisChainId], [stakingTokenInstance.address])
+            ).to.be.revertedWithCustomError(depository, "WrongStakingModel");
+
+            // Set model as retired
+            await depository.setStakingModelStatuses([gnosisChainId], [stakingTokenInstance.address], [0]);
+
+            // Try to close a model with remainder still not equal supply
+            await expect(
+                depository.closeRetiredStakingModels([gnosisChainId], [stakingTokenInstance.address])
+            ).to.be.revertedWithCustomError(depository, "WrongStakingModel");
+
+            const numUnstakes = 25;
+            chainIds = new Array(numUnstakes).fill(gnosisChainId);
+            stakingInstances = new Array(numUnstakes).fill(stakingTokenInstance.address);
+            bridgePayloads = new Array(numUnstakes).fill(bridgePayload);
+            values = new Array(numUnstakes).fill(0);
+            const stakingModelId = await depository.getStakingModelId(gnosisChainId, stakingTokenInstance.address);
+            let stakingModel;
+            for (let i = 0; i < numIters; i++) {
+                await depository.unstakeRetired(chainIds, stakingInstances, bridgePayloads, values);
+
+                // Check model balances after unstakes and break if unstake is complete
+                stakingModel = await depository.mapStakingModels(stakingModelId);
+                if (stakingModel.supply == stakingModel.remainder) {
+                    break;
+                }
+            }
+
+            // Close retired model
+            await depository.closeRetiredStakingModels([gnosisChainId], [stakingTokenInstance.address]);
+
+            console.log("\nL2");
+
+            // Check collector balance
+            let collectorBalance = await olas.balanceOf(collector.address);
+            expect(collectorBalance).to.equal(stakingModel.supply);
+            console.log("Collector balance:", collectorBalance.toString());
+            return;
+
+            // Relay rewards to L1
+            console.log("Calling relay rewards tokens to L1 by agent or manually");
+            await collector.relayTokens(unstakeRetiredOperation, bridgePayload);
+
+            console.log("\nL1");
+
+            console.log("stakedBalance:", await st.stakedBalance());
+            console.log("vaultBalance:", await st.vaultBalance());
+            console.log("reserveBalance:", await st.reserveBalance());
+
+            stBalance = await st.balanceOf(deployer.address);
+            console.log("Final user stOLAS remainder:", stBalance.toString());
+
+            stBalance = await st.totalAssets();
+            console.log("Final OLAS total assets on stOLAS:", stBalance.toString());
 
             // Restore a previous state of blockchain
             snapshot.restore();

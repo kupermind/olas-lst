@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
-
+import "hardhat/console.sol";
 import {Implementation, OwnerOnly, ZeroAddress} from "../Implementation.sol";
 import {IToken} from "../interfaces/IToken.sol";
 
@@ -295,6 +295,7 @@ contract Depository is Implementation {
     }
 
     // TODO Deactivate staking models for good via proofs
+    // TODO Staking models must not retire if availableRewards are not zero
     /// @dev Sets existing staking model statuses.
     /// @notice If the model is inactive, it does not mean that it must be unstaked right away as it might continue
     ///         working and accumulating rewards until fully depleted. Then it must be retired and unstaked.
@@ -328,7 +329,8 @@ contract Depository is Implementation {
             if (mapStakingModels[stakingModelId].supply == 0) {
                 revert WrongStakingModel(stakingModelId);
             }
-
+//console.log("status:", uint8(statuses[i]));
+//console.log("stakingModelId:", stakingModelId);
             mapStakingModels[stakingModelId].status = statuses[i];
         }
 
@@ -543,7 +545,7 @@ contract Depository is Implementation {
     /// @param bridgePayloads Bridge payloads corresponding to each chain Id.
     /// @param values Value amounts for each bridge interaction, if applicable.
     /// @return amounts Corresponding OLAS amounts for each staking proxy.
-    function unstakeForRetire(
+    function unstakeRetired(
         uint256[] memory chainIds,
         address[] memory stakingProxies,
         bytes[] memory bridgePayloads,
@@ -579,9 +581,14 @@ contract Depository is Implementation {
                 revert WrongStakingModel(stakingModelId);
             }
 
-            // Check for model existence and remainder as Staking Proxy must not be fully unstaked
-            if (stakingModel.supply == 0 || stakingModel.remainder == stakingModel.supply) {
+            // Check for model existence
+            if (stakingModel.supply == 0) {
                 revert WrongStakingModel(stakingModelId);
+            }
+
+            // Skip if model is already fully unstaked
+            if (stakingModel.remainder == stakingModel.supply) {
+                continue;
             }
 
             // Adjust unstaking amount to not overflow the max allowed one
@@ -602,11 +609,11 @@ contract Depository is Implementation {
         emit Unstake(msg.sender, unstakeAmount, chainIds, stakingProxies, amounts);
     }
 
-    /// @dev Retires specified models.
+    /// @dev Close specified retired models.
     /// @notice This action is irreversible and clears up staking model info.
     /// @param chainIds Set of chain Ids with staking proxies.
     /// @param stakingProxies Set of staking proxies corresponding to each chain Id.
-    function retire(uint256[] memory chainIds, address[] memory stakingProxies) external {
+    function closeRetiredStakingModels(uint256[] memory chainIds, address[] memory stakingProxies) external {
         // Check array lengths
         if (chainIds.length == 0 || chainIds.length != stakingProxies.length) {
             revert WrongArrayLength();
@@ -622,6 +629,7 @@ contract Depository is Implementation {
             StakingModel memory stakingModel = mapStakingModels[stakingModelId];
             // Check for retired model status
             if (stakingModel.status != StakingModelStatus.Retired) {
+                //console.log(uint8(stakingModel.status));
                 revert WrongStakingModel(stakingModelId);
             }
 

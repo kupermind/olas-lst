@@ -242,11 +242,12 @@ contract stOLAS is ERC4626 {
             revert DepositoryOnly(msg.sender, depository);
         }
 
-        asset.transferFrom(msg.sender, address(this), amount);
         topUpBalance = amount;
-        reserveBalance += amount;
+        uint256 curReserveBalance = reserveBalance + amount;
+        reserveBalance = curReserveBalance;
+        asset.transferFrom(msg.sender, address(this), amount);
 
-        emit ReserveBalanceTopUpped(amount);
+        emit TotalReservesUpdated(stakedBalance, vaultBalance, curReserveBalance, totalReserves + amount);
     }
 
     /// @dev Top-ups vault balance via Distributor.
@@ -256,10 +257,34 @@ contract stOLAS is ERC4626 {
             revert DistributorOnly(msg.sender, distributor);
         }
 
+        uint256 curVaultBalance = vaultBalance + amount;
+        vaultBalance = curVaultBalance;
         asset.transferFrom(msg.sender, address(this), amount);
-        vaultBalance += amount;
 
-        emit VaultBalanceTopUpped(amount);
+        emit TotalReservesUpdated(stakedBalance, curVaultBalance, reserveBalance, totalReserves + amount);
+    }
+
+    /// @dev Top-ups unstake balance from retired models via Depository: increase reserve balance and decrease staked one.
+    /// @param amount OLAS amount.
+    function topUpRetiredBalance(uint256 amount) external {
+        if (msg.sender != depository) {
+            revert DepositoryOnly(msg.sender, depository);
+        }
+
+        uint256 curStakedBalance = stakedBalance;
+        // This must never happen
+        if (amount > curStakedBalance) {
+            revert Overflow(amount, curStakedBalance);
+        }
+        curStakedBalance -= amount;
+        stakedBalance = curStakedBalance;
+
+        uint256 curReserveBalance = reserveBalance + amount;
+        reserveBalance = curReserveBalance;
+
+        asset.transferFrom(msg.sender, address(this), amount);
+
+        emit TotalReservesUpdated(curStakedBalance, vaultBalance, curReserveBalance, totalReserves);
     }
 
     /// @dev Funds Depository with reserve balances.

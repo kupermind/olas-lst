@@ -77,12 +77,6 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
     // Staking Manager version
     string public constant VERSION = "0.1.0";
 
-    // Stake operation
-    bytes32 public constant STAKE = 0x1bcc0f4c3fad314e585165815f94ecca9b96690a26d6417d7876448a9a867a69;
-    // Unstake operation
-    bytes32 public constant UNSTAKE = 0x8ca9a95e41b5eece253c93f5b31eed1253aed6b145d8a6e14d913fdf8e732293;
-    // Unstake-retired operation
-    bytes32 public constant UNSTAKE_RETIRED = 0x9065ad15d9673159e4597c86084aff8052550cec93c5a6e44b3f1dba4c8731b3;
     // Number of agent instances
     uint256 public constant NUM_AGENT_INSTANCES = 1;
     // Threshold
@@ -343,10 +337,11 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         emit DeployAndStake(stakingProxy, serviceId, multisig, instances[0]);
     }
 
-    /// @dev Deposits OLAS and stakes into specified staking proxy contract if deposit is enough for staking.
+    /// @dev Stakes OLAS into specified staking proxy contract if deposit + balance is enough for staking.
     /// @param stakingProxy Staking proxy address.
     /// @param amount OLAS amount.
-    function stake(address stakingProxy, uint256 amount) external virtual {
+    /// @param operation Stake operation type.
+    function stake(address stakingProxy, uint256 amount, bytes32 operation) external virtual {
         // Reentrancy guard
         if (_locked > 1) {
             revert ReentrancyGuard();
@@ -410,7 +405,7 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
 
         mapStakingProxyBalances[stakingProxy] = balance;
 
-        emit StakingBalanceUpdated(STAKE, stakingProxy, numStakes, balance);
+        emit StakingBalanceUpdated(operation, stakingProxy, numStakes, balance);
 
         _locked = 1;
     }
@@ -488,7 +483,7 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
             mapLastStakedServiceIdxs[stakingProxy] = lastIdx;
         }
 
-        emit StakingBalanceUpdated(UNSTAKE, stakingProxy, numUnstakes, balance);
+        emit StakingBalanceUpdated(operation, stakingProxy, numUnstakes, balance);
 
         // Update staking balance
         mapStakingProxyBalances[stakingProxy] = balance;

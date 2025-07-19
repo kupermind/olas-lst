@@ -5,7 +5,11 @@ import {IBridgeErrors} from "../../interfaces/IBridgeErrors.sol";
 
 // StakingManager interface
 interface IStakingManager {
-    function stake(address stakingProxy, uint256 amount) external;
+    /// @dev Stakes OLAS into specified staking proxy contract if deposit + balance is enough for staking.
+    /// @param stakingProxy Staking proxy address.
+    /// @param amount OLAS amount.
+    /// @param operation Stake operation type.
+    function stake(address stakingProxy, uint256 amount, bytes32 operation) external;
 
     /// @dev Unstakes, if needed, and withdraws specified amounts from a specified staking contract.
     /// @notice Unstakes services if needed to satisfy withdraw requests.
@@ -65,6 +69,8 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
     bytes32 public constant STAKE = 0x1bcc0f4c3fad314e585165815f94ecca9b96690a26d6417d7876448a9a867a69;
     // Unstake operation
     bytes32 public constant UNSTAKE = 0x8ca9a95e41b5eece253c93f5b31eed1253aed6b145d8a6e14d913fdf8e732293;
+    // Unstake-retired operation
+    bytes32 public constant UNSTAKE_RETIRED = 0x9065ad15d9673159e4597c86084aff8052550cec93c5a6e44b3f1dba4c8731b3;
 
     // OLAS address
     address public immutable olas;
@@ -167,9 +173,8 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
                 IToken(olas).approve(stakingManager, amount);
 
                 // This is a low level call since it must never revert
-                bytes memory stakeData = abi.encodeCall(IStakingManager.stake, (target, amount));
+                bytes memory stakeData = abi.encodeCall(IStakingManager.stake, (target, amount, operation));
                 (success, ) = stakingManager.call(stakeData);
-                //IStakingManager(stakingManager).stake(target, amount);
 
                 if (success) {
                     emit StakeRequestExecuted(target, amount, batchHash);
@@ -186,7 +191,7 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
 
                 emit StakeRequestQueued(queueHash, target, amount, batchHash, operation, olasBalance, paused);
             }
-        } else if (operation == UNSTAKE) {
+        } else if (operation == UNSTAKE || operation == UNSTAKE_RETIRED) {
             // This is a low level call since it must never revert
             bytes memory unstakeData = abi.encodeCall(IStakingManager.unstake, (target, amount, operation));
             (bool success, ) = stakingManager.call(unstakeData);
@@ -281,7 +286,7 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
             if (olasBalance >= amount) {
                 // Approve OLAS for stakingManager
                 IToken(olas).approve(stakingManager, amount);
-                IStakingManager(stakingManager).stake(target, amount);
+                IStakingManager(stakingManager).stake(target, amount, operation);
 
                 emit StakeRequestExecuted(target, amount, batchHash);
 
@@ -291,7 +296,7 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
                 // OLAS balance is not enough for redeem
                 revert InsufficientBalance(olasBalance, amount);
             }
-        } else if (operation == UNSTAKE) {
+        } else if (operation == UNSTAKE || operation == UNSTAKE_RETIRED) {
             IStakingManager(stakingManager).unstake(target, amount, operation);
         } else {
             // Must never happen
