@@ -39,12 +39,30 @@ error AlreadyInitialized();
 /// @param max Maximum possible value.
 error Overflow(uint256 provided, uint256 max);
 
+/// @dev Wrong length of arrays.
+error WrongArrayLength();
+
+/// @dev Caught reentrancy violation.
+error ReentrancyGuard();
+
+// ReceiverBalance struct
+struct ReceiverBalance {
+    uint256 balance;
+    address receiver;
+}
+
+
 /// @title Collector - Smart contract for collecting staking rewards
 contract Collector is Implementation {
     event StakingProcessorUpdated(address indexed stakingProcessorL2);
+    event OperationReceiversSet(bytes32[] operations, address[] receivers);
+    event OperationReceiverBalancesUpdated(bytes32 indexed operations, address indexed receiver, uint256 balance);
     event ProtocolFactorUpdated(uint256 protocolFactor);
-    event RewardTokensRelayed(address indexed l1Distributor, uint256 amount);
+    event ProtocolBalanceUpdated(uint256 protocolBalance);
+    event TokensRelayed(address indexed l1Distributor, uint256 amount);
 
+    // Reward transfer operation
+    bytes32 public constant REWARD = 0x0b9821ae606ebc7c79bf3390bdd3dc93e1b4a7cda27aad60646e7b88ff55b001;
     // Min olas balance to relay
     uint256 public constant MIN_OLAS_BALANCE = 1 ether;
     // Max protocol factor
@@ -52,8 +70,6 @@ contract Collector is Implementation {
 
     // OLAS contract address
     address public immutable olas;
-    // Distributor contract address on L1
-    address public immutable l1Distributor;
 
     // Protocol balance
     uint256 public protocolBalance;
@@ -62,11 +78,15 @@ contract Collector is Implementation {
     // L2 staking processor address
     address public l2StakingProcessor;
 
+    // Reentrancy lock
+    uint256 internal _locked = 1;
+
+    // Mapping of operation => OLAS balance and L1 address to send to
+    mapping(bytes32 => ReceiverBalance) public mapOperationReceiverBalances;
+
     /// @param _olas OLAS address on L2.
-    /// @param _l1Distributor Distributor contract address on L1.
-    constructor(address _olas, address _l1Distributor) {
+    constructor(address _olas) {
         olas = _olas;
-        l1Distributor = _l1Distributor;
     }
 
     /// @dev Initializes collector.
@@ -111,38 +131,109 @@ contract Collector is Implementation {
         emit ProtocolFactorUpdated(newProtocolFactor);
     }
 
-    /// @dev Relays reward tokens to L1.
-    /// @param bridgePayload Bridge payload.
-    function relayRewardTokens(bytes memory bridgePayload) external payable {
-        // Get OLAS balance
-        uint256 olasBalance = IToken(olas).balanceOf(address(this));
-        // Get current protocol balance
-        uint256 curProtocolBalance = protocolBalance;
-
-        // Overflow check: this must never happen, as protocol balance is included in total OLAS balance
-        if (olasBalance < curProtocolBalance) {
-            revert Overflow(olasBalance, curProtocolBalance);
+    function setOperationReceivers(bytes32[] memory operations, address[] memory receivers) external {
+        // Check for ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
         }
 
-        uint256 amount = olasBalance - curProtocolBalance;
+        // Check array lengths
+        if (operations.length == 0 || operations.length != receivers.length) {
+            revert WrongArrayLength();
+        }
+
+        for (uint256 i = 0; i < operations.length; ++i) {
+            // Check for zero value
+            if (operations[i] == 0) {
+                revert ZeroValue();
+            }
+
+            // Check for zero address
+            if (receivers[i] == address(0)) {
+                revert ZeroAddress();
+            }
+
+            ReceiverBalance storage receiverBalance = mapOperationReceiverBalances[operations[i]];
+            receiverBalance.receiver = receivers[i];
+        }
+
+        emit OperationReceiversSet(operations, receivers);
+    }
+
+    function topUpBalance(uint256 amount, bytes32 operation) external {
+        // Reentrancy guard
+        if (_locked == 2) {
+            revert ReentrancyGuard();
+        }
+        _locked = 2;
+
+        ReceiverBalance storage receiverBalance = mapOperationReceiverBalances[operation];
+
+        // Get receiver address
+        address receiver = receiverBalance.receiver;
+        // Check for zero address
+        if (receiverBalance.receiver == address(0)) {
+            revert ZeroAddress();
+        }
+
+        IToken(olas).transferFrom(msg.sender, address(this), amount);
+        uint256 balance = receiverBalance.balance + amount;
+        receiverBalance.balance = balance;
+
+        emit OperationReceiverBalancesUpdated(operation, receiver, balance);
+
+        _locked = 1;
+    }
+
+    /// @dev Relays tokens to L1.
+    /// @param operation Operation type related to L1 receiver.
+    /// @param bridgePayload Bridge payload.
+    function relayTokens(bytes32 operation, bytes memory bridgePayload) external payable {
+        // Reentrancy guard
+        if (_locked == 2) {
+            revert ReentrancyGuard();
+        }
+        _locked = 2;
+
+        ReceiverBalance storage receiverBalance = mapOperationReceiverBalances[operation];
+
+        // Get receiver address
+        address receiver = receiverBalance.receiver;
+        // Check for zero address
+        if (receiver == address(0)) {
+            revert ZeroAddress();
+        }
+
+        // Get OLAS balance
+        uint256 olasBalance = receiverBalance.balance;
         // Check for minimum balance
-        if (amount < MIN_OLAS_BALANCE) {
+        if (olasBalance < MIN_OLAS_BALANCE) {
             revert ZeroValue();
         }
 
-        uint256 protocolAmount = (olasBalance * protocolFactor) / MAX_PROTOCOL_FACTOR;
-        amount -= protocolAmount;
+        // Rewards are subject to a protocol fee
+        if (operation == REWARD) {
+            uint256 protocolAmount = (olasBalance * protocolFactor) / MAX_PROTOCOL_FACTOR;
+            olasBalance -= protocolAmount;
 
-        // Update protocol balance
-        curProtocolBalance += protocolAmount;
-        protocolBalance = curProtocolBalance;
+            // Update protocol balance
+            uint256 curProtocolBalance = protocolBalance + protocolAmount;
+            protocolBalance = curProtocolBalance;
 
-        emit RewardTokensRelayed(l1Distributor, amount);
+            emit ProtocolBalanceUpdated(curProtocolBalance);
+        }
+
+        // Zero operation balance
+        receiverBalance.balance = 0;
+
+        emit TokensRelayed(receiver, olasBalance);
 
         // Transfer tokens
-        IToken(olas).transfer(l2StakingProcessor, amount);
+        IToken(olas).transfer(l2StakingProcessor, olasBalance);
 
         // Send tokens to L1
-        IBridge(l2StakingProcessor).relayToL1{value: msg.value}(l1Distributor, amount, bridgePayload);
+        IBridge(l2StakingProcessor).relayToL1{value: msg.value}(receiver, olasBalance, bridgePayload);
+
+        _locked = 1;
     }
 }

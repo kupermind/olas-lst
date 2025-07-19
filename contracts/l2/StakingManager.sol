@@ -8,6 +8,10 @@ import {IService} from "../interfaces/IService.sol";
 import {IStaking} from "../interfaces/IStaking.sol";
 import {IToken, INFToken} from "../interfaces/IToken.sol";
 
+interface ICollector {
+    function topUpBalance(uint256 amount, bytes32 operation) external;
+}
+
 // Activity module interface
 interface IActivityModule {
     /// @dev Initializes activity module proxy.
@@ -57,6 +61,7 @@ error UnauthorizedAccount(address account);
 /// @dev Caught reentrancy violation.
 error ReentrancyGuard();
 
+
 /// @title StakingManager - Smart contract for OLAS staking management
 contract StakingManager is Implementation, ERC721TokenReceiver {
     event StakingProcessorL2Updated(address indexed l2StakingProcessor);
@@ -72,10 +77,6 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
     // Staking Manager version
     string public constant VERSION = "0.1.0";
 
-    // Stake operation
-    bytes32 public constant STAKE = 0x1bcc0f4c3fad314e585165815f94ecca9b96690a26d6417d7876448a9a867a69;
-    // Unstake operation
-    bytes32 public constant UNSTAKE = 0x8ca9a95e41b5eece253c93f5b31eed1253aed6b145d8a6e14d913fdf8e732293;
     // Number of agent instances
     uint256 public constant NUM_AGENT_INSTANCES = 1;
     // Threshold
@@ -91,8 +92,6 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
     address public immutable serviceManager;
     // OLAS token address
     address public immutable olas;
-    // Treasury address on L1
-    address public immutable l1Treasury;
     // Service registry address
     address public immutable serviceRegistry;
     // Service registry token utility address
@@ -133,7 +132,6 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
 
     /// @dev StakerL2 constructor.
     /// @param _olas OLAS token address.
-    /// @param _l1Treasury Treasury address on L1.
     /// @param _serviceManager Service manager address.
     /// @param _stakingFactory Staking factory address.
     /// @param _safeModuleInitializer Safe module initializer address.
@@ -144,7 +142,6 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
     /// @param _configHash Contributor service config hash.
     constructor(
         address _olas,
-        address _l1Treasury,
         address _serviceManager,
         address _stakingFactory,
         address _safeModuleInitializer,
@@ -155,9 +152,9 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         bytes32 _configHash
     ) {
         // Check for zero addresses
-        if (_olas == address(0) || _l1Treasury == address(0) || _serviceManager == address(0) ||
-            _stakingFactory == address(0) || _safeModuleInitializer ==address(0) || _safeL2 == address(0) ||
-            _beacon ==address(0) || _collector == address(0))
+        if (_olas == address(0) || _serviceManager == address(0) || _stakingFactory == address(0) ||
+            _safeModuleInitializer ==address(0) || _safeL2 == address(0) || _beacon ==address(0) ||
+            _collector == address(0))
         {
             revert ZeroAddress();
         }
@@ -171,7 +168,6 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         configHash = _configHash;
 
         olas = _olas;
-        l1Treasury = _l1Treasury;
         serviceManager = _serviceManager;
         stakingFactory = _stakingFactory;
         safeModuleInitializer = _safeModuleInitializer;
@@ -341,10 +337,11 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         emit DeployAndStake(stakingProxy, serviceId, multisig, instances[0]);
     }
 
-    /// @dev Deposits OLAS and stakes into specified staking proxy contract if deposit is enough for staking.
+    /// @dev Stakes OLAS into specified staking proxy contract if deposit + balance is enough for staking.
     /// @param stakingProxy Staking proxy address.
     /// @param amount OLAS amount.
-    function stake(address stakingProxy, uint256 amount) external virtual {
+    /// @param operation Stake operation type.
+    function stake(address stakingProxy, uint256 amount, bytes32 operation) external virtual {
         // Reentrancy guard
         if (_locked > 1) {
             revert ReentrancyGuard();
@@ -408,7 +405,7 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
 
         mapStakingProxyBalances[stakingProxy] = balance;
 
-        emit StakingBalanceUpdated(STAKE, stakingProxy, numStakes, balance);
+        emit StakingBalanceUpdated(operation, stakingProxy, numStakes, balance);
 
         _locked = 1;
     }
@@ -417,14 +414,17 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
     /// @notice Unstakes services if needed to satisfy withdraw requests.
     ///         Call this to unstake definitely terminated staking contracts - deactivated on L1 and / or ran out of funds.
     ///         The majority of discovered chains does not need any value to process token bridge transfer.
-    function unstake(address stakingProxy, uint256 amount) external virtual {
+    /// @param stakingProxy Staking proxy address.
+    /// @param amount Unstake amount.
+    /// @param operation Unstake operation type.
+    function unstake(address stakingProxy, uint256 amount, bytes32 operation) external virtual {
         // Reentrancy guard
         if (_locked > 1) {
             revert ReentrancyGuard();
         }
         _locked = 2;
 
-        // Check for treasury requesting withdraw
+        // Check for l2StakingProcessor to be a sender
         if (msg.sender != l2StakingProcessor) {
             revert UnauthorizedAccount(msg.sender);
         }
@@ -483,19 +483,16 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
             mapLastStakedServiceIdxs[stakingProxy] = lastIdx;
         }
 
-        emit StakingBalanceUpdated(UNSTAKE, stakingProxy, numUnstakes, balance);
+        emit StakingBalanceUpdated(operation, stakingProxy, numUnstakes, balance);
 
         // Update staking balance
         mapStakingProxyBalances[stakingProxy] = balance;
 
-        // Send OLAS to collector to initiate L1 transfer for all the balances at this time
-        IToken(olas).transfer(l2StakingProcessor, amount);
+        // Approve OLAS for collector to initiate L1 transfer for corresponding operation later by agents / operators
+        IToken(olas).approve(collector, amount);
 
-        // Send tokens to L1 Treasury and not stOLAS, since the redeem finalization is handled by Treasury
-        // Note that if any msg.value is needed for relay to L1, it must be handled in the corresponding
-        // Staking Processor L2 contract, since this function is called in the L1-L2-L1 tx and it is difficult
-        // to pre-calculate L2-L1 value before hand as bridging time varies and quotes might become outdated
-        IBridge(l2StakingProcessor).relayToL1(l1Treasury, amount, "");
+        // Request top-up by Collector for a specific unstake operation
+        ICollector(collector).topUpBalance(amount, operation);
 
         _locked = 1;
     }

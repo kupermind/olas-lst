@@ -3,6 +3,27 @@ pragma solidity ^0.8.30;
 
 import {IStaking} from "../interfaces/IStaking.sol";
 
+interface ICollector {
+    function topUpBalance(uint256 amount, bytes32 operation) external;
+}
+
+/// @dev Safe multi send interface
+interface IMultiSend {
+    /// @dev Sends multiple transactions and reverts all if one fails.
+    /// @param transactions Encoded transactions. Each transaction is encoded as a packed bytes of
+    ///                     operation has to be uint8(0) in this version (=> 1 byte),
+    ///                     to as a address (=> 20 bytes),
+    ///                     value as a uint256 (=> 32 bytes),
+    ///                     payload length as a uint256 (=> 32 bytes),
+    ///                     payload as bytes.
+    ///                     see abi.encodePacked for more information on packed encoding
+    /// @notice The code is for most part the same as the normal MultiSend (to keep compatibility),
+    ///         but reverts if a transaction tries to use a delegatecall.
+    /// @notice This method is payable as delegatecalls keep the msg.value from the previous call
+    ///         If the calling method (e.g. execTransaction) received ETH this would revert otherwise
+    function multiSend(bytes memory transactions) external payable;
+}
+
 interface ISafe {
     enum Operation {Call, DelegateCall}
 
@@ -66,11 +87,11 @@ interface IStakingManager {
 
 // ERC20 token interface
 interface IToken {
-    /// @dev Transfers the token amount.
-    /// @param to Address to transfer to.
-    /// @param amount The amount to transfer.
+    /// @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
+    /// @param spender Account address that will be able to transfer tokens on behalf of the caller.
+    /// @param amount Token amount.
     /// @return True if the function execution is successful.
-    function transfer(address to, uint256 amount) external returns (bool);
+    function approve(address spender, uint256 amount) external returns (bool);
 
     /// @dev Gets the amount of tokens owned by a specified account.
     /// @param account Account address.
@@ -103,6 +124,8 @@ contract ActivityModule {
     // Activity Module version
     string public constant VERSION = "0.1.0";
 
+    // Reward transfer operation
+    bytes32 public constant REWARD = 0x0b9821ae606ebc7c79bf3390bdd3dc93e1b4a7cda27aad60646e7b88ff55b001;
     // Default activity increment
     uint256 public constant DEFAULT_ACTIVITY = 1;
 
@@ -110,6 +133,8 @@ contract ActivityModule {
     address public immutable olas;
     // Rewards collector address
     address public immutable collector;
+    // Multisend contract address
+    address public immutable multiSend;
 
     // Activity tracker
     uint256 public activityNonce;
@@ -128,9 +153,11 @@ contract ActivityModule {
     /// @dev ActivityModule constructor.
     /// @param _olas OLAS address.
     /// @param _collector Collector address.
-    constructor(address _olas, address _collector) {
+    /// @param _multiSend Multisend contract address.
+    constructor(address _olas, address _collector, address _multiSend) {
         olas = _olas;
         collector = _collector;
+        multiSend = _multiSend;
     }
 
     /// @dev Drains unclaimed rewards after service unstake.
@@ -141,11 +168,22 @@ contract ActivityModule {
 
         // Check for zero balance
         if (balance > 0) {
-            // Encode olas transfer function call
-            bytes memory data = abi.encodeCall(IToken.transfer, (collector, balance));
+            // Encode OLAS approve function call
+            bytes memory data = abi.encodeCall(IToken.approve, (collector, balance));
+            // MultiSend payload with the packed data of (operation, multisig address, value(0), payload length, payload)
+            bytes memory msPayload = abi.encodePacked(ISafe.Operation.Call, olas, uint256(0), data.length, data);
 
-            // Send collected funds to collector
-            ISafe(multisig).execTransactionFromModule(olas, 0, data, ISafe.Operation.Call);
+            // Encode collector top-up function call
+            data = abi.encodeCall(ICollector.topUpBalance, (balance, REWARD));
+            // Concatenate multi send payload with the packed data of (operation, multisig address, value(0), payload length, payload)
+            msPayload = bytes.concat(msPayload, abi.encodePacked(ISafe.Operation.Call, collector, uint256(0),
+                data.length, data));
+
+            // Multisend call to execute all the payloads
+            msPayload = abi.encodeCall(IMultiSend.multiSend, (msPayload));
+
+            // Execute module call
+            ISafe(multisig).execTransactionFromModule(multiSend, 0, msPayload, ISafe.Operation.DelegateCall);
 
             emit Drained(balance);
         }
