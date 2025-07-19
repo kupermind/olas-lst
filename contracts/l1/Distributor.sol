@@ -31,7 +31,7 @@ error UnauthorizedAccount(address account);
 error ReentrancyGuard();
 
 
-/// @title Distributor - Smart contract for distributing funds obtained bia bridging or direct deposits.
+/// @title Distributor - Smart contract for distributing funds obtained via bridging or direct deposits.
 contract Distributor is Implementation {
     event LockFactorUpdated(uint256 lockFactor);
     event Locked(address indexed account, uint256 olasAmount, uint256 lockAmount, uint256 vaultBalance,
@@ -81,7 +81,7 @@ contract Distributor is Implementation {
         emit Locked(msg.sender, olasAmount, lockAmount, remainder, unlockTimeIncreased);
     }
 
-    /// @dev FundsDistributor initializer.
+    /// @dev Distributor initializer.
     /// @param _lockFactor Lock factor value.
     function initialize(uint256 _lockFactor) external{
         // Check for already initialized
@@ -111,7 +111,7 @@ contract Distributor is Implementation {
         emit LockFactorUpdated(newLockFactor);
     }
 
-    /// @dev Distributes OLAS to specified destinations.
+    /// @dev Distributes OLAS to stOLAS for balances re-distribution.
     function distribute() external {
         // Reentrancy guard
         if (_locked) {
@@ -129,9 +129,10 @@ contract Distributor is Implementation {
             // Lock OLAS for veOLAS
             olasAmount = _increaseLock(olasAmount);
 
-            // Transfer OLAS to stOLAS
+            // Approve OLAS for stOLAS
             IToken(olas).approve(st, olasAmount);
 
+            // Top-up stOLAS with the approved amount
             IST(st).topUpVaultBalance(olasAmount);
 
             emit Distributed(msg.sender, st, olasAmount);

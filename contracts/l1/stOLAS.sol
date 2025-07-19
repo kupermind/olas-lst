@@ -24,6 +24,11 @@ error DepositoryOnly(address sender, address depository);
 /// @param distributor Required sender address as a distributor.
 error DistributorOnly(address sender, address distributor);
 
+/// @dev Only `unstakeRelayer` has a privilege, but the `sender` was provided.
+/// @param sender Sender address.
+/// @param unstakeRelayer Required sender address as an unstakeRelayer.
+error UnstakeRelayerOnly(address sender, address unstakeRelayer);
+
 /// @dev Provided zero address.
 error ZeroAddress();
 
@@ -40,7 +45,8 @@ contract stOLAS is ERC4626 {
     using FixedPointMathLib for uint256;
 
     event OwnerUpdated(address indexed owner);
-    event ManagersUpdated(address indexed treasury, address indexed depository, address indexed dstributor);
+    event ManagersUpdated(address indexed treasury, address indexed depository, address indexed dstributor,
+        address unstakeRelayer);
     event TotalReservesUpdated(uint256 stakedBalance, uint256 vaultBalance, uint256 reserveBalance, uint256 totalReserves);
     event ReserveBalanceTopUpped(uint256 amount);
     event VaultBalanceTopUpped(uint256 amount);
@@ -65,6 +71,8 @@ contract stOLAS is ERC4626 {
     address public depository;
     // Distributor address
     address public distributor;
+    // Unstake relayer address for retired model funds
+    address public unstakeRelayer;
 
     /// @dev stOLAS constructor.
     /// @param _olas OLAS token address.
@@ -91,19 +99,27 @@ contract stOLAS is ERC4626 {
     /// @param newTreasury New treasury address.
     /// @param newDepository New depository address.
     /// @param newDistributor New distributor address.
-    function changeManagers(address newTreasury, address newDepository, address newDistributor) external {
+    function changeManagers(
+        address newTreasury,
+        address newDepository,
+        address newDistributor,
+        address newUnstakeRelayer
+    ) external {
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);
         }
 
-        if (newTreasury == address(0) || newDepository == address(0) || newDistributor == address(0)) {
+        if (newTreasury == address(0) || newDepository == address(0) || newDistributor == address(0) ||
+            newUnstakeRelayer == address(0))
+        {
             revert ZeroAddress();
         }
 
         treasury = newTreasury;
         depository = newDepository;
         distributor = newDistributor;
-        emit ManagersUpdated(newTreasury, newDepository, newDistributor);
+        unstakeRelayer = newUnstakeRelayer;
+        emit ManagersUpdated(newTreasury, newDepository, newDistributor, newUnstakeRelayer);
     }
 
     /// @dev Deposits OLAS in exchange for stOLAS tokens.
@@ -267,18 +283,21 @@ contract stOLAS is ERC4626 {
     /// @dev Top-ups unstake balance from retired models via Depository: increase reserve balance and decrease staked one.
     /// @param amount OLAS amount.
     function topUpRetiredBalance(uint256 amount) external {
-        if (msg.sender != depository) {
-            revert DepositoryOnly(msg.sender, depository);
+        if (msg.sender != unstakeRelayer) {
+            revert UnstakeRelayerOnly(msg.sender, unstakeRelayer);
         }
 
         uint256 curStakedBalance = stakedBalance;
-        // This must never happen
+        // This can only happen if OLAS funds have been additionally transferred to UnstakeRelayer contract
+        // The leftover difference is passed to reserve balance
         if (amount > curStakedBalance) {
-            revert Overflow(amount, curStakedBalance);
+            curStakedBalance = 0;
+        } else {
+            curStakedBalance -= amount;
         }
-        curStakedBalance -= amount;
         stakedBalance = curStakedBalance;
 
+        // Update reserve balance
         uint256 curReserveBalance = reserveBalance + amount;
         reserveBalance = curReserveBalance;
 

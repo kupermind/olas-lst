@@ -23,6 +23,7 @@ describe("Liquid Staking", function () {
     let stakingVerifier;
     let lock;
     let distributor;
+    let unstakeRelayer;
     let depository;
     let treasury;
     let collector;
@@ -177,6 +178,16 @@ describe("Liquid Staking", function () {
         await distributorProxy.deployed();
         distributor = await ethers.getContractAt("Distributor", distributorProxy.address);
 
+        const UnstakeRelayer = await ethers.getContractFactory("UnstakeRelayer");
+        unstakeRelayer = await UnstakeRelayer.deploy(olas.address, st.address);
+        await unstakeRelayer.deployed();
+
+        const UnstakeRelayerProxy = await ethers.getContractFactory("Proxy");
+        initPayload = unstakeRelayer.interface.encodeFunctionData("initialize", []);
+        const unstakeRelayerProxy = await UnstakeRelayerProxy.deploy(unstakeRelayer.address, initPayload);
+        await unstakeRelayerProxy.deployed();
+        unstakeRelayer = await ethers.getContractAt("UnstakeRelayer", unstakeRelayerProxy.address);
+
         const Depository = await ethers.getContractFactory("Depository");
         depository = await Depository.deploy(olas.address, st.address);
         await depository.deployed();
@@ -199,7 +210,7 @@ describe("Liquid Staking", function () {
 
         // Change managers for stOLAS
         // Only Treasury contract can mint OLAS
-        await st.changeManagers(treasury.address, depository.address, distributor.address);
+        await st.changeManagers(treasury.address, depository.address, distributor.address, unstakeRelayer.address);
 
         // Change treasury address in depository
         await depository.changeTreasury(treasury.address);
@@ -311,7 +322,7 @@ describe("Liquid Staking", function () {
 
         // Set
         await collector.setOperationReceivers([rewardOperation, unstakeOperation, unstakeRetiredOperation],
-            [distributor.address, treasury.address, distributor.address]);
+            [distributor.address, treasury.address, unstakeRelayer.address]);
     });
 
     context("Staking", function () {
@@ -1377,17 +1388,37 @@ describe("Liquid Staking", function () {
             let collectorBalance = await olas.balanceOf(collector.address);
             expect(collectorBalance).to.equal(stakingModel.supply);
             console.log("Collector balance:", collectorBalance.toString());
-            return;
 
             // Relay rewards to L1
-            console.log("Calling relay rewards tokens to L1 by agent or manually");
+            console.log("Calling relay unstake retired tokens to L1 by agent or manually");
             await collector.relayTokens(unstakeRetiredOperation, bridgePayload);
 
             console.log("\nL1");
 
-            console.log("stakedBalance:", await st.stakedBalance());
-            console.log("vaultBalance:", await st.vaultBalance());
-            console.log("reserveBalance:", await st.reserveBalance());
+            const stakedBalanceBefore = await st.stakedBalance();
+            const vaultBalanceBefore = await st.vaultBalance();
+            const reserveBalanceBefore = await st.reserveBalance();
+
+            // Relay OLAS to stOLAS
+            console.log("Calling relay unstake retired tokens to stOLAS by agent or manually");
+            await unstakeRelayer.relay();
+
+            const stakedBalanceAfter = await st.stakedBalance();
+            const vaultBalanceAfter = await st.vaultBalance();
+            const reserveBalanceAfter = await st.reserveBalance();
+
+            console.log("stakedBalance before:", stakedBalanceBefore.toString());
+            console.log("vaultBalance before:", vaultBalanceBefore.toString());
+            console.log("reserveBalance before:", reserveBalanceBefore.toString());
+
+            // Check updated balances
+            expect(stakedBalanceAfter).to.equal(stakedBalanceBefore.sub(collectorBalance));
+            expect(vaultBalanceAfter).to.equal(vaultBalanceBefore);
+            expect(reserveBalanceAfter).to.equal(reserveBalanceBefore.add(collectorBalance));
+
+            console.log("stakedBalance after:", stakedBalanceAfter.toString());
+            console.log("vaultBalance after:", vaultBalanceAfter.toString());
+            console.log("reserveBalance after:", reserveBalanceAfter.toString());
 
             stBalance = await st.balanceOf(deployer.address);
             console.log("Final user stOLAS remainder:", stBalance.toString());
