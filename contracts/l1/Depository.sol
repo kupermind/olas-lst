@@ -68,15 +68,27 @@ error UnauthorizedAccount(address account);
 /// @dev Caught reentrancy violation.
 error ReentrancyGuard();
 
+enum StakingModelStatus {
+    Retired,
+    Active,
+    Inactive
+}
+
+// StakingModel struct
+struct StakingModel {
+    // Max available supply
+    uint96 supply;
+    // Remaining supply
+    uint96 remainder;
+    // Stake limit per slot as the deposit amount required for a single service stake
+    uint96 stakeLimitPerSlot;
+    // Staking model status: Retired, Active, Inactive
+    StakingModelStatus status;
+}
+
 
 /// @title Depository - Smart contract for the stOLAS Depository.
 contract Depository is Implementation {
-    enum StakingModelStatus {
-        Retired,
-        Active,
-        Inactive
-    }
-
     event TreasuryUpdated(address indexed treasury);
     event SetDepositProcessorChainIds(address[] depositProcessors, uint256[] chainIds);
     event StakingModelsActivated(uint256[] chainIds, address[] stakingProxies, uint256[] stakeLimitPerSlots,
@@ -87,18 +99,6 @@ contract Depository is Implementation {
     event Unstake(address indexed sender, uint256 unstakeAmount, uint256[] chainIds, address[] stakingProxies,
         uint256[] amounts);
     event Retired(uint256[] chainIds, address[] stakingProxies);
-
-    // StakingModel struct
-    struct StakingModel {
-        // Max available supply
-        uint96 supply;
-        // Remaining supply
-        uint96 remainder;
-        // Stake limit per slot as the deposit amount required for a single service stake
-        uint96 stakeLimitPerSlot;
-        // Staking model status: Retired, Active, Inactive
-        StakingModelStatus status;
-    }
 
     // Depository version
     string public constant VERSION = "0.1.0";
