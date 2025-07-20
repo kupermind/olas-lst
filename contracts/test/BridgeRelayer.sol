@@ -348,7 +348,7 @@ contract BridgeRelayer {
     }
 
     struct TransferWithPayload {
-        uint8 payloadID;
+        uint8 payloadId;
         uint256 amount;
         bytes32 tokenAddress;
         uint16 tokenChain;
