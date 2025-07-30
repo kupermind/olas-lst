@@ -9,19 +9,18 @@ import { ReadCodecV1, EVMCallRequestV1 } from "@layerzerolabs/oapp-evm/contracts
 import { OAppRead } from "@layerzerolabs/oapp-evm/contracts/oapp/OAppRead.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import {StakingModel} from "../Depository.sol";
-import {InstanceParams} from "@registries/contracts/staking/StakingFactory.sol";
-
-interface IStakingFactory {
-    /// @dev Gets InstanceParams struct for a specified staking proxy
-    /// @param stakingProxy Staking proxy address.
-    function mapInstanceParams(address stakingProxy) external view returns (InstanceParams memory);
-}
 
 interface IStakingProxy {
-    /// @dev Gets maximum number of staking services.
-    function maxNumServices() external view returns (uint256);
-    /// @dev Gets minimum service staking deposit value required for staking.
-    function minStakingDeposit() external view returns (uint256);
+    /// @dev Gets stakingProxy info.
+    /// @param stakingProxy Staking proxy address.
+    /// @return isEnabled Staking proxy status flag.
+    /// @return maxNumSlots Max number of slots in staking proxy.
+    /// @return minStakingDeposit Minimum deposit value required for service staking.
+    /// @return availableRewards Staking proxy available rewards.
+    /// @return bytecodeHash Staking proxy bytecode hash.
+    function getStakingInfo(address stakingProxy) external view returns (bool isEnabled, uint256 maxNumSlots,
+        uint256 minStakingDeposit, uint256 availableRewards, bytes32 bytecodeHash);
+
     /// @dev Gets token rewards.
     function availableRewards() external view returns (uint256);
 }
@@ -76,23 +75,32 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
     // Message type for read close operation
     uint16 public constant READ_TYPE_CLOSE = 2;
 
+    // Staking proxy bytecode hash
+    bytes32 public immutable stakingProxyBytecodeHash;
     // Depository address
     address public immutable depository;
 
-    // Mapping of EVM chain Id => (stakingFactory address, chainId in LZ format, msg type)
-    mapping(uint256 => AccountChainIdMsgType) public mapStakingFactoryLzChainIds;
+    // Mapping of EVM chain Id => (stakingHelper address, chainId in LZ format, msg type)
+    mapping(uint256 => AccountChainIdMsgType) public mapStakingHelperLzChainIds;
     // Mapping of Guid => (stakingProxy address, EVM chainId, msg type)
     mapping(bytes32 => AccountChainIdMsgType) public mapUidStakingProxyChainIds;
 
     constructor(
         address _endpoint,
+        bytes32 _stakingProxyBytecodeHash,
         uint256[] memory _chainIds,
-        address[] memory _stakingFactories,
+        address[] memory _stakingHelpers,
         uint256[] memory _lzChainIds
     )
         OAppRead(_endpoint, msg.sender) Ownable(msg.sender)
     {
-        setChainIdStakingFactoryLzChainIds(_chainIds, _stakingFactories, _lzChainIds);
+        if (_stakingProxyBytecodeHash == 0) {
+            revert ZeroValue();
+        }
+
+        stakingProxyBytecodeHash = _stakingProxyBytecodeHash;
+
+        setChainIdStakingHelperLzChainIds(_chainIds, _stakingHelpers, _lzChainIds);
     }
 
 //    /// @notice Thanks for making it virtual :).
@@ -122,21 +130,21 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
         // Check for message type
         if (accountChainIdMsgType.msgType == READ_TYPE_CREATE) {
             // Decode obtained data
-            (InstanceParams memory instanceParams, uint256 maxNumServices, uint256 minStakingDeposit,
-                uint256 availableRewards) = abi.decode(message, (InstanceParams, uint256, uint256, uint256));
+            (bool isEnabled, uint256 maxNumServices, uint256 minStakingDeposit, uint256 availableRewards,
+                bytes32 bytecodeHash) = abi.decode(message, (bool, uint256, uint256, uint256, bytes32));
 
             // Check for correctness of parameters
-            if (!instanceParams.isEnabled || availableRewards == 0) {
+            if (!isEnabled || availableRewards == 0 || bytecodeHash != stakingProxyBytecodeHash) {
                 revert ();
             }
 
             // Considering 1 agent per service: deposit + operator bond = 2 * minStakingDeposit
             uint256 stakeLimitPerSlot = 2 * minStakingDeposit;
-            IDepository(depository).LzCreateAndActivateStakingModel(accountChainIdMsgType.chainId, accountChainIdMsgType.account,
-                stakeLimitPerSlot, maxNumServices);
+            IDepository(depository).LzCreateAndActivateStakingModel(accountChainIdMsgType.chainId,
+                accountChainIdMsgType.account, stakeLimitPerSlot, maxNumServices);
 
-            emit LzCreateAndActivateStakingModelProcessed(guid, accountChainIdMsgType.chainId, accountChainIdMsgType.account,
-                stakeLimitPerSlot, maxNumServices);
+            emit LzCreateAndActivateStakingModelProcessed(guid, accountChainIdMsgType.chainId,
+                accountChainIdMsgType.account, stakeLimitPerSlot, maxNumServices);
         } else if (accountChainIdMsgType.msgType == READ_TYPE_CLOSE) {
             // Decode obtained data
             uint256 availableRewards = abi.decode(message, (uint256));
@@ -164,9 +172,9 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
         uint256 lzChainId
     ) internal view returns (bytes memory) {
         // Allocate required number of read requests
-        EVMCallRequestV1[] memory readRequests = new EVMCallRequestV1[](4);
+        EVMCallRequestV1[] memory readRequests = new EVMCallRequestV1[](1);
 
-        // Get instance params of stakingProxy
+        // Get stakingProxy info
         readRequests[0] = EVMCallRequestV1({
             appRequestLabel: uint16(0),
             targetEid: uint32(lzChainId),
@@ -174,40 +182,7 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
             blockNumOrTimestamp: uint64(block.timestamp),
             confirmations: 15,
             to: stakingFactory,
-            callData: abi.encodeCall(IStakingFactory.mapInstanceParams, (stakingProxy))
-        });
-
-        // Get max number of services in stakingProxy
-        readRequests[1] = EVMCallRequestV1({
-            appRequestLabel: uint16(0),
-            targetEid: uint32(lzChainId),
-            isBlockNum: false,
-            blockNumOrTimestamp: uint64(block.timestamp),
-            confirmations: 15,
-            to: stakingProxy,
-            callData: abi.encodeCall(IStakingProxy.maxNumServices, ())
-        });
-
-        // Get min staking deposit in stakingProxy
-        readRequests[2] = EVMCallRequestV1({
-            appRequestLabel: uint16(0),
-            targetEid: uint32(lzChainId),
-            isBlockNum: false,
-            blockNumOrTimestamp: uint64(block.timestamp),
-            confirmations: 15,
-            to: stakingProxy,
-            callData: abi.encodeCall(IStakingProxy.minStakingDeposit, ())
-        });
-
-        // Get stakingProxy available rewards
-        readRequests[3] = EVMCallRequestV1({
-            appRequestLabel: uint16(0),
-            targetEid: uint32(lzChainId),
-            isBlockNum: false,
-            blockNumOrTimestamp: uint64(block.timestamp),
-            confirmations: 15,
-            to: stakingProxy,
-            callData: abi.encodeCall(IStakingProxy.availableRewards, ())
+            callData: abi.encodeCall(IStakingProxy.getStakingInfo, (stakingProxy))
         });
 
         return ReadCodecV1.encode(0, readRequests);
@@ -227,7 +202,7 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
             revert StakingModelAlreadyExists(stakingModelId);
         }
 
-        AccountChainIdMsgType memory accountChainId = mapStakingFactoryLzChainIds[chainId];
+        AccountChainIdMsgType memory accountChainId = mapStakingHelperLzChainIds[chainId];
         bytes memory payload = _getCmdCreateAndActivateStakingModel(stakingProxy, accountChainId.account,
             accountChainId.chainId);
 
@@ -249,13 +224,13 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
         emit LzCreateAndActivateStakingModelInitiated(receipt.guid, chainId, stakingProxy);
     }
 
-    function setChainIdStakingFactoryLzChainIds(
+    function setChainIdStakingHelperLzChainIds(
         uint256[] memory chainIds,
-        address[] memory stakingFactories,
+        address[] memory stakingHelpers,
         uint256[] memory lzChainIds
     ) public onlyOwner {
         // Check for array length correctness
-        if (chainIds.length == 0 || chainIds.length != stakingFactories.length || chainIds.length != lzChainIds.length) {
+        if (chainIds.length == 0 || chainIds.length != stakingHelpers.length || chainIds.length != lzChainIds.length) {
             revert WrongArrayLength();
         }
 
@@ -266,11 +241,11 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
             }
 
             // Check for zero address
-            if (stakingFactories[i] == address(0)) {
+            if (stakingHelpers[i] == address(0)) {
                 revert ZeroAddress();
             }
 
-            mapStakingFactoryLzChainIds[chainIds[i]] = AccountChainIdMsgType(stakingFactories[i], uint32(lzChainIds[i]), 0);
+            mapStakingHelperLzChainIds[chainIds[i]] = AccountChainIdMsgType(stakingHelpers[i], uint32(lzChainIds[i]), 0);
         }
     }
 }
