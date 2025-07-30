@@ -2,7 +2,6 @@
 pragma solidity ^0.8.30;
 
 import {ERC20, ERC4626, FixedPointMathLib} from  "../../lib/solmate/src/tokens/ERC4626.sol";
-import {IToken} from "../l2/ActivityModule.sol";
 
 /// @dev Only `owner` has a privilege, but the `sender` was provided.
 /// @param sender Sender address.

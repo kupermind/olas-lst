@@ -9,6 +9,7 @@ const main = async () => {
     let st;
     let lock;
     let distributor;
+    let unstakeRelayer;
     let depository;
     let treasury;
     let gnosisDepositProcessorL1;
@@ -142,6 +143,42 @@ const main = async () => {
     console.log("Distributor Proxy address:", distributorProxy.address);
     fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
     distributor = await ethers.getContractAt("Distributor", parsedData.distributorProxyAddress);
+
+    // Deploy UnstakeRelayer
+    console.log("Deploying UnstakeRelayer");
+    const UnstakeRelayer = await ethers.getContractFactory("UnstakeRelayer");
+    unstakeRelayer = await UnstakeRelayer.deploy(parsedData.olasAddress, parsedData.stOLASAddress);
+    await unstakeRelayer.deployed();
+
+    // Wait for half a minute for the transaction completion
+    await new Promise(r => setTimeout(r, 30000));
+
+    await hre.run("verify:verify", {
+        address: unstakeRelayer.address,
+        constructorArguments: [parsedData.olasAddress, parsedData.stOLASAddress],
+    });
+    parsedData.unstakeRelayerAddress = unstakeRelayer.address;
+    console.log("UnstakeRelayer address:", unstakeRelayer.address);
+    fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
+
+    // Deploy UnstakeRelayer Proxy
+    console.log("Deploying UnstakeRelayer Proxy");
+    const UnstakeRelayerProxy = await ethers.getContractFactory("Proxy");
+    initPayload = unstakeRelayer.interface.encodeFunctionData("initialize", []);
+    const unstakeRelayerProxy = await UnstakeRelayerProxy.deploy(parsedData.unstakeRelayerAddress, initPayload);
+    await unstakeRelayerProxy.deployed();
+
+    // Wait for half a minute for the transaction completion
+    await new Promise(r => setTimeout(r, 30000));
+
+    await hre.run("verify:verify", {
+        address: unstakeRelayerProxy.address,
+        constructorArguments: [unstakeRelayer.address, initPayload],
+    });
+    parsedData.unstakeRelayerProxyAddress = unstakeRelayerProxy.address;
+    console.log("UnstakeRelayer Proxy address:", unstakeRelayerProxy.address);
+    fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
+    unstakeRelayer = await ethers.getContractAt("UnstakeRelayer", parsedData.unstakeRelayerProxyAddress);
 
     // Deploy Depository
     console.log("Deploying Depository");
