@@ -92,9 +92,9 @@ contract Depository is Implementation {
     event TreasuryUpdated(address indexed treasury);
     event LzOracleUpdated(address indexed lzOracle);
     event SetDepositProcessorChainIds(address[] depositProcessors, uint256[] chainIds);
-    event StakingModelActivated(uint256 indexed chainId, address indexed stakingProxies, uint256 stakeLimitPerSlots,
+    event StakingModelActivated(uint256 indexed chainId, address indexed stakingProxy, uint256 stakeLimitPerSlots,
         uint256 numSlots);
-    event ChangeModelStatuses(uint256[] chainIds, address[] stakingProxies, StakingModelStatus[] statuses);
+    event StakingModelStatusSet(uint256 indexed chainId, address indexed stakingProxy, StakingModelStatus status);
     event Deposit(address indexed sender, uint256 stakeAmount, uint256 stAmount, uint256[] chainIds,
         address[] stakingProxies, uint256[] amounts);
     event Unstake(address indexed sender, uint256 unstakeAmount, uint256[] chainIds, address[] stakingProxies,
@@ -193,6 +193,27 @@ contract Depository is Implementation {
         setStakingModelIds.push(stakingModelId);
 
         emit StakingModelActivated(chainId, stakingProxy, stakeLimitPerSlot, numSlots);
+    }
+
+    /// @dev Sets staking model status.
+    /// @param chainId Chain Id.
+    /// @param stakingProxy Corresponding staking proxy address.
+    /// @param status Corresponding staking model status.
+    function _setStakingModelStatus(uint256 chainId, address stakingProxy, StakingModelStatus status) internal {
+        // Get staking model Id
+        // Push a pair of key defining variables into one key: chainId | stakingProxy
+        // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
+        uint256 stakingModelId = uint256(uint160(stakingProxy));
+        stakingModelId |= chainId << 160;
+
+        // Check for staking model existence
+        if (mapStakingModels[stakingModelId].supply == 0) {
+            revert WrongStakingModel(stakingModelId);
+        }
+
+        mapStakingModels[stakingModelId].status = status;
+
+        emit StakingModelStatusSet(chainId, stakingProxy, status);
     }
 
     function _operationSendMessage(
@@ -346,7 +367,19 @@ contract Depository is Implementation {
 
         // Create and activate staking model
         _createAndActivateStakingModel(chainId, stakingProxy, stakeLimitPerSlot, numSlots);
-}
+    }
+
+    /// @dev Closes staking model via lzRead proofs.
+    /// @param chainId Chain Id.
+    /// @param stakingProxy Corresponding staking proxy address.
+    function LzCloseStakingModel(uint256 chainId, address stakingProxy) external {
+        if (msg.sender != lzOracle) {
+            revert UnauthorizedAccount(msg.sender);
+        }
+
+        // Retire staking model
+        _setStakingModelStatus(chainId, stakingProxy, StakingModelStatus.Retired);
+    }
 
     // TODO Deactivate staking models for good via proofs
     // TODO Staking models must not retire if availableRewards are not zero
@@ -373,21 +406,8 @@ contract Depository is Implementation {
 
         // Traverse staking models and statuses
         for (uint256 i = 0; i < chainIds.length; ++i) {
-            // Get staking model Id
-            // Push a pair of key defining variables into one key: chainId | stakingProxy
-            // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
-            uint256 stakingModelId = uint256(uint160(stakingProxies[i]));
-            stakingModelId |= chainIds[i] << 160;
-
-            // Check for staking model existence
-            if (mapStakingModels[stakingModelId].supply == 0) {
-                revert WrongStakingModel(stakingModelId);
-            }
-
-            mapStakingModels[stakingModelId].status = statuses[i];
+            _setStakingModelStatus(chainIds[i], stakingProxies[i], statuses[i]);
         }
-
-        emit ChangeModelStatuses(chainIds, stakingProxies, statuses);
     }
 
     /// @dev Calculates amounts and initiates cross-chain stake request for specified models.

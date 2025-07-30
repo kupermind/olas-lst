@@ -8,9 +8,9 @@ import { OAppOptionsType3, EnforcedOptionParam } from "@layerzerolabs/oapp-evm/c
 import { ReadCodecV1, EVMCallRequestV1 } from "@layerzerolabs/oapp-evm/contracts/oapp/libs/ReadCodecV1.sol";
 import { OAppRead } from "@layerzerolabs/oapp-evm/contracts/oapp/OAppRead.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-import {StakingModel} from "../Depository.sol";
+import {StakingModel, StakingModelAlreadyExists, WrongArrayLength, WrongStakingModel, ZeroAddress, ZeroValue} from "../Depository.sol";
 
-interface IStakingProxy {
+interface IStakingHelper {
     /// @dev Gets stakingProxy info.
     /// @param stakingProxy Staking proxy address.
     /// @return isEnabled Staking proxy status flag.
@@ -20,7 +20,9 @@ interface IStakingProxy {
     /// @return bytecodeHash Staking proxy bytecode hash.
     function getStakingInfo(address stakingProxy) external view returns (bool isEnabled, uint256 maxNumSlots,
         uint256 minStakingDeposit, uint256 availableRewards, bytes32 bytecodeHash);
+}
 
+interface IStakingProxy {
     /// @dev Gets token rewards.
     function availableRewards() external view returns (uint256);
 }
@@ -37,20 +39,12 @@ interface IDepository {
     /// @param numSlots Corresponding number of staking slots.
     function LzCreateAndActivateStakingModel(uint256 chainId, address stakingProxy, uint256 stakeLimitPerSlot,
         uint256 numSlots) external;
+
+    /// @dev Closes staking model via lzRead proofs.
+    /// @param chainId Chain Id.
+    /// @param stakingProxy Corresponding staking proxy address.
+    function LzCloseStakingModel(uint256 chainId, address stakingProxy) external;
 }
-
-/// @dev Zero address.
-error ZeroAddress();
-
-/// @dev Zero value.
-error ZeroValue();
-
-/// @dev Wrong length of arrays.
-error WrongArrayLength();
-
-/// @dev Staking model already exists.
-/// @param stakingModelId Staking model Id.
-error StakingModelAlreadyExists(uint256 stakingModelId);
 
 struct AccountChainIdMsgType {
     address account;
@@ -63,7 +57,9 @@ struct AccountChainIdMsgType {
 contract LzOracle is OAppRead, OAppOptionsType3 {
     event LzCreateAndActivateStakingModelProcessed(bytes32 indexed guid, uint256 chainId, address indexed stakingProxy,
         uint256 stakeLimitPerSlot, uint256 maxNumServices);
+    event LzCloseStakingModelProcessed(bytes32 indexed guid, uint256 chainId, address indexed stakingProxy);
     event LzCreateAndActivateStakingModelInitiated(bytes32 indexed guid, uint256 chainId, address indexed stakingProxy);
+    event LzCloseStakingModelInitiated(bytes32 indexed guid, uint256 chainId, address indexed stakingProxy);
 
     /// lzRead responses are sent from arbitrary channels with Endpoint IDs in the range of
     /// `eid > 4294965694` (which is `type(uint32).max - 1600`).
@@ -154,21 +150,23 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
                 revert ();
             }
 
-            // TODO emit
+            IDepository(depository).LzCloseStakingModel(accountChainIdMsgType.chainId, accountChainIdMsgType.account);
+
+            emit LzCloseStakingModelProcessed(guid, accountChainIdMsgType.chainId, accountChainIdMsgType.account);
         } else {
             // This must never happen
             revert();
         }
     }
 
-    /// @dev Constructs a command to query stakingProxy info on a specified chain Id.
+    /// @dev Constructs a command to query stakingHelper to fetch stakingProxy info on a specified chain Id.
     /// @param stakingProxy Staking proxy address.
-    /// @param stakingFactory Staking factory address.
+    /// @param stakingHelper Staking helper address.
     /// @param lzChainId Chain Id in LZ format.
     /// @return Encoded lzRead request.
-    function _getCmdCreateAndActivateStakingModel(
+    function _cmdGetStakingInfo(
         address stakingProxy,
-        address stakingFactory,
+        address stakingHelper,
         uint256 lzChainId
     ) internal view returns (bytes memory) {
         // Allocate required number of read requests
@@ -181,8 +179,30 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
             isBlockNum: false,
             blockNumOrTimestamp: uint64(block.timestamp),
             confirmations: 15,
-            to: stakingFactory,
-            callData: abi.encodeCall(IStakingProxy.getStakingInfo, (stakingProxy))
+            to: stakingHelper,
+            callData: abi.encodeCall(IStakingHelper.getStakingInfo, (stakingProxy))
+        });
+
+        return ReadCodecV1.encode(0, readRequests);
+    }
+
+    /// @dev Constructs a command to query stakingProxy available rewards on a specified chain Id.
+    /// @param stakingProxy Staking proxy address.
+    /// @param lzChainId Chain Id in LZ format.
+    /// @return Encoded lzRead request.
+    function _cmdGetAvailableRewards(address stakingProxy, uint256 lzChainId) internal view returns (bytes memory) {
+        // Allocate required number of read requests
+        EVMCallRequestV1[] memory readRequests = new EVMCallRequestV1[](1);
+
+        // Get stakingProxy info
+        readRequests[0] = EVMCallRequestV1({
+            appRequestLabel: uint16(0),
+            targetEid: uint32(lzChainId),
+            isBlockNum: false,
+            blockNumOrTimestamp: uint64(block.timestamp),
+            confirmations: 15,
+            to: stakingProxy,
+            callData: abi.encodeCall(IStakingProxy.availableRewards, ())
         });
 
         return ReadCodecV1.encode(0, readRequests);
@@ -197,14 +217,13 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
         // Get staking model struct
         StakingModel memory stakingModel = IDepository(depository).mapStakingModels(stakingModelId);
 
-        // Check for existing staking model
+        // Check for existing staking model: supply must be zero as the model does not exist
         if (stakingModel.supply > 0) {
             revert StakingModelAlreadyExists(stakingModelId);
         }
 
         AccountChainIdMsgType memory accountChainId = mapStakingHelperLzChainIds[chainId];
-        bytes memory payload = _getCmdCreateAndActivateStakingModel(stakingProxy, accountChainId.account,
-            accountChainId.chainId);
+        bytes memory payload = _cmdGetStakingInfo(stakingProxy, accountChainId.account, accountChainId.chainId);
 
         // TODO Figure out the correct quote check
         MessagingFee memory fee = _quote(READ_CHANNEL, payload, options, false);
@@ -222,6 +241,41 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
         mapUidStakingProxyChainIds[receipt.guid] = AccountChainIdMsgType(stakingProxy, uint32(chainId), READ_TYPE_CREATE);
 
         emit LzCreateAndActivateStakingModelInitiated(receipt.guid, chainId, stakingProxy);
+    }
+
+    function lzCloseStakingModel(uint256 chainId, address stakingProxy, bytes calldata options) external payable {
+        // Push a pair of key defining variables into one key: chainId | stakingProxy
+        // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
+        uint256 stakingModelId = uint256(uint160(stakingProxy));
+        stakingModelId |= chainId << 160;
+
+        // Get staking model struct
+        StakingModel memory stakingModel = IDepository(depository).mapStakingModels(stakingModelId);
+
+        // Check for existing staking model: supply must be non-zero
+        if (stakingModel.supply == 0) {
+            revert WrongStakingModel(stakingModelId);
+        }
+
+        AccountChainIdMsgType memory accountChainId = mapStakingHelperLzChainIds[chainId];
+        bytes memory payload = _cmdGetAvailableRewards(stakingProxy, accountChainId.chainId);
+
+        // TODO Figure out the correct quote check
+        MessagingFee memory fee = _quote(READ_CHANNEL, payload, options, false);
+        require(msg.value >= fee.nativeFee);
+
+        MessagingReceipt memory receipt =
+            _lzSend(
+                READ_CHANNEL,
+                payload,
+                combineOptions(READ_CHANNEL, READ_TYPE_CLOSE, options),
+                MessagingFee(msg.value, 0),
+                payable(tx.origin)
+            );
+
+        mapUidStakingProxyChainIds[receipt.guid] = AccountChainIdMsgType(stakingProxy, uint32(chainId), READ_TYPE_CLOSE);
+
+        emit LzCloseStakingModelInitiated(receipt.guid, chainId, stakingProxy);
     }
 
     function setChainIdStakingHelperLzChainIds(
