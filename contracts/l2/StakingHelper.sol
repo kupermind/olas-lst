@@ -20,16 +20,6 @@ interface IStakingProxy {
 /// @dev Zero address.
 error ZeroAddress();
 
-/// @dev Zero value.
-error ZeroValue();
-
-/// @dev Wrong length of arrays.
-error WrongArrayLength();
-
-/// @dev Staking model already exists.
-/// @param stakingModelId Staking model Id.
-error StakingModelAlreadyExists(uint256 stakingModelId);
-
 
 /// @title StakingHelper - Smart contract for helper functions about staking contracts.
 contract StakingHelper {
