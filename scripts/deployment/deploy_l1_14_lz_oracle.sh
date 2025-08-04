@@ -31,10 +31,11 @@ derivationPath=$(jq -r '.derivationPath' $globals)
 chainId=$(jq -r '.chainId' $globals)
 networkURL=$(jq -r '.networkURL' $globals)
 
-olasAddress=$(jq -r '.olasAddress' $globals)
-depositoryProxyAddress=$(jq -r '.depositoryProxyAddress' $globals)
-gnosisOmniBridgeAddress=$(jq -r '.gnosisOmniBridgeAddress' $globals)
-gnosisAMBForeignAddress=$(jq -r '.gnosisAMBForeignAddress' $globals)
+endpointAddress=$(jq -r '.endpointAddress' $globals)
+stakingProxyBytecodeHash=$(jq -r '.stakingProxyBytecodeHash' $globals)
+chainIds=$(jq -r '.chainIds' $globals)
+stakingHelpers=$(jq -r '.stakingHelpers' $globals)
+lzChainIds=$(jq -r '.lzChainIds' $globals)
 
 # Getting L1 API key
 if [ $chainId == 1 ]; then
@@ -51,9 +52,9 @@ elif [ $chainId == 11155111 ]; then
     fi
 fi
 
-contractName="GnosisDepositProcessorL1"
+contractName="LzOracle"
 contractPath="contracts/l1/bridging/$contractName.sol:$contractName"
-constructorArgs="$olasAddress $depositoryProxyAddress $gnosisOmniBridgeAddress $gnosisAMBForeignAddress"
+constructorArgs="$endpointAddress $stakingProxyBytecodeHash $chainIds $stakingHelpers $lzChainIds"
 contractArgs="$contractPath --constructor-args $constructorArgs"
 
 # Get deployer based on the ledger flag
@@ -74,10 +75,10 @@ echo "${green}Deployment of: $contractArgs${reset}"
 # Deploy the contract and capture the address
 execCmd="forge create --broadcast --rpc-url $networkURL$API_KEY $walletArgs $contractArgs"
 deploymentOutput=$($execCmd)
-gnosisDepositProcessorL1Address=$(echo "$deploymentOutput" | grep 'Deployed to:' | awk '{print $3}')
+lzOracleAddress=$(echo "$deploymentOutput" | grep 'Deployed to:' | awk '{print $3}')
 
 # Get output length
-outputLength=${#gnosisDepositProcessorL1Address}
+outputLength=${#lzOracleAddress}
 
 # Check for the deployed address
 if [ $outputLength != 42 ]; then
@@ -87,11 +88,11 @@ fi
 
 
 # Write new deployed contract back into deployment file
-echo "$(jq '. += {"gnosisDepositProcessorL1Address":"'$gnosisDepositProcessorL1Address'"}' $globals)" > $globals
+echo "$(jq '. += {"lzOracleAddress":"'$lzOracleAddress'"}' $globals)" > $globals
 
 # Verify contract
 if [ "$contractVerification" == "true" ]; then
-  contractParams="$gnosisDepositProcessorL1Address $contractPath --constructor-args $(cast abi-encode "constructor(address,address,address,address)" $constructorArgs)"
+  contractParams="$lzOracleAddress $contractPath --constructor-args $(cast abi-encode "constructor(address,bytes32,uint256[],address[],uint256[])" $constructorArgs)"
   echo "Verification contract params: $contractParams"
 
   echo "${green}Verifying contract on Etherscan...${reset}"
@@ -104,4 +105,4 @@ if [ "$contractVerification" == "true" ]; then
   fi
 fi
 
-echo "${green}$contractName deployed at: $gnosisDepositProcessorL1Address${reset}"
+echo "${green}$contractName deployed at: $lzOracleAddress${reset}"

@@ -53,7 +53,7 @@ elif [ $chainId == 11155111 ]; then
 fi
 
 contractName="BaseDepositProcessorL1"
-contractPath="contracts/l1/$contractName.sol:$contractName"
+contractPath="contracts/l1/bridging/$contractName.sol:$contractName"
 constructorArgs="$olasAddress $depositoryProxyAddress $baseL1StandardBridgeProxyAddress $baseL1CrossDomainMessengerProxyAddress $baseOLASAddress"
 contractArgs="$contractPath --constructor-args $constructorArgs"
 
@@ -92,7 +92,7 @@ echo "$(jq '. += {"baseDepositProcessorL1Address":"'$baseDepositProcessorL1Addre
 
 # Verify contract
 if [ "$contractVerification" == "true" ]; then
-  contractParams="$baseDepositProcessorL1Address $contractPath --constructor-args $(cast abi-encode "constructor(address,address,address,address)" $constructorArgs)"
+  contractParams="$baseDepositProcessorL1Address $contractPath --constructor-args $(cast abi-encode "constructor(address,address,address,address,address)" $constructorArgs)"
   echo "Verification contract params: $contractParams"
 
   echo "${green}Verifying contract on Etherscan...${reset}"
