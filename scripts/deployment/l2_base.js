@@ -100,7 +100,8 @@ const main = async () => {
     // Deploy ActivityModule
     console.log("Deploying ActivityModule");
     const ActivityModule = await ethers.getContractFactory("ActivityModule");
-    activityModule = await ActivityModule.deploy(parsedData.olasAddress, parsedData.collectorProxyAddress);
+    activityModule = await ActivityModule.deploy(parsedData.olasAddress, parsedData.collectorProxyAddress,
+        parsedData.multiSendCallOnlyAddress);
     await activityModule.deployed();
 
     // Wait for half a minute for the transaction completion
@@ -112,7 +113,7 @@ const main = async () => {
 
     await hre.run("verify:verify", {
         address: parsedData.activityModuleAddress,
-        constructorArguments: [parsedData.olasAddress, parsedData.collectorProxyAddress],
+        constructorArguments: [parsedData.olasAddress, parsedData.collectorProxyAddress, parsedData.multiSendCallOnlyAddress],
     });
 
     // Deploy Beacon
