@@ -51,7 +51,7 @@ elif [ $chainId == 11155111 ]; then
 fi
 
 contractName="Proxy"
-contractPath="contracts/l1/$contractName.sol:$contractName"
+contractPath="contracts/$contractName.sol:$contractName"
 constructorArgs="$distributorAddress $proxyData"
 contractArgs="$contractPath --constructor-args $constructorArgs"
 
