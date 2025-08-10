@@ -81,6 +81,12 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
     // Mapping of Guid => (stakingProxy address, EVM chainId, msg type)
     mapping(bytes32 => AccountChainIdMsgType) public mapUidStakingProxyChainIds;
 
+    /// @dev LzOracle constructor.
+    /// @param _endpoint LZ endpoint address.
+    /// @param _stakingProxyBytecodeHash Staking proxy contract bytecode hash.
+    /// @param _chainIds supported EVM chain Ids.
+    /// @param _stakingHelpers Corresponding staking helper addresses.
+    /// @param _lzChainIds Corresponding LZ format chain Ids.
     constructor(
         address _endpoint,
         bytes32 _stakingProxyBytecodeHash,
@@ -98,12 +104,6 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
 
         setChainIdStakingHelperLzChainIds(_chainIds, _stakingHelpers, _lzChainIds);
     }
-
-//    /// @notice Thanks for making it virtual :).
-//    function _payNative(uint256 _nativeFee) internal override returns (uint256 nativeFee) {
-//        require(msg.value >= _nativeFee, "NotEnoughNative");
-//        return _nativeFee;
-//    }
 
     /// @notice Internal function to handle message responses.
     /// @dev origin The origin information.
@@ -208,6 +208,10 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
         return ReadCodecV1.encode(0, readRequests);
     }
 
+    /// @dev Creates and activates staking model via LzRead.
+    /// @param chainId EVM chain Id.
+    /// @param stakingProxy Staking proxy address.
+    /// @param options LZ message options.
     function lzCreateAndActivateStakingModel(uint256 chainId, address stakingProxy, bytes calldata options) external payable {
         // Push a pair of key defining variables into one key: chainId | stakingProxy
         // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
@@ -243,6 +247,10 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
         emit LzCreateAndActivateStakingModelInitiated(receipt.guid, chainId, stakingProxy);
     }
 
+    /// @dev Closes staking model via LzRead.
+    /// @param chainId EVM chain Id.
+    /// @param stakingProxy Staking proxy address.
+    /// @param options LZ message options.
     function lzCloseStakingModel(uint256 chainId, address stakingProxy, bytes calldata options) external payable {
         // Push a pair of key defining variables into one key: chainId | stakingProxy
         // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
@@ -278,6 +286,10 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
         emit LzCloseStakingModelInitiated(receipt.guid, chainId, stakingProxy);
     }
 
+    /// @dev Sets correspondence between EVM chain Id, staking helper addresses and LZ format chain Ids.
+    /// @param chainIds supported EVM chain Ids.
+    /// @param stakingHelpers Corresponding staking helper addresses.
+    /// @param lzChainIds Corresponding LZ format chain Ids.
     function setChainIdStakingHelperLzChainIds(
         uint256[] memory chainIds,
         address[] memory stakingHelpers,

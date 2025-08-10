@@ -216,6 +216,13 @@ contract Depository is Implementation {
         emit StakingModelStatusSet(chainId, stakingProxy, status);
     }
 
+    /// @dev Sends message according to the required operation: stake, unstake, etc.
+    /// @param chainIds Set of chain Ids with staking proxies.
+    /// @param stakingProxies Set of staking proxies corresponding to each chain Id.
+    /// @param amounts Corresponding OLAS amounts for each staking proxy.
+    /// @param bridgePayloads Bridge payloads corresponding to each chain Id.
+    /// @param values Value amounts for each bridge interaction, if applicable.
+    /// @param operation Operation type.
     function _operationSendMessage(
         uint256[] memory chainIds,
         address[] memory stakingProxies,
@@ -381,8 +388,6 @@ contract Depository is Implementation {
         _setStakingModelStatus(chainId, stakingProxy, StakingModelStatus.Retired);
     }
 
-    // TODO Deactivate staking models for good via proofs
-    // TODO Staking models must not retire if availableRewards are not zero
     /// @dev Sets existing staking model statuses.
     /// @notice If the model is inactive, it does not mean that it must be unstaked right away as it might continue
     ///         working and accumulating rewards until fully depleted. Then it must be retired and unstaked.

@@ -24,4 +24,5 @@ exclude_lints = [
     "erc20-unchecked-transfer",
     "mixed-case-function",
     "screaming-snake-case-immutable",
+    "unwrapped-modifier-logic",
 ]
