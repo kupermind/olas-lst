@@ -28,5 +28,10 @@
   "gnosisDepositProcessorL1Address": "0xDa98ee3c84ACA13f32c8BA43eD4b3a818F8019af",
   "baseDepositProcessorL1Address": "0xD22737aF009CD0C0cfC50E7b3FcD985e2Cc1F5dA",
   "gnosisStakingProcessorL2Address": "",
-  "baseStakingProcessorL2Address": "0xA126bf628f1fa7B922D0681733CbCE9236ca44Af"
+  "baseStakingProcessorL2Address": "0xA126bf628f1fa7B922D0681733CbCE9236ca44Af",
+  "endpointAddress": "0x6EDCE65403992e310A62460808c4b910D972f10f",
+  "stakingProxyBytecodeHash": "0xc1af47b3f066ea29bb6c97a0832f4b32d773e7b7f0f8819061414ce798932f44",
+  "chainIds": ["8453"],
+  "stakingHelpers": ["0xf8a415d761b1279B0f1ACE68cD85e5ca4346Cc3F"],
+  "lzChainIds": ["40245"]
 }
