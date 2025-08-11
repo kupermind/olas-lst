@@ -13,13 +13,13 @@ import {StakingModel, StakingModelAlreadyExists, WrongArrayLength, WrongStakingM
 interface IStakingHelper {
     /// @dev Gets stakingProxy info.
     /// @param stakingProxy Staking proxy address.
+    /// @return bytecodeHash Staking proxy implementation bytecode hash.
     /// @return isEnabled Staking proxy status flag.
     /// @return maxNumSlots Max number of slots in staking proxy.
     /// @return minStakingDeposit Minimum deposit value required for service staking.
     /// @return availableRewards Staking proxy available rewards.
-    /// @return bytecodeHash Staking proxy bytecode hash.
-    function getStakingInfo(address stakingProxy) external view returns (bool isEnabled, uint256 maxNumSlots,
-        uint256 minStakingDeposit, uint256 availableRewards, bytes32 bytecodeHash);
+    function getStakingInfo(address stakingProxy) external view returns (bytes32 bytecodeHash, bool isEnabled,
+        uint256 maxNumSlots,uint256 minStakingDeposit, uint256 availableRewards);
 }
 
 interface IStakingProxy {
@@ -71,8 +71,8 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
     // Message type for read close operation
     uint16 public constant READ_TYPE_CLOSE = 2;
 
-    // Staking proxy bytecode hash
-    bytes32 public immutable stakingProxyBytecodeHash;
+    // Staking implementation bytecode hash
+    bytes32 public immutable stakingImplementationBytecodeHash;
     // Depository address
     address public immutable depository;
 
@@ -83,25 +83,26 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
 
     /// @dev LzOracle constructor.
     /// @param _endpoint LZ endpoint address.
-    /// @param _stakingProxyBytecodeHash Staking proxy contract bytecode hash.
+    /// @param _stakingImplementationBytecodeHash Staking implementation contract bytecode hash.
     /// @param _chainIds supported EVM chain Ids.
     /// @param _stakingHelpers Corresponding staking helper addresses.
     /// @param _lzChainIds Corresponding LZ format chain Ids.
     constructor(
         address _endpoint,
-        bytes32 _stakingProxyBytecodeHash,
+        bytes32 _stakingImplementationBytecodeHash,
         uint256[] memory _chainIds,
         address[] memory _stakingHelpers,
         uint256[] memory _lzChainIds
     )
         OAppRead(_endpoint, msg.sender) Ownable(msg.sender)
     {
-        if (_stakingProxyBytecodeHash == 0) {
+        if (_stakingImplementationBytecodeHash == 0) {
             revert ZeroValue();
         }
 
-        stakingProxyBytecodeHash = _stakingProxyBytecodeHash;
+        stakingImplementationBytecodeHash = _stakingImplementationBytecodeHash;
 
+        // Set chain Ids and corresponding staking helpers
         setChainIdStakingHelperLzChainIds(_chainIds, _stakingHelpers, _lzChainIds);
     }
 
@@ -126,11 +127,11 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
         // Check for message type
         if (accountChainIdMsgType.msgType == READ_TYPE_CREATE) {
             // Decode obtained data
-            (bool isEnabled, uint256 maxNumServices, uint256 minStakingDeposit, uint256 availableRewards,
-                bytes32 bytecodeHash) = abi.decode(message, (bool, uint256, uint256, uint256, bytes32));
+            (bytes32 bytecodeHash, bool isEnabled, uint256 maxNumServices, uint256 minStakingDeposit,
+                uint256 availableRewards) = abi.decode(message, (bytes32, bool, uint256, uint256, uint256));
 
             // Check for correctness of parameters
-            if (!isEnabled || availableRewards == 0 || bytecodeHash != stakingProxyBytecodeHash) {
+            if (!isEnabled || availableRewards == 0 || bytecodeHash != stakingImplementationBytecodeHash) {
                 revert ();
             }
 

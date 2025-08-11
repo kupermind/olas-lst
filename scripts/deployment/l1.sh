@@ -45,3 +45,9 @@
 
 # Change LzOracle address in Depository
 ./scripts/deployment/script_l1_02_change_lz_oracle.sh $1
+
+# Set StakingProcessorL2 in DepositProcessorL1
+#./scripts/deployment/script_l1_03_set_l2_staking_processor.sh $1 $2
+
+# Set DepositProcessorL1-s and corresponding chainIds
+#./scripts/deployment/script_l1_04_set_deposit_processor_chain_ids.sh $1 $2 $3

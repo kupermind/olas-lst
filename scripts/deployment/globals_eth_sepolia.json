@@ -29,12 +29,12 @@
   "treasuryProxyAddress": "0xa02A7AB26e7FC659799c3C52C7eC28d236df1A31",
   "gnosisDepositProcessorL1Address": "0x8Dc50a2EeCf517c453bcb5C879870E9FC16C1e4D",
   "baseDepositProcessorL1Address": "0xD88FDd4491Dc9933C3306bb27c410394e07BC1a2",
-  "gnosisStakingProcessorL2Address": "",
-  "baseStakingProcessorL2Address": "0xA126bf628f1fa7B922D0681733CbCE9236ca44Af",
+  "gnosisStakingProcessorL2Address": "0xa4f06F1A180bAcA12e41eef283BD48659530d309",
+  "baseStakingProcessorL2Address": "",
   "endpointAddress": "0x6EDCE65403992e310A62460808c4b910D972f10f",
-  "stakingProxyBytecodeHash": "0xc1af47b3f066ea29bb6c97a0832f4b32d773e7b7f0f8819061414ce798932f44",
+  "stakingImplementationBytecodeHash": "0xc1af47b3f066ea29bb6c97a0832f4b32d773e7b7f0f8819061414ce798932f44",
   "chainIds": "[8453]",
   "stakingHelpers": "[0xf8a415d761b1279B0f1ACE68cD85e5ca4346Cc3F]",
   "lzChainIds": "[40245]",
-  "lzOracleAddress": "0x29b0B403031b324E079C71FA04DCaD4bEB5ce014"
+  "lzOracleAddress": "0xa51015a36E60eD0FA9128FbB7F3bf653123A2Ce0"
 }

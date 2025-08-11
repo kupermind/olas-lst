@@ -3,7 +3,7 @@
 # Check if $1 is provided
 if [ -z "$1" ]; then
   echo "Usage: $0 <network>"
-  echo "Example: $0 ethereum_mainnet"
+  echo "Example: $0 eth_mainnet"
   exit 1
 fi
 
@@ -32,7 +32,7 @@ chainId=$(jq -r '.chainId' $globals)
 networkURL=$(jq -r '.networkURL' $globals)
 
 endpointAddress=$(jq -r '.endpointAddress' $globals)
-stakingProxyBytecodeHash=$(jq -r '.stakingProxyBytecodeHash' $globals)
+stakingImplementationBytecodeHash=$(jq -r '.stakingImplementationBytecodeHash' $globals)
 chainIds=$(jq -r '.chainIds' $globals)
 stakingHelpers=$(jq -r '.stakingHelpers' $globals)
 lzChainIds=$(jq -r '.lzChainIds' $globals)
@@ -54,7 +54,7 @@ fi
 
 contractName="LzOracle"
 contractPath="contracts/l1/bridging/$contractName.sol:$contractName"
-constructorArgs="$endpointAddress $stakingProxyBytecodeHash $chainIds $stakingHelpers $lzChainIds"
+constructorArgs="$endpointAddress $stakingImplementationBytecodeHash $chainIds $stakingHelpers $lzChainIds"
 contractArgs="$contractPath --constructor-args $constructorArgs"
 
 # Get deployer based on the ledger flag

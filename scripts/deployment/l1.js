@@ -25,7 +25,7 @@ const main = async () => {
     const maxNumServices = 100;
     const stakingSupply = fullStakeDeposit.mul(ethers.BigNumber.from(maxNumServices));
 
-    const globalsFile = "scripts/deployment/globals_ethereum_sepolia.json";
+    const globalsFile = "scripts/deployment/globals_eth_sepolia.json";
     const dataFromJSON = fs.readFileSync(globalsFile, "utf8");
     let parsedData = JSON.parse(dataFromJSON);
 

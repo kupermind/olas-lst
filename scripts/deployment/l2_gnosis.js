@@ -39,7 +39,7 @@ const main = async () => {
         stakingManager: AddressZero,
         activityChecker: AddressZero
     };
-    const gnosisChainId = 100;
+    const chainId = 1;
     const fullStakeDeposit = regDeposit.mul(2);
     const stakingSupply = fullStakeDeposit.mul(ethers.BigNumber.from(maxNumServices));
 
@@ -62,7 +62,7 @@ const main = async () => {
     // Deploy Collector
     console.log("Deploying Collector");
     const Collector = await ethers.getContractFactory("Collector");
-    collector = await Collector.deploy(parsedData.olasAddress, parsedData.distributorAddress);
+    collector = await Collector.deploy(parsedData.olasAddress);
     await collector.deployed();
 
     // Wait for half a minute for the transaction completion
@@ -70,7 +70,7 @@ const main = async () => {
 
     await hre.run("verify:verify", {
         address: collector.address,
-        constructorArguments: [parsedData.olasAddress, parsedData.distributorAddress],
+        constructorArguments: [parsedData.olasAddress],
     });
     parsedData.collectorAddress = collector.address;
     console.log("Collector address:", collector.address);
@@ -133,9 +133,9 @@ const main = async () => {
     // Deploy StakingManager
     console.log("Deploying StakingManager");
     const StakingManager = await ethers.getContractFactory("StakingManager");
-    stakingManager = await StakingManager.deploy(parsedData.olasAddress, parsedData.treasuryProxyAddress,
-        parsedData.serviceManagerTokenAddress, parsedData.stakingFactoryAddress, parsedData.safeToL2SetupAddress,
-        parsedData.gnosisSafeL2Address, parsedData.beaconAddress, parsedData.collectorProxyAddress, agentId, defaultHash);
+    stakingManager = await StakingManager.deploy(parsedData.olasAddress, parsedData.serviceManagerTokenAddress,
+        parsedData.stakingFactoryAddress, parsedData.safeToL2SetupAddress, parsedData.gnosisSafeL2Address,
+        parsedData.beaconAddress, parsedData.collectorProxyAddress, agentId, defaultHash);
     await stakingManager.deployed();
 
     // Wait for half a minute for the transaction completion
@@ -182,7 +182,7 @@ const main = async () => {
     const GnosisStakingProcessorL2 = await ethers.getContractFactory("GnosisStakingProcessorL2");
     gnosisStakingProcessorL2 = await GnosisStakingProcessorL2.deploy(parsedData.olasAddress,
         parsedData.stakingManagerProxyAddress, parsedData.gnosisOmniBridgeAddress, parsedData.gnosisAMBHomeAddress,
-        parsedData.gnosisDepositProcessorL1Address, gnosisChainId);
+        parsedData.gnosisDepositProcessorL1Address, chainId);
     await gnosisStakingProcessorL2.deployed();
 
     // Wait for half a minute for the transaction completion
@@ -192,20 +192,11 @@ const main = async () => {
         address: gnosisStakingProcessorL2.address,
         constructorArguments: [parsedData.olasAddress, parsedData.stakingManagerProxyAddress,
             parsedData.gnosisOmniBridgeAddress, parsedData.gnosisAMBHomeAddress,
-            parsedData.gnosisDepositProcessorL1Address, gnosisChainId],
+            parsedData.gnosisDepositProcessorL1Address, chainId],
     });
     parsedData.gnosisStakingProcessorL2Address = gnosisStakingProcessorL2.address;
     console.log("GnosisStakingProcessorL2 address:", gnosisStakingProcessorL2.address);
     fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
-
-
-    // changeStakingProcessorL2 for collector
-    collector = await ethers.getContractAt("Collector", parsedData.collectorProxyAddress);
-    await collector.changeStakingProcessorL2(parsedData.gnosisStakingProcessorL2Address);
-
-    // changeStakingProcessorL2 for stakingManager
-    stakingManager = await ethers.getContractAt("StakingManager", parsedData.stakingManagerProxyAddress);
-    await stakingManager.changeStakingProcessorL2(parsedData.gnosisStakingProcessorL2Address);
 
     // Deploy ActivityChecker
     console.log("Deploying ActivityChecker");
@@ -241,7 +232,6 @@ const main = async () => {
     console.log("StakingTokenLocked address:", stakingTokenImplementation.address);
     fs.writeFileSync(globalsFile, JSON.stringify(parsedData));
 
-
     // Whitelist implementation
     stakingVerifier = await ethers.getContractAt("StakingVerifier", parsedData.stakingVerifierAddress);
     await stakingVerifier.setImplementationsStatuses([parsedData.stakingTokenImplementationAddress], [true], true);
@@ -271,6 +261,14 @@ const main = async () => {
         address: parsedData.stakingTokenAddress,
         constructorArguments: [parsedData.stakingTokenImplementationAddress],
     });
+
+    // changeStakingProcessorL2 for collector
+    collector = await ethers.getContractAt("Collector", parsedData.collectorProxyAddress);
+    await collector.changeStakingProcessorL2(parsedData.gnosisStakingProcessorL2Address);
+
+    // changeStakingProcessorL2 for stakingManager
+    stakingManager = await ethers.getContractAt("StakingManager", parsedData.stakingManagerProxyAddress);
+    await stakingManager.changeStakingProcessorL2(parsedData.gnosisStakingProcessorL2Address);
 
     // Fund the staking contract
     olas = await ethers.getContractAt("ERC20Token", parsedData.olasAddress);

@@ -3,7 +3,7 @@
 # Check if $1 is provided
 if [ -z "$1" ]; then
   echo "Usage: $0 <network>"
-  echo "Example: $0 eth_mainnet"
+  echo "Example: $0 base_mainnet"
   exit 1
 fi
 
@@ -24,8 +24,9 @@ derivationPath=$(jq -r '.derivationPath' $globals)
 chainId=$(jq -r '.chainId' $globals)
 networkURL=$(jq -r '.networkURL' $globals)
 
-depositoryProxyAddress=$(jq -r '.depositoryProxyAddress' $globals)
-lzOracleAddress=$(jq -r '.lzOracleAddress' $globals)
+depositoryProxyAddress=$(jq -r ".depositoryProxyAddress" $globals)
+stakingTokenAddress=$(jq -r ".stakingTokenAddress" $globals)
+amount="10000000000000000000000000"
 
 # Getting L1 API key
 if [ $chainId == 1 ]; then
@@ -54,8 +55,8 @@ fi
 
 castSendHeader="cast send --rpc-url $networkURL$API_KEY $walletArgs"
 
-echo "${green}Change LzOracle in Depository${reset}"
-castArgs="$depositoryProxyAddress changeTreasury(address) $lzOracleAddress"
+echo "${green}Add staking models${reset}"
+castArgs="$depositoryProxyAddress createAndActivateStakingModels(uint256[],address[],uint256[],uint256[]) [100] [0x0c463d5AA0FE121cd6D23421fF817C2e0803C4f1] [20000000000000000000000] [20]"
 echo $castArgs
 castCmd="$castSendHeader $castArgs"
 result=$($castCmd)

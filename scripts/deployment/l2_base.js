@@ -39,7 +39,7 @@ const main = async () => {
         stakingManager: AddressZero,
         activityChecker: AddressZero
     };
-    const baseChainId = 8453;
+    const chainId = 1;
     const fullStakeDeposit = regDeposit.mul(2);
     const stakingSupply = fullStakeDeposit.mul(ethers.BigNumber.from(maxNumServices));
 
@@ -62,7 +62,7 @@ const main = async () => {
     // Deploy Collector
     console.log("Deploying Collector");
     const Collector = await ethers.getContractFactory("Collector");
-    collector = await Collector.deploy(parsedData.olasAddress, parsedData.distributorAddress);
+    collector = await Collector.deploy(parsedData.olasAddress);
     await collector.deployed();
 
     // Wait for half a minute for the transaction completion
@@ -74,7 +74,7 @@ const main = async () => {
 
     await hre.run("verify:verify", {
         address: parsedData.collectorAddress,
-        constructorArguments: [parsedData.olasAddress, parsedData.distributorAddress],
+        constructorArguments: [parsedData.olasAddress],
     });
 
     // Deploy Collector Proxy
@@ -187,7 +187,7 @@ const main = async () => {
     const BaseStakingProcessorL2 = await ethers.getContractFactory("BaseStakingProcessorL2");
     baseStakingProcessorL2 = await BaseStakingProcessorL2.deploy(parsedData.olasAddress,
         parsedData.stakingManagerProxyAddress, parsedData.baseL2StandardBridgeProxyAddress,
-        parsedData.baseL2CrossDomainMessengerProxyAddress, parsedData.baseDepositProcessorL1Address, baseChainId);
+        parsedData.baseL2CrossDomainMessengerProxyAddress, parsedData.baseDepositProcessorL1Address, chainId);
     await baseStakingProcessorL2.deployed();
 
     // Wait for half a minute for the transaction completion
@@ -201,7 +201,7 @@ const main = async () => {
         address: parsedData.baseStakingProcessorL2Address,
         constructorArguments: [parsedData.olasAddress, parsedData.stakingManagerProxyAddress,
             parsedData.baseL2StandardBridgeProxyAddress, parsedData.baseL2CrossDomainMessengerProxyAddress,
-            parsedData.baseDepositProcessorL1Address, baseChainId],
+            parsedData.baseDepositProcessorL1Address, chainId],
     });
 
     // changeStakingProcessorL2 for collector

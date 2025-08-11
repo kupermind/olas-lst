@@ -9,6 +9,7 @@
   "gnosisSafeAddress": "0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552",
   "gnosisSafeL2Address": "0x3E5c63644E683549055b9Be8653de26E0B4CD36E",
   "gnosisSafeProxyFactoryAddress": "0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2",
+  "multiSendCallOnlyAddress": "0x40A2aCCbd92BCA938b02010E17A5b8929b49130D",
   "fallbackHandlerAddress": "0xf48f2B2d2a534e402487b3ee7C18c33Aec0Fe5e4",
   "safeToL2SetupAddress": "0xBD89A1CE4DDe368FFAB0eC35506eEcE0b1fFdc54",
   "baseURI": "https://gateway.autonolas.tech/ipfs/",
@@ -32,7 +33,7 @@
   "stakingFactoryAddress": "0x661E609d03bb63819f2F47b9202E15e1826f5B5f",
   "distributorProxyAddress": "0x26E27872e9116ff35Cb796D8500b59D2671A7786",
   "treasuryProxyAddress": "0x6401532D75CA14009D260ceB27E322E9a6fE9beB",
-  "baseDepositProcessorL1Address": "0xD22737aF009CD0C0cfC50E7b3FcD985e2Cc1F5dA",
+  "baseDepositProcessorL1Address": "0xD88FDd4491Dc9933C3306bb27c410394e07BC1a2",
   "collectorAddress": "0xdff764147C2C42aFC512c243D205E731f2CEAE6e",
   "collectorProxyAddress": "0xfdCC6Dd2da095b762a1eBd5e2C03332B53FD95D8",
   "activityModuleAddress": "0x2d8C1a8F4E9B1e8c2Ac6C1797AC3fcaCB5A6BFEA",
@@ -44,5 +45,5 @@
   "activityCheckerAddress": "0x63b0f322837a7160B7E3d95C60aAaeB4EF1aECcb",
   "stakingTokenAddress": "0x191f05fe4a043f0b8ee1045ce0f282e719e52e9a",
   "stakingTokenAddress2": "0xb61fd90520f67d7e5f164b35fba3f7811c855e22",
-  "stakingHelperAddress": "0xf8a415d761b1279B0f1ACE68cD85e5ca4346Cc3F"
+  "stakingHelperAddress": "0x56B83C1E457ae25F64936cCDCb6eD7d2DE828672"
 }

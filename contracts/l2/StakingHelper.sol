@@ -4,8 +4,9 @@ pragma solidity ^0.8.30;
 interface IStakingFactory {
     /// @dev Gets InstanceParams struct for a specified staking proxy
     /// @param stakingProxy Staking proxy address.
+    /// @return implementation Staking implementation address.
     /// @return isEnabled Staking proxy status flag.
-    function mapInstanceParams(address stakingProxy) external view returns (address, address, bool isEnabled);
+    function mapInstanceParams(address stakingProxy) external view returns (address implementation, address, bool isEnabled);
 }
 
 interface IStakingProxy {
@@ -39,16 +40,20 @@ contract StakingHelper {
 
     /// @dev Gets stakingProxy info.
     /// @param stakingProxy Staking proxy address.
+    /// @return bytecodeHash Staking implementation bytecode hash.
     /// @return isEnabled Staking proxy status flag.
     /// @return maxNumSlots Max number of slots in staking proxy.
     /// @return minStakingDeposit Minimum deposit value required for service staking.
     /// @return availableRewards Staking proxy available rewards.
-    /// @return bytecodeHash Staking proxy bytecode hash.
-    function getStakingInfo(address stakingProxy) external view returns (bool isEnabled, uint256 maxNumSlots,
-        uint256 minStakingDeposit, uint256 availableRewards, bytes32 bytecodeHash)
+    function getStakingInfo(address stakingProxy) external view returns (bytes32 bytecodeHash, bool isEnabled,
+        uint256 maxNumSlots,uint256 minStakingDeposit, uint256 availableRewards)
     {
         // Get stakingProxy status
-        (, , isEnabled) = IStakingFactory(stakingFactory).mapInstanceParams(stakingProxy);
+        address implementation;
+        (implementation, , isEnabled) = IStakingFactory(stakingFactory).mapInstanceParams(stakingProxy);
+
+        // Get bytecode hash
+        bytecodeHash = implementation.codehash;
 
         // Get max number of services in stakingProxy
         maxNumSlots = IStakingProxy(stakingProxy).maxNumServices();
@@ -58,8 +63,5 @@ contract StakingHelper {
 
         // Get stakingProxy available rewards
         availableRewards = IStakingProxy(stakingProxy).availableRewards();
-
-        // Get bytecode hash
-        bytecodeHash = stakingProxy.codehash;
     }
 }

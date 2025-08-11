@@ -3,7 +3,7 @@
 # Check if $1 is provided
 if [ -z "$1" ]; then
   echo "Usage: $0 <network>"
-  echo "Example: $0 eth_mainnet"
+  echo "Example: $0 base_mainnet"
   exit 1
 fi
 
@@ -24,20 +24,24 @@ derivationPath=$(jq -r '.derivationPath' $globals)
 chainId=$(jq -r '.chainId' $globals)
 networkURL=$(jq -r '.networkURL' $globals)
 
-depositoryProxyAddress=$(jq -r '.depositoryProxyAddress' $globals)
-lzOracleAddress=$(jq -r '.lzOracleAddress' $globals)
+# Get network name from network_mainnet or network_sepolia or another testnet
+network=${1%_*}
 
-# Getting L1 API key
-if [ $chainId == 1 ]; then
-  API_KEY=$ALCHEMY_API_KEY_MAINNET
+collectorProxyAddress=$(jq -r ".collectorProxyAddress" $globals)
+stakingManagerProxyAddress=$(jq -r ".stakingManagerProxyAddress" $globals)
+stakingProcessorL2Address=$(jq -r ".${network}StakingProcessorL2Address" $globals)
+
+# Check for Polygon keys only since on other networks those are not needed
+if [ $chainId == 137 ]; then
+  API_KEY=$ALCHEMY_API_KEY_MATIC
   if [ "$API_KEY" == "" ]; then
-      echo "set ALCHEMY_API_KEY_MAINNET env variable"
+      echo "set ALCHEMY_API_KEY_MATIC env variable"
       exit 0
   fi
-elif [ $chainId == 11155111 ]; then
-    API_KEY=$ALCHEMY_API_KEY_SEPOLIA
+elif [ $chainId == 80002 ]; then
+    API_KEY=$ALCHEMY_API_KEY_AMOY
     if [ "$API_KEY" == "" ]; then
-        echo "set ALCHEMY_API_KEY_SEPOLIA env variable"
+        echo "set ALCHEMY_API_KEY_AMOY env variable"
         exit 0
     fi
 fi
@@ -54,8 +58,15 @@ fi
 
 castSendHeader="cast send --rpc-url $networkURL$API_KEY $walletArgs"
 
-echo "${green}Change LzOracle in Depository${reset}"
-castArgs="$depositoryProxyAddress changeTreasury(address) $lzOracleAddress"
+echo "${green}Change Staking Processor L2 in CollectorProxy${reset}"
+castArgs="$collectorProxyAddress changeStakingProcessorL2(address) $stakingProcessorL2Address"
+echo $castArgs
+castCmd="$castSendHeader $castArgs"
+result=$($castCmd)
+echo "$result" | grep "status"
+
+echo "${green}Change Staking Processor L2 in StakingManagerProxy${reset}"
+castArgs="$stakingManagerProxyAddress changeStakingProcessorL2(address) $stakingProcessorL2Address"
 echo $castArgs
 castCmd="$castSendHeader $castArgs"
 result=$($castCmd)

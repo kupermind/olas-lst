@@ -7,6 +7,12 @@ if [ -z "$1" ]; then
   exit 1
 fi
 
+# Get L2 network name: gnosis, base, etc.
+networkL2=$2
+
+# Get chain Id L2
+l2ChainId=$3
+
 red=$(tput setaf 1)
 green=$(tput setaf 2)
 reset=$(tput sgr0)
@@ -24,8 +30,8 @@ derivationPath=$(jq -r '.derivationPath' $globals)
 chainId=$(jq -r '.chainId' $globals)
 networkURL=$(jq -r '.networkURL' $globals)
 
-depositoryProxyAddress=$(jq -r '.depositoryProxyAddress' $globals)
-lzOracleAddress=$(jq -r '.lzOracleAddress' $globals)
+depositoryProxyAddress=$(jq -r ".depositoryProxyAddress" $globals)
+depositProcessorL1Address=$(jq -r ".${networkL2}DepositProcessorL1Address" $globals)
 
 # Getting L1 API key
 if [ $chainId == 1 ]; then
@@ -54,8 +60,8 @@ fi
 
 castSendHeader="cast send --rpc-url $networkURL$API_KEY $walletArgs"
 
-echo "${green}Change LzOracle in Depository${reset}"
-castArgs="$depositoryProxyAddress changeTreasury(address) $lzOracleAddress"
+echo "${green}Set DepositProcessorL1 chain Ids${reset}"
+castArgs="$depositoryProxyAddress setDepositProcessorChainIds(address[],uint256[]) [$depositProcessorL1Address] [$l2ChainId]"
 echo $castArgs
 castCmd="$castSendHeader $castArgs"
 result=$($castCmd)

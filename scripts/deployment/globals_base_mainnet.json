@@ -18,7 +18,7 @@
   "serviceRegistrySymbol": "AUTONOLAS-SERVICE-L2-V1",
   "olasAddress": "0x54330d28ca3357F294334BDC454a032e7f353416",
   "multisigProxyHash130": "0xb89c1b3bdf2cf8827818646bce9a8f6e372885f8c55e5c07acbd307cb133b000",
-  "stakingProxyBytecodeHash": "",
+  "stakingImplementationBytecodeHash": "",
   "baseL2StandardBridgeProxyAddress": "0x4200000000000000000000000000000000000010",
   "baseL2CrossDomainMessengerProxyAddress": "0x4200000000000000000000000000000000000007",
   "serviceRegistryAddress": "0x3C1fF68f5aa342D296d4DEe4Bb1cACCA912D95fE",

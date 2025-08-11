@@ -3,7 +3,7 @@
 # Check if $1 is provided
 if [ -z "$1" ]; then
   echo "Usage: $0 <network>"
-  echo "Example: $0 eth_mainnet"
+  echo "Example: $0 base_mainnet"
   exit 1
 fi
 
@@ -31,28 +31,26 @@ derivationPath=$(jq -r '.derivationPath' $globals)
 chainId=$(jq -r '.chainId' $globals)
 networkURL=$(jq -r '.networkURL' $globals)
 
-olasAddress=$(jq -r '.olasAddress' $globals)
-stOLASAddress=$(jq -r '.stOLASAddress' $globals)
-depositoryProxyAddress=$(jq -r '.depositoryProxyAddress' $globals)
+livenessRatio=$(jq -r '.livenessRatio' $globals)
 
-# Getting L1 API key
-if [ $chainId == 1 ]; then
-  API_KEY=$ALCHEMY_API_KEY_MAINNET
+# Check for Polygon keys only since on other networks those are not needed
+if [ $chainId == 137 ]; then
+  API_KEY=$ALCHEMY_API_KEY_MATIC
   if [ "$API_KEY" == "" ]; then
-      echo "set ALCHEMY_API_KEY_MAINNET env variable"
+      echo "set ALCHEMY_API_KEY_MATIC env variable"
       exit 0
   fi
-elif [ $chainId == 11155111 ]; then
-    API_KEY=$ALCHEMY_API_KEY_SEPOLIA
+elif [ $chainId == 80002 ]; then
+    API_KEY=$ALCHEMY_API_KEY_AMOY
     if [ "$API_KEY" == "" ]; then
-        echo "set ALCHEMY_API_KEY_SEPOLIA env variable"
+        echo "set ALCHEMY_API_KEY_AMOY env variable"
         exit 0
     fi
 fi
 
-contractName="Treasury"
-contractPath="contracts/l1/$contractName.sol:$contractName"
-constructorArgs="$olasAddress $stOLASAddress $depositoryProxyAddress"
+contractName="ModuleActivityChecker"
+contractPath="contracts/l2/$contractName.sol:$contractName"
+constructorArgs="$livenessRatio"
 contractArgs="$contractPath --constructor-args $constructorArgs"
 
 # Get deployer based on the ledger flag
@@ -73,10 +71,10 @@ echo "${green}Deployment of: $contractArgs${reset}"
 # Deploy the contract and capture the address
 execCmd="forge create --broadcast --rpc-url $networkURL$API_KEY $walletArgs $contractArgs"
 deploymentOutput=$($execCmd)
-treasuryAddress=$(echo "$deploymentOutput" | grep 'Deployed to:' | awk '{print $3}')
+moduleActivityCheckerAddress=$(echo "$deploymentOutput" | grep 'Deployed to:' | awk '{print $3}')
 
 # Get output length
-outputLength=${#treasuryAddress}
+outputLength=${#moduleActivityCheckerAddress}
 
 # Check for the deployed address
 if [ $outputLength != 42 ]; then
@@ -86,11 +84,11 @@ fi
 
 
 # Write new deployed contract back into deployment file
-echo "$(jq '. += {"treasuryAddress":"'$treasuryAddress'"}' $globals)" > $globals
+echo "$(jq '. += {"moduleActivityCheckerAddress":"'$moduleActivityCheckerAddress'"}' $globals)" > $globals
 
 # Verify contract
 if [ "$contractVerification" == "true" ]; then
-  contractParams="$treasuryAddress $contractPath --constructor-args $(cast abi-encode "constructor(address,address,address)" $constructorArgs)"
+  contractParams="$moduleActivityCheckerAddress $contractPath --constructor-args $(cast abi-encode "constructor(uint256)" $constructorArgs)"
   echo "Verification contract params: $contractParams"
 
   echo "${green}Verifying contract on Etherscan...${reset}"
@@ -103,4 +101,4 @@ if [ "$contractVerification" == "true" ]; then
   fi
 fi
 
-echo "${green}$contractName deployed at: $treasuryAddress${reset}"
+echo "${green}$contractName deployed at: $moduleActivityCheckerAddress${reset}"

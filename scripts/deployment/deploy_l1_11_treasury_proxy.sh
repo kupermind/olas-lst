@@ -3,7 +3,7 @@
 # Check if $1 is provided
 if [ -z "$1" ]; then
   echo "Usage: $0 <network>"
-  echo "Example: $0 ethereum_mainnet"
+  echo "Example: $0 eth_mainnet"
   exit 1
 fi
 

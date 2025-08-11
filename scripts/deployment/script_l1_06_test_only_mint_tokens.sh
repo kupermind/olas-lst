@@ -3,7 +3,7 @@
 # Check if $1 is provided
 if [ -z "$1" ]; then
   echo "Usage: $0 <network>"
-  echo "Example: $0 eth_mainnet"
+  echo "Example: $0 base_mainnet"
   exit 1
 fi
 
@@ -24,8 +24,9 @@ derivationPath=$(jq -r '.derivationPath' $globals)
 chainId=$(jq -r '.chainId' $globals)
 networkURL=$(jq -r '.networkURL' $globals)
 
-depositoryProxyAddress=$(jq -r '.depositoryProxyAddress' $globals)
-lzOracleAddress=$(jq -r '.lzOracleAddress' $globals)
+olasAddress=$(jq -r ".olasAddress" $globals)
+stakingTokenAddress=$(jq -r ".stakingTokenAddress" $globals)
+amount="10000000000000000000000000"
 
 # Getting L1 API key
 if [ $chainId == 1 ]; then
@@ -54,8 +55,8 @@ fi
 
 castSendHeader="cast send --rpc-url $networkURL$API_KEY $walletArgs"
 
-echo "${green}Change LzOracle in Depository${reset}"
-castArgs="$depositoryProxyAddress changeTreasury(address) $lzOracleAddress"
+echo "${green}Mint OLAS to deployer${reset}"
+castArgs="$olasAddress mint(address,uint256) $deployer $amount"
 echo $castArgs
 castCmd="$castSendHeader $castArgs"
 result=$($castCmd)
