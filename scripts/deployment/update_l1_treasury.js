@@ -7,7 +7,7 @@ const main = async () => {
     let treasury;
     let deployer;
 
-    const globalsFile = "scripts/deployment/globals_ethereum_sepolia.json";
+    const globalsFile = "scripts/deployment/globals_eth_sepolia.json";
     const dataFromJSON = fs.readFileSync(globalsFile, "utf8");
     let parsedData = JSON.parse(dataFromJSON);
 

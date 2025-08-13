@@ -86,8 +86,6 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
     uint256 public immutable agentId;
     // Contributor service config hash
     bytes32 public immutable configHash;
-    // Contributors proxy address
-    address public immutable contributorsProxy;
     // Service manager address
     address public immutable serviceManager;
     // OLAS token address

@@ -68,37 +68,38 @@ error UnauthorizedAccount(address account);
 /// @dev Caught reentrancy violation.
 error ReentrancyGuard();
 
+enum StakingModelStatus {
+    Retired,
+    Active,
+    Inactive
+}
+
+// StakingModel struct
+struct StakingModel {
+    // Max available supply
+    uint96 supply;
+    // Remaining supply
+    uint96 remainder;
+    // Stake limit per slot as the deposit amount required for a single service stake
+    uint96 stakeLimitPerSlot;
+    // Staking model status: Retired, Active, Inactive
+    StakingModelStatus status;
+}
+
 
 /// @title Depository - Smart contract for the stOLAS Depository.
 contract Depository is Implementation {
-    enum StakingModelStatus {
-        Retired,
-        Active,
-        Inactive
-    }
-
     event TreasuryUpdated(address indexed treasury);
+    event LzOracleUpdated(address indexed lzOracle);
     event SetDepositProcessorChainIds(address[] depositProcessors, uint256[] chainIds);
-    event StakingModelsActivated(uint256[] chainIds, address[] stakingProxies, uint256[] stakeLimitPerSlots,
-        uint256[] numSlots);
-    event ChangeModelStatuses(uint256[] chainIds, address[] stakingProxies, StakingModelStatus[] statuses);
+    event StakingModelActivated(uint256 indexed chainId, address indexed stakingProxy, uint256 stakeLimitPerSlots,
+        uint256 numSlots);
+    event StakingModelStatusSet(uint256 indexed chainId, address indexed stakingProxy, StakingModelStatus status);
     event Deposit(address indexed sender, uint256 stakeAmount, uint256 stAmount, uint256[] chainIds,
         address[] stakingProxies, uint256[] amounts);
     event Unstake(address indexed sender, uint256 unstakeAmount, uint256[] chainIds, address[] stakingProxies,
         uint256[] amounts);
     event Retired(uint256[] chainIds, address[] stakingProxies);
-
-    // StakingModel struct
-    struct StakingModel {
-        // Max available supply
-        uint96 supply;
-        // Remaining supply
-        uint96 remainder;
-        // Stake limit per slot as the deposit amount required for a single service stake
-        uint96 stakeLimitPerSlot;
-        // Staking model status: Retired, Active, Inactive
-        StakingModelStatus status;
-    }
 
     // Depository version
     string public constant VERSION = "0.1.0";
@@ -116,6 +117,8 @@ contract Depository is Implementation {
 
     // Treasury contract address
     address public treasury;
+    // Layer Zero oracle
+    address public lzOracle;
 
     // Lock factor in 10_000 value
     uint256 public lockFactor;
@@ -139,6 +142,87 @@ contract Depository is Implementation {
         st = _st;
     }
 
+    /// @dev Creates and activates staking model.
+    /// @param chainId Chain Id.
+    /// @param stakingProxy Corresponding staking proxy address.
+    /// @param stakeLimitPerSlot Corresponding staking limit per each staking slot.
+    /// @param numSlots Corresponding number of staking slots.
+    function _createAndActivateStakingModel(
+        uint256 chainId,
+        address stakingProxy,
+        uint256 stakeLimitPerSlot,
+        uint256 numSlots
+    ) internal {
+        uint256 supply = stakeLimitPerSlot * numSlots;
+
+        // Check for overflow
+        if (supply > type(uint96).max) {
+            revert Overflow(supply, type(uint96).max);
+        }
+
+        // Check for zero value
+        if (supply == 0) {
+            revert ZeroValue();
+        }
+
+        // Check for zero address
+        if (stakingProxy == address(0)) {
+            revert ZeroAddress();
+        }
+
+        // Push a pair of key defining variables into one key: chainId | stakingProxy
+        // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
+        uint256 stakingModelId = uint256(uint160(stakingProxy));
+        stakingModelId |= chainId << 160;
+
+        // Get staking model struct
+        StakingModel storage stakingModel = mapStakingModels[stakingModelId];
+
+        // Check for existing staking model
+        if (stakingModel.supply > 0) {
+            revert StakingModelAlreadyExists(stakingModelId);
+        }
+
+        // Set supply and activate
+        stakingModel.supply = uint96(supply);
+        stakingModel.remainder = uint96(supply);
+        stakingModel.stakeLimitPerSlot = uint96(stakeLimitPerSlot);
+        stakingModel.status = StakingModelStatus.Active;
+
+        // Add into global staking model set
+        setStakingModelIds.push(stakingModelId);
+
+        emit StakingModelActivated(chainId, stakingProxy, stakeLimitPerSlot, numSlots);
+    }
+
+    /// @dev Sets staking model status.
+    /// @param chainId Chain Id.
+    /// @param stakingProxy Corresponding staking proxy address.
+    /// @param status Corresponding staking model status.
+    function _setStakingModelStatus(uint256 chainId, address stakingProxy, StakingModelStatus status) internal {
+        // Get staking model Id
+        // Push a pair of key defining variables into one key: chainId | stakingProxy
+        // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
+        uint256 stakingModelId = uint256(uint160(stakingProxy));
+        stakingModelId |= chainId << 160;
+
+        // Check for staking model existence
+        if (mapStakingModels[stakingModelId].supply == 0) {
+            revert WrongStakingModel(stakingModelId);
+        }
+
+        mapStakingModels[stakingModelId].status = status;
+
+        emit StakingModelStatusSet(chainId, stakingProxy, status);
+    }
+
+    /// @dev Sends message according to the required operation: stake, unstake, etc.
+    /// @param chainIds Set of chain Ids with staking proxies.
+    /// @param stakingProxies Set of staking proxies corresponding to each chain Id.
+    /// @param amounts Corresponding OLAS amounts for each staking proxy.
+    /// @param bridgePayloads Bridge payloads corresponding to each chain Id.
+    /// @param values Value amounts for each bridge interaction, if applicable.
+    /// @param operation Operation type.
     function _operationSendMessage(
         uint256[] memory chainIds,
         address[] memory stakingProxies,
@@ -197,6 +281,23 @@ contract Depository is Implementation {
         emit TreasuryUpdated(newTreasury);
     }
 
+    /// @dev Changes Layer Zero oracle contract address.
+    /// @param newLzOracle Address of a new lzOracle.
+    function changeLzOracle(address newLzOracle) external {
+        // Check for ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
+        }
+
+        // Check for zero address
+        if (newLzOracle == address(0)) {
+            revert ZeroAddress();
+        }
+
+        lzOracle = newLzOracle;
+        emit LzOracleUpdated(newLzOracle);
+    }
+
     /// @dev Sets deposit processor contracts addresses and L2 chain Ids.
     /// @notice It is the contract owner responsibility to set correct L1 deposit processor contracts
     ///         and corresponding supported L2 chain Ids.
@@ -227,7 +328,6 @@ contract Depository is Implementation {
         emit SetDepositProcessorChainIds(depositProcessors, chainIds);
     }
 
-    // TODO Activate via proofs
     /// @dev Creates and activates staking models.
     /// @param chainIds Chain Ids.
     /// @param stakingProxies Corresponding staking proxy addresses.
@@ -250,52 +350,44 @@ contract Depository is Implementation {
             revert WrongArrayLength();
         }
 
+        // Traverse all staking models
         for (uint256 i = 0; i < chainIds.length; ++i) {
-            uint256 supply = stakeLimitPerSlots[i] * numSlots[i];
-
-            // Check for overflow
-            if (supply > type(uint96).max) {
-                revert Overflow(supply, type(uint96).max);
-            }
-
-            // Check for zero value
-            if (supply == 0) {
-                revert ZeroValue();
-            }
-
-            // Check for zero address
-            if (stakingProxies[i] == address(0)) {
-                revert ZeroAddress();
-            }
-
-            // Push a pair of key defining variables into one key: chainId | stakingProxy
-            // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
-            uint256 stakingModelId = uint256(uint160(stakingProxies[i]));
-            stakingModelId |= chainIds[i] << 160;
-
-            // Get staking model struct
-            StakingModel storage stakingModel = mapStakingModels[stakingModelId];
-
-            // Check for existing staking model
-            if (stakingModel.supply > 0) {
-                revert StakingModelAlreadyExists(stakingModelId);
-            }
-
-            // Set supply and activate
-            stakingModel.supply = uint96(supply);
-            stakingModel.remainder = uint96(supply);
-            stakingModel.stakeLimitPerSlot = uint96(stakeLimitPerSlots[i]);
-            stakingModel.status = StakingModelStatus.Active;
-
-            // Add into global staking model set
-            setStakingModelIds.push(stakingModelId);
+            // Create and activate staking model
+            _createAndActivateStakingModel(chainIds[i], stakingProxies[i], stakeLimitPerSlots[i], numSlots[i]);
         }
-
-        emit StakingModelsActivated(chainIds, stakingProxies, stakeLimitPerSlots, numSlots);
     }
 
-    // TODO Deactivate staking models for good via proofs
-    // TODO Staking models must not retire if availableRewards are not zero
+    /// @dev Creates and activates staking model via lzRead proofs.
+    /// @param chainId Chain Id.
+    /// @param stakingProxy Corresponding staking proxy address.
+    /// @param stakeLimitPerSlot Corresponding staking limit per each staking slot.
+    /// @param numSlots Corresponding number of staking slots.
+    function LzCreateAndActivateStakingModel(
+        uint256 chainId,
+        address stakingProxy,
+        uint256 stakeLimitPerSlot,
+        uint256 numSlots
+    ) external {
+        if (msg.sender != lzOracle) {
+            revert UnauthorizedAccount(msg.sender);
+        }
+
+        // Create and activate staking model
+        _createAndActivateStakingModel(chainId, stakingProxy, stakeLimitPerSlot, numSlots);
+    }
+
+    /// @dev Closes staking model via lzRead proofs.
+    /// @param chainId Chain Id.
+    /// @param stakingProxy Corresponding staking proxy address.
+    function LzCloseStakingModel(uint256 chainId, address stakingProxy) external {
+        if (msg.sender != lzOracle) {
+            revert UnauthorizedAccount(msg.sender);
+        }
+
+        // Retire staking model
+        _setStakingModelStatus(chainId, stakingProxy, StakingModelStatus.Retired);
+    }
+
     /// @dev Sets existing staking model statuses.
     /// @notice If the model is inactive, it does not mean that it must be unstaked right away as it might continue
     ///         working and accumulating rewards until fully depleted. Then it must be retired and unstaked.
@@ -319,21 +411,8 @@ contract Depository is Implementation {
 
         // Traverse staking models and statuses
         for (uint256 i = 0; i < chainIds.length; ++i) {
-            // Get staking model Id
-            // Push a pair of key defining variables into one key: chainId | stakingProxy
-            // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
-            uint256 stakingModelId = uint256(uint160(stakingProxies[i]));
-            stakingModelId |= chainIds[i] << 160;
-
-            // Check for staking model existence
-            if (mapStakingModels[stakingModelId].supply == 0) {
-                revert WrongStakingModel(stakingModelId);
-            }
-
-            mapStakingModels[stakingModelId].status = statuses[i];
+            _setStakingModelStatus(chainIds[i], stakingProxies[i], statuses[i]);
         }
-
-        emit ChangeModelStatuses(chainIds, stakingProxies, statuses);
     }
 
     /// @dev Calculates amounts and initiates cross-chain stake request for specified models.
