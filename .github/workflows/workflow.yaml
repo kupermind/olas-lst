@@ -34,17 +34,17 @@ jobs:
           virtualenvs-create: true
           installer-parallel: true
 
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
       # Install modules
       - name: Install modules
         run: make install
 
       - name: Run formatting
         run: make fmt
-
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: nightly
 
       # Run linters
       - name: Run ESLint
