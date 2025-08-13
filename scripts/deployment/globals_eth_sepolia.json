@@ -25,7 +25,7 @@
   "depositoryAddress": "0xFaa8acDc378D3EF59709f7DE92c7573b498733eE",
   "depositoryProxyAddress": "0x74aCA83f899673f2AD1939fdd39Fc9424f8E1745",
   "withdrawDelay": "3600",
-  "treasuryAddress": "0xD5E5349Dbdef0BB9A67FaA50524dA74d217Cc720",
+  "treasuryAddress": "0x647F06534F589861b11840E108d54DCBE5D7811a",
   "treasuryProxyAddress": "0xa02A7AB26e7FC659799c3C52C7eC28d236df1A31",
   "gnosisDepositProcessorL1Address": "0x8Dc50a2EeCf517c453bcb5C879870E9FC16C1e4D",
   "baseDepositProcessorL1Address": "0xD88FDd4491Dc9933C3306bb27c410394e07BC1a2",

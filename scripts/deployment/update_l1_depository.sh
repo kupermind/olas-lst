@@ -3,6 +3,30 @@
 # Deploy Depository
 ./scripts/deployment/deploy_l1_08_depository.sh $1
 
+# Check if $1 is provided
+if [ -z "$1" ]; then
+  echo "Usage: $0 <network>"
+  echo "Example: $0 eth_mainnet"
+  exit 1
+fi
+
+# check if the ETHERSCAN_API_KEY is set
+if [ -z "$ETHERSCAN_API_KEY" ]; then
+  echo "Please set the ETHERSCAN_API_KEY environment variable."
+  exit 1
+fi
+
+red=$(tput setaf 1)
+green=$(tput setaf 2)
+reset=$(tput sgr0)
+
+# Get globals file
+globals="$(dirname "$0")/globals_$1.json"
+if [ ! -f $globals ]; then
+  echo "${red}!!! $globals is not found${reset}"
+  exit 0
+fi
+
 # Read variables using jq
 useLedger=$(jq -r '.useLedger' $globals)
 derivationPath=$(jq -r '.derivationPath' $globals)
