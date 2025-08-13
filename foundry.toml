@@ -10,3 +10,14 @@ evm_version = "prague"
 remappings = [
     "@gnosis.pm=node_modules/@gnosis.pm",
 ]
+
+[lint]
+ignore = [
+    "test/BridgeRelayer.sol",
+]
+exclude_lints = [
+    "asm-keccak256",
+    "erc20-unchecked-transfer",
+    "mixed-case-function",
+    "screaming-snake-case-immutable",
+]
