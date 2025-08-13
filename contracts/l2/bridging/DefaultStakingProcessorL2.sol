@@ -53,10 +53,23 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
     event OwnerUpdated(address indexed owner);
     event FundsReceived(address indexed sender, uint256 value);
     event StakeRequestExecuted(address target, uint256 amount, bytes32 indexed batchHash);
-    event StakeRequestQueued(bytes32 indexed queueHash, address target, uint256 amount,
-        bytes32 indexed batchHash, bytes32 operation, uint256 olasBalance, uint256 paused);
-    event UnstakeRequestQueued(bytes32 indexed queueHash, address target, uint256 amount,
-        bytes32 indexed batchHash, bytes32 operation, uint256 paused);
+    event StakeRequestQueued(
+        bytes32 indexed queueHash,
+        address target,
+        uint256 amount,
+        bytes32 indexed batchHash,
+        bytes32 operation,
+        uint256 olasBalance,
+        uint256 paused
+    );
+    event UnstakeRequestQueued(
+        bytes32 indexed queueHash,
+        address target,
+        uint256 amount,
+        bytes32 indexed batchHash,
+        bytes32 operation,
+        uint256 paused
+    );
     event MessageReceived(address indexed sender, uint256 chainId, bytes data);
     event Drain(address indexed owner, uint256 amount);
     event Migrated(address indexed sender, address indexed newL2TargetDispenser, uint256 amount);
@@ -111,8 +124,10 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
         uint256 _l1SourceChainId
     ) {
         // Check for zero addresses
-        if (_olas == address(0) || _stakingManager == address(0) || _l2TokenRelayer == address(0) ||
-            _l2MessageRelayer == address(0) || _l1DepositProcessor == address(0)) {
+        if (
+            _olas == address(0) || _stakingManager == address(0) || _l2TokenRelayer == address(0)
+                || _l2MessageRelayer == address(0) || _l1DepositProcessor == address(0)
+        ) {
             revert ZeroAddress();
         }
 
@@ -174,7 +189,7 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
 
                 // This is a low level call since it must never revert
                 bytes memory stakeData = abi.encodeCall(IStakingManager.stake, (target, amount, operation));
-                (success, ) = stakingManager.call(stakeData);
+                (success,) = stakingManager.call(stakeData);
 
                 if (success) {
                     emit StakeRequestExecuted(target, amount, batchHash);
@@ -194,7 +209,7 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
         } else if (operation == UNSTAKE || operation == UNSTAKE_RETIRED) {
             // This is a low level call since it must never revert
             bytes memory unstakeData = abi.encodeCall(IStakingManager.unstake, (target, amount, operation));
-            (bool success, ) = stakingManager.call(unstakeData);
+            (bool success,) = stakingManager.call(unstakeData);
 
             if (!success) {
                 // Hash of target + amount + batchHash + operation + current target dispenser address (migration-proof)
@@ -217,11 +232,7 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
     /// @param messageRelayer L2 bridge message relayer address.
     /// @param sourceProcessor L1 deposit processor address.
     /// @param data Bytes message data sent from L1.
-    function _receiveMessage(
-        address messageRelayer,
-        address sourceProcessor,
-        bytes memory data
-    ) internal virtual {
+    function _receiveMessage(address messageRelayer, address sourceProcessor, bytes memory data) internal virtual {
         // Check L2 message relayer address
         if (messageRelayer != l2MessageRelayer) {
             revert TargetRelayerOnly(messageRelayer, l2MessageRelayer);
@@ -368,7 +379,7 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
         }
 
         // Send funds to the owner
-        (bool success, ) = msg.sender.call{value: amount}("");
+        (bool success,) = msg.sender.call{value: amount}("");
         if (!success) {
             revert TransferFailed(address(0), address(this), msg.sender, amount);
         }
@@ -433,7 +444,7 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
     /// @param to Address to send tokens to.
     /// @param olasAmount OLAS amount.
     /// @param bridgePayload Bridge payload.
-    function relayToL1(address to, uint256 olasAmount, bytes memory bridgePayload) external virtual payable;
+    function relayToL1(address to, uint256 olasAmount, bytes memory bridgePayload) external payable virtual;
 
     /// @dev Gets the maximum number of token decimals able to be transferred across the bridge.
     /// @return Number of supported decimals.

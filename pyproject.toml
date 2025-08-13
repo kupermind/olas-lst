@@ -1,0 +1,20 @@
+[project]
+name = "olas-lst"
+version = "0.1.0"
+description = ""
+authors = [
+]
+readme = "README.md"
+requires-python = ">=3.12,<4"
+dependencies = [
+]
+
+[tool.poetry]
+package-mode=false
+
+[tool.poetry.group.dev.dependencies]
+reportlab = "^4.4.3"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

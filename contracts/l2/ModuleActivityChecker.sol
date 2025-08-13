@@ -10,18 +10,18 @@ interface IMultisig {
     function getOwners() external view returns (address[] memory);
 
     /// @dev Multisig activity tracker.
-    function activityNonce() external view returns(uint256);
+    function activityNonce() external view returns (uint256);
 }
 
 /// @dev Provided zero address.
 error ZeroAddress();
 
 /// @title ModuleActivityChecker - Smart contract for multisig module staking activity checking
-contract ModuleActivityChecker is StakingActivityChecker{
+contract ModuleActivityChecker is StakingActivityChecker {
     /// @dev ModuleActivityChecker constructor.
     /// @param _livenessRatio Liveness ratio in the format of 1e18.
     constructor(uint256 _livenessRatio) StakingActivityChecker(_livenessRatio) {}
-    
+
     /// @dev Gets service multisig nonces.
     /// @param multisig Service multisig address.
     /// @return nonces Set of a nonce and a deliveries count for the multisig.

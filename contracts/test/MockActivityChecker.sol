@@ -30,11 +30,7 @@ contract MockActivityChecker {
     }
 
     /// @dev Checks if the service multisig liveness ratio passes the defined liveness threshold.
-    function isRatioPass(
-        uint256[] memory,
-        uint256[] memory,
-        uint256
-    ) external view virtual returns (bool) {
+    function isRatioPass(uint256[] memory, uint256[] memory, uint256) external view virtual returns (bool) {
         return true;
     }
 }

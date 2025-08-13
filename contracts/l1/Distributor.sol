@@ -30,12 +30,12 @@ error UnauthorizedAccount(address account);
 /// @dev Caught reentrancy violation.
 error ReentrancyGuard();
 
-
 /// @title Distributor - Smart contract for distributing funds obtained via bridging or direct deposits.
 contract Distributor is Implementation {
     event LockFactorUpdated(uint256 lockFactor);
-    event Locked(address indexed account, uint256 olasAmount, uint256 lockAmount, uint256 vaultBalance,
-        bool unlockTimeIncreased);
+    event Locked(
+        address indexed account, uint256 olasAmount, uint256 lockAmount, uint256 vaultBalance, bool unlockTimeIncreased
+    );
     event Distributed(address indexed account, address indexed st, uint256 olasAmount);
 
     // Depository version
@@ -83,7 +83,7 @@ contract Distributor is Implementation {
 
     /// @dev Distributor initializer.
     /// @param _lockFactor Lock factor value.
-    function initialize(uint256 _lockFactor) external{
+    function initialize(uint256 _lockFactor) external {
         // Check for already initialized
         if (owner != address(0)) {
             revert AlreadyInitialized();

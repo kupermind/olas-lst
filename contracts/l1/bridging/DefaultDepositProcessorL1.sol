@@ -56,12 +56,7 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
     /// @param _l1Depository L1 tokenomics depository address.
     /// @param _l1TokenRelayer L1 token relayer bridging contract address.
     /// @param _l1MessageRelayer L1 message relayer bridging contract address.
-    constructor(
-        address _olas,
-        address _l1Depository,
-        address _l1TokenRelayer,
-        address _l1MessageRelayer
-    ) {
+    constructor(address _olas, address _l1Depository, address _l1TokenRelayer, address _l1MessageRelayer) {
         // Check for zero addresses
         if (_l1Depository == address(0) || _l1TokenRelayer == address(0) || _l1MessageRelayer == address(0)) {
             revert ZeroAddress();
@@ -96,12 +91,11 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
     /// @param amount Corresponding staking amount.
     /// @param bridgePayload Bridge payload necessary (if required) for a specific bridge relayer.
     /// @param operation Funds operation: stake / unstake.
-    function sendMessage(
-        address target,
-        uint256 amount,
-        bytes memory bridgePayload,
-        bytes32 operation
-    ) external virtual payable {
+    function sendMessage(address target, uint256 amount, bytes memory bridgePayload, bytes32 operation)
+        external
+        payable
+        virtual
+    {
         // Check for the dispenser contract to be the msg.sender
         if (msg.sender != l1Depository) {
             revert ManagerOnly(l1Depository, msg.sender);
@@ -123,7 +117,7 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
         if (leftovers > 0) {
             // If the call fails, ignore to avoid the attack that would prevent this function from executing
             // solhint-disable-next-line avoid-low-level-calls
-            (bool success, ) = tx.origin.call{value: leftovers}("");
+            (bool success,) = tx.origin.call{value: leftovers}("");
 
             emit LeftoversRefunded(tx.origin, leftovers, success);
         }

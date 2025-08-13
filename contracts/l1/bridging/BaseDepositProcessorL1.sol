@@ -36,11 +36,7 @@ interface IBridge {
     /// @param _target      Target contract or wallet address.
     /// @param _message     Message to trigger the target address with.
     /// @param _minGasLimit Minimum gas limit that the message can be executed with.
-    function sendMessage(
-        address _target,
-        bytes calldata _message,
-        uint32 _minGasLimit
-    ) external payable;
+    function sendMessage(address _target, bytes calldata _message, uint32 _minGasLimit) external payable;
 }
 
 /// @title BaseDepositProcessorL1 - Smart contract for sending tokens and data via Base bridge from L1 to L2 and processing data received from L2.
@@ -62,8 +58,7 @@ contract BaseDepositProcessorL1 is DefaultDepositProcessorL1 {
         address _l1TokenRelayer,
         address _l1MessageRelayer,
         address _olasL2
-    ) DefaultDepositProcessorL1(_olas, _l1Dispenser, _l1TokenRelayer, _l1MessageRelayer)
-    {
+    ) DefaultDepositProcessorL1(_olas, _l1Dispenser, _l1TokenRelayer, _l1MessageRelayer) {
         // Check for zero address
         if (_olasL2 == address(0)) {
             revert ZeroAddress();
@@ -88,7 +83,9 @@ contract BaseDepositProcessorL1 is DefaultDepositProcessorL1 {
             IToken(olas).approve(l1TokenRelayer, amount);
 
             // Transfer OLAS to L2 staking dispenser contract across the bridge
-            IBridge(l1TokenRelayer).depositERC20To(olas, olasL2, l2StakingProcessor, amount, uint32(TOKEN_GAS_LIMIT), "");
+            IBridge(l1TokenRelayer).depositERC20To(
+                olas, olasL2, l2StakingProcessor, amount, uint32(TOKEN_GAS_LIMIT), ""
+            );
         }
 
         uint256 gasLimitMessage;

@@ -104,7 +104,7 @@ git clone --recursive https://github.com/kupermind/olas-lst.git
 cd olas-lst
 
 # Install dependencies
-yarn install
+make install
 ```
 
 ### Compilation and Testing
@@ -164,6 +164,11 @@ The test suite covers comprehensive E2E scenarios:
 - [ ] Cross-chain yield strategies
 
 ## Documentation
+
+```
+make docs
+```
+The documentation is generated using the `doc` directory and includes:
 
 - [Whitepaper (PDF)](doc/stolas_whitepaper_formatted.pdf)
 - [Whitepaper (Text)](doc/stolas_whitepaper.txt)

@@ -20,11 +20,10 @@ interface IActivityChecker {
     /// @param lastNonces Last service multisig set of a single nonce.
     /// @param ts Time difference between current and last timestamps.
     /// @return ratioPass True, if the liveness ratio passes the check.
-    function isRatioPass(
-        uint256[] memory curNonces,
-        uint256[] memory lastNonces,
-        uint256 ts
-    ) external view returns (bool ratioPass);
+    function isRatioPass(uint256[] memory curNonces, uint256[] memory lastNonces, uint256 ts)
+        external
+        view
+        returns (bool ratioPass);
 }
 
 // Service Registry interface
@@ -87,7 +86,9 @@ interface IService {
     /// @param serviceId Service Id.
     /// @return numAgentIds Number of canonical agent Ids in the service.
     /// @return agentParams Set of agent parameters for each canonical agent Id.
-    function getAgentParams(uint256 serviceId) external view
+    function getAgentParams(uint256 serviceId)
+        external
+        view
         returns (uint256 numAgentIds, AgentParams[] memory agentParams);
 
     /// @dev Gets the service security token info.
@@ -191,14 +192,29 @@ contract StakingTokenLocked is ERC721TokenReceiver {
         address activityChecker;
     }
 
-    event ServiceStaked(uint256 epoch, uint256 indexed serviceId, address indexed owner, address indexed multisig,
-        uint256[] nonces);
-    event Checkpoint(uint256 indexed epoch, uint256 availableRewards, uint256[] serviceIds, uint256[] rewards,
-        uint256 epochLength);
-    event ServiceUnstaked(uint256 epoch, uint256 indexed serviceId, address indexed owner, address indexed multisig,
-        uint256[] nonces, uint256 reward, uint256 availableRewards);
-    event RewardClaimed(uint256 epoch, uint256 indexed serviceId, address indexed owner, address indexed multisig,
-        uint256[] nonces, uint256 reward);
+    event ServiceStaked(
+        uint256 epoch, uint256 indexed serviceId, address indexed owner, address indexed multisig, uint256[] nonces
+    );
+    event Checkpoint(
+        uint256 indexed epoch, uint256 availableRewards, uint256[] serviceIds, uint256[] rewards, uint256 epochLength
+    );
+    event ServiceUnstaked(
+        uint256 epoch,
+        uint256 indexed serviceId,
+        address indexed owner,
+        address indexed multisig,
+        uint256[] nonces,
+        uint256 reward,
+        uint256 availableRewards
+    );
+    event RewardClaimed(
+        uint256 epoch,
+        uint256 indexed serviceId,
+        address indexed owner,
+        address indexed multisig,
+        uint256[] nonces,
+        uint256 reward
+    );
     event Deposit(address indexed sender, uint256 amount, uint256 balance, uint256 availableRewards);
     event Withdraw(address indexed to, uint256 amount);
 
@@ -238,24 +254,23 @@ contract StakingTokenLocked is ERC721TokenReceiver {
     uint256 public tsCheckpoint;
 
     // Mapping of serviceId => staking service info
-    mapping (uint256 => ServiceInfo) public mapServiceInfo;
+    mapping(uint256 => ServiceInfo) public mapServiceInfo;
     // Set of currently staking serviceIds
     uint256[] public setServiceIds;
 
     /// @dev StakingBase initialization.
     /// @param _stakingParams Service staking parameters.
-    function initialize(
-        StakingParams memory _stakingParams
-    ) external {
+    function initialize(StakingParams memory _stakingParams) external {
         // Double initialization check
         if (serviceRegistry != address(0)) {
             revert AlreadyInitialized();
         }
-        
+
         // Initial checks
-        if (_stakingParams.maxNumServices == 0 ||
-            _stakingParams.rewardsPerSecond == 0 || _stakingParams.livenessPeriod == 0 ||
-            _stakingParams.timeForEmissions == 0) {
+        if (
+            _stakingParams.maxNumServices == 0 || _stakingParams.rewardsPerSecond == 0
+                || _stakingParams.livenessPeriod == 0 || _stakingParams.timeForEmissions == 0
+        ) {
             revert ZeroValue();
         }
 
@@ -285,8 +300,8 @@ contract StakingTokenLocked is ERC721TokenReceiver {
         activityChecker = _stakingParams.activityChecker;
 
         // Calculate emissions amount
-        emissionsAmount = _stakingParams.rewardsPerSecond * _stakingParams.maxNumServices *
-            _stakingParams.timeForEmissions;
+        emissionsAmount =
+            _stakingParams.rewardsPerSecond * _stakingParams.maxNumServices * _stakingParams.timeForEmissions;
 
         // Set the checkpoint timestamp to be the deployment one
         tsCheckpoint = block.timestamp;
@@ -298,11 +313,11 @@ contract StakingTokenLocked is ERC721TokenReceiver {
     /// @param ts Time difference between current and last timestamps.
     /// @return ratioPass True, if the defined nonce ratio passes the check.
     /// @return currentNonces Current multisig nonces.
-    function _checkRatioPass(
-        address multisig,
-        uint256[] memory lastNonces,
-        uint256 ts
-    ) internal view returns (bool ratioPass, uint256[] memory currentNonces) {
+    function _checkRatioPass(address multisig, uint256[] memory lastNonces, uint256 ts)
+        internal
+        view
+        returns (bool ratioPass, uint256[] memory currentNonces)
+    {
         // Get current service multisig nonce
         // This is a low level call since it must never revert
         bytes memory activityData = abi.encodeCall(IActivityChecker.getMultisigNonces, multisig);
@@ -333,15 +348,19 @@ contract StakingTokenLocked is ERC721TokenReceiver {
     /// @param eligibleServiceRewards Corresponding rewards for eligible service Ids.
     /// @param serviceIds All the staking service Ids.
     /// @param serviceNonces Current service nonces.
-    function _calculateStakingRewards() internal view returns (
-        uint256 lastAvailableRewards,
-        uint256 numServices,
-        uint256 totalRewards,
-        uint256[] memory eligibleServiceIds,
-        uint256[] memory eligibleServiceRewards,
-        uint256[] memory serviceIds,
-        uint256[][] memory serviceNonces
-    ) {
+    function _calculateStakingRewards()
+        internal
+        view
+        returns (
+            uint256 lastAvailableRewards,
+            uint256 numServices,
+            uint256 totalRewards,
+            uint256[] memory eligibleServiceIds,
+            uint256[] memory eligibleServiceRewards,
+            uint256[] memory serviceIds,
+            uint256[][] memory serviceNonces
+        )
+    {
         // Check the last checkpoint timestamp and the liveness period, also check for available rewards to be not zero
         uint256 tsCheckpointLast = tsCheckpoint;
         lastAvailableRewards = availableRewards;
@@ -397,15 +416,17 @@ contract StakingTokenLocked is ERC721TokenReceiver {
     /// @return Staking service Ids.
     /// @return Set of reward-eligible service Ids.
     /// @return Corresponding set of reward-eligible service rewards.
-    function checkpoint() public returns (
-        uint256[] memory,
-        uint256[] memory,
-        uint256[] memory
-    ) {
+    function checkpoint() public returns (uint256[] memory, uint256[] memory, uint256[] memory) {
         // Calculate staking rewards
-        (uint256 lastAvailableRewards, uint256 numServices, uint256 totalRewards,
-            uint256[] memory eligibleServiceIds, uint256[] memory eligibleServiceRewards,
-            uint256[] memory serviceIds, uint256[][] memory serviceNonces) = _calculateStakingRewards();
+        (
+            uint256 lastAvailableRewards,
+            uint256 numServices,
+            uint256 totalRewards,
+            uint256[] memory eligibleServiceIds,
+            uint256[] memory eligibleServiceRewards,
+            uint256[] memory serviceIds,
+            uint256[][] memory serviceNonces
+        ) = _calculateStakingRewards();
 
         // Get arrays for eligible service Ids and rewards of exact size
         uint256[] memory finalEligibleServiceIds;
@@ -484,8 +505,9 @@ contract StakingTokenLocked is ERC721TokenReceiver {
             // Increase the epoch counter
             epochCounter = eCounter + 1;
 
-            emit Checkpoint(eCounter, lastAvailableRewards, finalEligibleServiceIds, finalEligibleServiceRewards,
-                epochLength);
+            emit Checkpoint(
+                eCounter, lastAvailableRewards, finalEligibleServiceIds, finalEligibleServiceRewards, epochLength
+            );
         }
 
         // If the checkpoint was not successful, the serviceIds set is not returned and needs to be allocated
@@ -582,7 +604,7 @@ contract StakingTokenLocked is ERC721TokenReceiver {
         }
 
         // Call the checkpoint
-        (uint256[] memory serviceIds, , ) = checkpoint();
+        (uint256[] memory serviceIds,,) = checkpoint();
 
         // Get the service reward
         reward = sInfo.reward;
@@ -699,8 +721,14 @@ contract StakingTokenLocked is ERC721TokenReceiver {
     /// @return reward Service reward for the on-going epoch.
     function calculateStakingLastReward(uint256 serviceId) public view returns (uint256 reward) {
         // Calculate overall staking rewards
-        (uint256 lastAvailableRewards, uint256 numServices, uint256 totalRewards, uint256[] memory eligibleServiceIds,
-            uint256[] memory eligibleServiceRewards, , ) = _calculateStakingRewards();
+        (
+            uint256 lastAvailableRewards,
+            uint256 numServices,
+            uint256 totalRewards,
+            uint256[] memory eligibleServiceIds,
+            uint256[] memory eligibleServiceRewards,
+            ,
+        ) = _calculateStakingRewards();
 
         // If there are eligible services, proceed with staking calculation and update rewards for the service Id
         for (uint256 i = 0; i < numServices; ++i) {

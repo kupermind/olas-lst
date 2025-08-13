@@ -6,7 +6,10 @@ interface IStakingFactory {
     /// @param stakingProxy Staking proxy address.
     /// @return implementation Staking implementation address.
     /// @return isEnabled Staking proxy status flag.
-    function mapInstanceParams(address stakingProxy) external view returns (address implementation, address, bool isEnabled);
+    function mapInstanceParams(address stakingProxy)
+        external
+        view
+        returns (address implementation, address, bool isEnabled);
 }
 
 interface IStakingProxy {
@@ -20,7 +23,6 @@ interface IStakingProxy {
 
 /// @dev Zero address.
 error ZeroAddress();
-
 
 /// @title StakingHelper - Smart contract for helper functions about staking contracts.
 contract StakingHelper {
@@ -45,12 +47,20 @@ contract StakingHelper {
     /// @return maxNumSlots Max number of slots in staking proxy.
     /// @return minStakingDeposit Minimum deposit value required for service staking.
     /// @return availableRewards Staking proxy available rewards.
-    function getStakingInfo(address stakingProxy) external view returns (bytes32 bytecodeHash, bool isEnabled,
-        uint256 maxNumSlots,uint256 minStakingDeposit, uint256 availableRewards)
+    function getStakingInfo(address stakingProxy)
+        external
+        view
+        returns (
+            bytes32 bytecodeHash,
+            bool isEnabled,
+            uint256 maxNumSlots,
+            uint256 minStakingDeposit,
+            uint256 availableRewards
+        )
     {
         // Get stakingProxy status
         address implementation;
-        (implementation, , isEnabled) = IStakingFactory(stakingFactory).mapInstanceParams(stakingProxy);
+        (implementation,, isEnabled) = IStakingFactory(stakingFactory).mapInstanceParams(stakingProxy);
 
         // Get bytecode hash
         bytecodeHash = implementation.codehash;

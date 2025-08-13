@@ -37,22 +37,19 @@ interface IService {
     /// @param agentInstances Agent instance addresses.
     /// @param agentIds Canonical Ids of the agent correspondent to the agent instance.
     /// @return success True, if function executed successfully.
-    function registerAgents(
-        uint256 serviceId,
-        address[] memory agentInstances,
-        uint32[] memory agentIds
-    ) external payable returns (bool success);
+    function registerAgents(uint256 serviceId, address[] memory agentInstances, uint32[] memory agentIds)
+        external
+        payable
+        returns (bool success);
 
     /// @dev Creates multisig instance controlled by the set of service agent instances and deploys the service.
     /// @param serviceId Correspondent service Id.
     /// @param multisigImplementation Multisig implementation address.
     /// @param data Data payload for the multisig creation.
     /// @return multisig Address of the created multisig.
-    function deploy(
-        uint256 serviceId,
-        address multisigImplementation,
-        bytes memory data
-    ) external returns (address multisig);
+    function deploy(uint256 serviceId, address multisigImplementation, bytes memory data)
+        external
+        returns (address multisig);
 
     /// @dev Terminates the service.
     /// @param serviceId Service Id.
@@ -83,13 +80,16 @@ interface IService {
     /// @return maxNumAgentInstances Total number of agent instances.
     /// @return numAgentInstances Actual number of agent instances.
     /// @return state Service state.
-    function mapServices(uint256 serviceId) external view returns (
-        uint96 securityDeposit,
-        address multisig,
-        bytes32 configHash,
-        uint32 threshold,
-        uint32 maxNumAgentInstances,
-        uint32 numAgentInstances,
-        uint8 state
-    );
+    function mapServices(uint256 serviceId)
+        external
+        view
+        returns (
+            uint96 securityDeposit,
+            address multisig,
+            bytes32 configHash,
+            uint32 threshold,
+            uint32 maxNumAgentInstances,
+            uint32 numAgentInstances,
+            uint8 state
+        );
 }
