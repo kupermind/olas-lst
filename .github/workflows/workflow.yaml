@@ -30,7 +30,7 @@ jobs:
       - name: Install and configure Poetry
         uses: snok/install-poetry@v1
         with:
-          version: 1.8.2
+          version: 2.1.4
           virtualenvs-create: true
           installer-parallel: true
 
@@ -57,6 +57,11 @@ jobs:
         run: forge build
       - name: Run tests
         run: forge test
+
+      - name: Check For changes
+        id: changes
+        run: |
+          git diff --exit-code
 
       # Run hardhat coverage and upload codecov report
       #- name: Solidity coverage summary
