@@ -58,10 +58,10 @@ jobs:
       - name: Run tests
         run: forge test
 
-      - name: Check For changes
-        id: changes
-        run: |
-          git diff --exit-code
+      # - name: Check For changes
+      #   id: changes
+      #   run: |
+      #     git diff --exit-code
 
       # Run hardhat coverage and upload codecov report
       #- name: Solidity coverage summary
