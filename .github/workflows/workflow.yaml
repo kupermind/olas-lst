@@ -25,7 +25,10 @@ jobs:
 
       # Install modules
       - name: Install modules
-        run: yarn install
+        run: make install
+
+      - name: Run formatting
+        run: make fmt
 
       # Run linters
       - name: Run ESLint
@@ -36,8 +39,11 @@ jobs:
       # Compile the code and run tests and deploy script(s)
       - name: Compile the code
         run: ./node_modules/.bin/hardhat compile
-      - name: Run tests
+      - name: Run Hardhat tests
         run: ./node_modules/.bin/hardhat test
+      - name: Run Forge tests
+        run: make tests
+      
 
       # Run hardhat coverage and upload codecov report
       #- name: Solidity coverage summary

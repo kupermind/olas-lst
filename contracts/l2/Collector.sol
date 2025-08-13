@@ -51,7 +51,6 @@ struct ReceiverBalance {
     address receiver;
 }
 
-
 /// @title Collector - Smart contract for collecting staking rewards
 contract Collector is Implementation {
     event StakingProcessorUpdated(address indexed stakingProcessorL2);

@@ -22,27 +22,21 @@ interface IBridge {
 
 /// @title GnosisDepositProcessorL1 - Smart contract for sending tokens and data via Gnosis bridge from L1 to L2 and processing data received from L2.
 contract GnosisDepositProcessorL1 is DefaultDepositProcessorL1 {
-
     /// @dev GnosisDepositProcessorL1 constructor.
     /// @param _olas OLAS token address.
     /// @param _l1Dispenser L1 tokenomics dispenser address.
     /// @param _l1TokenRelayer L1 token relayer bridging contract address (OmniBridge).
     /// @param _l1MessageRelayer L1 message relayer bridging contract address (AMB Proxy Foreign).
-    constructor(
-        address _olas,
-        address _l1Dispenser,
-        address _l1TokenRelayer,
-        address _l1MessageRelayer
-    ) DefaultDepositProcessorL1(_olas, _l1Dispenser, _l1TokenRelayer, _l1MessageRelayer) {}
+    constructor(address _olas, address _l1Dispenser, address _l1TokenRelayer, address _l1MessageRelayer)
+        DefaultDepositProcessorL1(_olas, _l1Dispenser, _l1TokenRelayer, _l1MessageRelayer)
+    {}
 
     /// @inheritdoc DefaultDepositProcessorL1
-    function _sendMessage(
-        address target,
-        uint256 amount,
-        bytes memory,
-        bytes32 batchHash,
-        bytes32 operation
-    ) internal override returns (uint256 sequence, uint256 leftovers) {
+    function _sendMessage(address target, uint256 amount, bytes memory, bytes32 batchHash, bytes32 operation)
+        internal
+        override
+        returns (uint256 sequence, uint256 leftovers)
+    {
         // Transfer OLAS tokens
         if (operation == STAKE) {
             // Approve tokens for the bridge contract

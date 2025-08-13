@@ -1,14 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import { AddressCast } from "@layerzerolabs/lz-evm-protocol-v2/contracts/libs/AddressCast.sol";
-import { MessagingFee, MessagingReceipt } from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroEndpointV2.sol";
-import { Origin } from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
-import { OAppOptionsType3, EnforcedOptionParam } from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OAppOptionsType3.sol";
-import { ReadCodecV1, EVMCallRequestV1 } from "@layerzerolabs/oapp-evm/contracts/oapp/libs/ReadCodecV1.sol";
-import { OAppRead } from "@layerzerolabs/oapp-evm/contracts/oapp/OAppRead.sol";
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-import {StakingModel, StakingModelAlreadyExists, WrongArrayLength, WrongStakingModel, ZeroAddress, ZeroValue} from "../Depository.sol";
+import {AddressCast} from "@layerzerolabs/lz-evm-protocol-v2/contracts/libs/AddressCast.sol";
+import {
+    MessagingFee,
+    MessagingReceipt
+} from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroEndpointV2.sol";
+import {Origin} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
+import {OAppOptionsType3, EnforcedOptionParam} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OAppOptionsType3.sol";
+import {ReadCodecV1, EVMCallRequestV1} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/ReadCodecV1.sol";
+import {OAppRead} from "@layerzerolabs/oapp-evm/contracts/oapp/OAppRead.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {
+    StakingModel,
+    StakingModelAlreadyExists,
+    WrongArrayLength,
+    WrongStakingModel,
+    ZeroAddress,
+    ZeroValue
+} from "../Depository.sol";
 
 interface IStakingHelper {
     /// @dev Gets stakingProxy info.
@@ -18,8 +28,16 @@ interface IStakingHelper {
     /// @return maxNumSlots Max number of slots in staking proxy.
     /// @return minStakingDeposit Minimum deposit value required for service staking.
     /// @return availableRewards Staking proxy available rewards.
-    function getStakingInfo(address stakingProxy) external view returns (bytes32 bytecodeHash, bool isEnabled,
-        uint256 maxNumSlots,uint256 minStakingDeposit, uint256 availableRewards);
+    function getStakingInfo(address stakingProxy)
+        external
+        view
+        returns (
+            bytes32 bytecodeHash,
+            bool isEnabled,
+            uint256 maxNumSlots,
+            uint256 minStakingDeposit,
+            uint256 availableRewards
+        );
 }
 
 interface IStakingProxy {
@@ -37,8 +55,12 @@ interface IDepository {
     /// @param stakingProxy Corresponding staking proxy address.
     /// @param stakeLimitPerSlot Corresponding staking limit per each staking slot.
     /// @param numSlots Corresponding number of staking slots.
-    function LzCreateAndActivateStakingModel(uint256 chainId, address stakingProxy, uint256 stakeLimitPerSlot,
-        uint256 numSlots) external;
+    function LzCreateAndActivateStakingModel(
+        uint256 chainId,
+        address stakingProxy,
+        uint256 stakeLimitPerSlot,
+        uint256 numSlots
+    ) external;
 
     /// @dev Closes staking model via lzRead proofs.
     /// @param chainId Chain Id.
@@ -52,11 +74,15 @@ struct AccountChainIdMsgType {
     uint16 msgType;
 }
 
-
 /// @title LzOracle - Smart contract for LayerZero oracle.
 contract LzOracle is OAppRead, OAppOptionsType3 {
-    event LzCreateAndActivateStakingModelProcessed(bytes32 indexed guid, uint256 chainId, address indexed stakingProxy,
-        uint256 stakeLimitPerSlot, uint256 maxNumServices);
+    event LzCreateAndActivateStakingModelProcessed(
+        bytes32 indexed guid,
+        uint256 chainId,
+        address indexed stakingProxy,
+        uint256 stakeLimitPerSlot,
+        uint256 maxNumServices
+    );
     event LzCloseStakingModelProcessed(bytes32 indexed guid, uint256 chainId, address indexed stakingProxy);
     event LzCreateAndActivateStakingModelInitiated(bytes32 indexed guid, uint256 chainId, address indexed stakingProxy);
     event LzCloseStakingModelInitiated(bytes32 indexed guid, uint256 chainId, address indexed stakingProxy);
@@ -93,9 +119,7 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
         uint256[] memory _chainIds,
         address[] memory _stakingHelpers,
         uint256[] memory _lzChainIds
-    )
-        OAppRead(_endpoint, msg.sender) Ownable(msg.sender)
-    {
+    ) OAppRead(_endpoint, msg.sender) Ownable(msg.sender) {
         if (_stakingImplementationBytecodeHash == 0) {
             revert ZeroValue();
         }
@@ -116,7 +140,7 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
         Origin calldata origin,
         bytes32 guid,
         bytes calldata message,
-        address /* executor */,
+        address, /* executor */
         bytes calldata /* extraData */
     ) internal override {
         require(origin.srcEid > READ_CHANNEL_EID_THRESHOLD, "LZ Read receives only");
@@ -127,29 +151,36 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
         // Check for message type
         if (accountChainIdMsgType.msgType == READ_TYPE_CREATE) {
             // Decode obtained data
-            (bytes32 bytecodeHash, bool isEnabled, uint256 maxNumServices, uint256 minStakingDeposit,
-                uint256 availableRewards) = abi.decode(message, (bytes32, bool, uint256, uint256, uint256));
+            (
+                bytes32 bytecodeHash,
+                bool isEnabled,
+                uint256 maxNumServices,
+                uint256 minStakingDeposit,
+                uint256 availableRewards
+            ) = abi.decode(message, (bytes32, bool, uint256, uint256, uint256));
 
             // Check for correctness of parameters
             if (!isEnabled || availableRewards == 0 || bytecodeHash != stakingImplementationBytecodeHash) {
                 // TODO
-                revert ();
+                revert();
             }
 
             // Considering 1 agent per service: deposit + operator bond = 2 * minStakingDeposit
             uint256 stakeLimitPerSlot = 2 * minStakingDeposit;
-            IDepository(depository).LzCreateAndActivateStakingModel(accountChainIdMsgType.chainId,
-                accountChainIdMsgType.account, stakeLimitPerSlot, maxNumServices);
+            IDepository(depository).LzCreateAndActivateStakingModel(
+                accountChainIdMsgType.chainId, accountChainIdMsgType.account, stakeLimitPerSlot, maxNumServices
+            );
 
-            emit LzCreateAndActivateStakingModelProcessed(guid, accountChainIdMsgType.chainId,
-                accountChainIdMsgType.account, stakeLimitPerSlot, maxNumServices);
+            emit LzCreateAndActivateStakingModelProcessed(
+                guid, accountChainIdMsgType.chainId, accountChainIdMsgType.account, stakeLimitPerSlot, maxNumServices
+            );
         } else if (accountChainIdMsgType.msgType == READ_TYPE_CLOSE) {
             // Decode obtained data
             uint256 availableRewards = abi.decode(message, (uint256));
 
             // Check for correctness of parameters
             if (availableRewards > 0) {
-                revert ();
+                revert();
             }
 
             IDepository(depository).LzCloseStakingModel(accountChainIdMsgType.chainId, accountChainIdMsgType.account);
@@ -166,11 +197,11 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
     /// @param stakingHelper Staking helper address.
     /// @param lzChainId Chain Id in LZ format.
     /// @return Encoded lzRead request.
-    function _cmdGetStakingInfo(
-        address stakingProxy,
-        address stakingHelper,
-        uint256 lzChainId
-    ) internal view returns (bytes memory) {
+    function _cmdGetStakingInfo(address stakingProxy, address stakingHelper, uint256 lzChainId)
+        internal
+        view
+        returns (bytes memory)
+    {
         // Allocate required number of read requests
         EVMCallRequestV1[] memory readRequests = new EVMCallRequestV1[](1);
 
@@ -214,7 +245,10 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
     /// @param chainId EVM chain Id.
     /// @param stakingProxy Staking proxy address.
     /// @param options LZ message options.
-    function lzCreateAndActivateStakingModel(uint256 chainId, address stakingProxy, bytes calldata options) external payable {
+    function lzCreateAndActivateStakingModel(uint256 chainId, address stakingProxy, bytes calldata options)
+        external
+        payable
+    {
         // Push a pair of key defining variables into one key: chainId | stakingProxy
         // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
         uint256 stakingModelId = uint256(uint160(stakingProxy));
@@ -236,16 +270,16 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
         MessagingFee memory fee = _quote(READ_CHANNEL, payload, options, false);
         require(msg.value >= fee.nativeFee);
 
-        MessagingReceipt memory receipt =
-            _lzSend(
-                READ_CHANNEL,
-                payload,
-                combineOptions(READ_CHANNEL, READ_TYPE_CREATE, options),
-                MessagingFee(msg.value, 0),
-                payable(tx.origin)
-            );
+        MessagingReceipt memory receipt = _lzSend(
+            READ_CHANNEL,
+            payload,
+            combineOptions(READ_CHANNEL, READ_TYPE_CREATE, options),
+            MessagingFee(msg.value, 0),
+            payable(tx.origin)
+        );
 
-        mapUidStakingProxyChainIds[receipt.guid] = AccountChainIdMsgType(stakingProxy, uint32(chainId), READ_TYPE_CREATE);
+        mapUidStakingProxyChainIds[receipt.guid] =
+            AccountChainIdMsgType(stakingProxy, uint32(chainId), READ_TYPE_CREATE);
 
         emit LzCreateAndActivateStakingModelInitiated(receipt.guid, chainId, stakingProxy);
     }
@@ -275,14 +309,13 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
         MessagingFee memory fee = _quote(READ_CHANNEL, payload, options, false);
         require(msg.value >= fee.nativeFee);
 
-        MessagingReceipt memory receipt =
-            _lzSend(
-                READ_CHANNEL,
-                payload,
-                combineOptions(READ_CHANNEL, READ_TYPE_CLOSE, options),
-                MessagingFee(msg.value, 0),
-                payable(tx.origin)
-            );
+        MessagingReceipt memory receipt = _lzSend(
+            READ_CHANNEL,
+            payload,
+            combineOptions(READ_CHANNEL, READ_TYPE_CLOSE, options),
+            MessagingFee(msg.value, 0),
+            payable(tx.origin)
+        );
 
         mapUidStakingProxyChainIds[receipt.guid] = AccountChainIdMsgType(stakingProxy, uint32(chainId), READ_TYPE_CLOSE);
 

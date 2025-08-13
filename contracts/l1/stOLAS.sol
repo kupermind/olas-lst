@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import {ERC20, ERC4626, FixedPointMathLib} from  "../../lib/solmate/src/tokens/ERC4626.sol";
+import {ERC20, ERC4626, FixedPointMathLib} from "../../lib/solmate/src/tokens/ERC4626.sol";
 
 /// @dev Only `owner` has a privilege, but the `sender` was provided.
 /// @param sender Sender address.
@@ -44,9 +44,12 @@ contract stOLAS is ERC4626 {
     using FixedPointMathLib for uint256;
 
     event OwnerUpdated(address indexed owner);
-    event ManagersUpdated(address indexed treasury, address indexed depository, address indexed dstributor,
-        address unstakeRelayer);
-    event TotalReservesUpdated(uint256 stakedBalance, uint256 vaultBalance, uint256 reserveBalance, uint256 totalReserves);
+    event ManagersUpdated(
+        address indexed treasury, address indexed depository, address indexed dstributor, address unstakeRelayer
+    );
+    event TotalReservesUpdated(
+        uint256 stakedBalance, uint256 vaultBalance, uint256 reserveBalance, uint256 totalReserves
+    );
     event ReserveBalanceTopUpped(uint256 amount);
     event VaultBalanceTopUpped(uint256 amount);
     event DepositoryFunded(uint256 amount);
@@ -108,9 +111,10 @@ contract stOLAS is ERC4626 {
             revert OwnerOnly(msg.sender, owner);
         }
 
-        if (newTreasury == address(0) || newDepository == address(0) || newDistributor == address(0) ||
-            newUnstakeRelayer == address(0))
-        {
+        if (
+            newTreasury == address(0) || newDepository == address(0) || newDistributor == address(0)
+                || newUnstakeRelayer == address(0)
+        ) {
             revert ZeroAddress();
         }
 
@@ -203,7 +207,7 @@ contract stOLAS is ERC4626 {
             // If vault and reserve does not have enough balance, use it all and take rest from staked
             transferAmount = vaultAndReserveBalance;
             uint256 remainingAmount = assets - vaultAndReserveBalance;
-            
+
             // Check for overflow, must never happen
             if (remainingAmount > curStakedBalance) {
                 revert Overflow(remainingAmount, curStakedBalance);
@@ -327,7 +331,9 @@ contract stOLAS is ERC4626 {
     /// @return curVaultBalance Current vault balance.
     /// @return curReserveBalance Current reserve balance.
     /// @return curTotalReserves Current total reserves.
-    function calculateDepositBalances(uint256 assets) public view
+    function calculateDepositBalances(uint256 assets)
+        public
+        view
         returns (uint256 curStakedBalance, uint256 curVaultBalance, uint256 curReserveBalance, uint256 curTotalReserves)
     {
         // topUpBalance is subtracted as it is passed as part of the assets value and already deposited
@@ -350,7 +356,7 @@ contract stOLAS is ERC4626 {
     ///       `deposit()` function use its static call directly.
     /// @param assets Deposited assets amount.
     function previewDeposit(uint256 assets) public view override returns (uint256) {
-        (, , , uint256 curTotalReserves) = calculateDepositBalances(assets);
+        (,,, uint256 curTotalReserves) = calculateDepositBalances(assets);
 
         uint256 shares = totalSupply;
         return shares == 0 ? assets : assets.mulDivDown(shares, curTotalReserves);
@@ -361,7 +367,9 @@ contract stOLAS is ERC4626 {
     /// @return curVaultBalance Current vault balance.
     /// @return curReserveBalance Current reserve balance.
     /// @return curTotalReserves Current total reserves.
-    function calculateCurrentBalances() public view
+    function calculateCurrentBalances()
+        public
+        view
         returns (uint256 curStakedBalance, uint256 curVaultBalance, uint256 curReserveBalance, uint256 curTotalReserves)
     {
         // Current staked balance
@@ -378,7 +386,7 @@ contract stOLAS is ERC4626 {
     /// @dev Previews redeem shares to assets amount.
     /// @param shares Redeemed shares amount.
     function previewRedeem(uint256 shares) public view override returns (uint256) {
-        (, , , uint256 curTotalReserves) = calculateCurrentBalances();
+        (,,, uint256 curTotalReserves) = calculateCurrentBalances();
 
         uint256 assets = totalSupply;
         return assets == 0 ? shares : shares.mulDivDown(curTotalReserves, assets);
