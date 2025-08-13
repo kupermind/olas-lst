@@ -1,4 +1,10 @@
 {
+  "lib/devtools": {
+    "rev": "d8d4d72cecdc22c961c350e62bb727126dc1a395"
+  },
+  "lib/openzeppelin-contracts": {
+    "rev": "c64a1edb67b6e3f4a15cca8909c9482ad33a02b0"
+  },
   "lib/layerzero-v2": {
     "rev": "63bbd31584c588844de33678bf8dd61d879cba14"
   },
@@ -7,11 +13,5 @@
   },
   "lib/solmate": {
     "rev": "e5e0ed64c75e74974151780884e59071d026d84e"
-  },
-  "lib/devtools": {
-    "rev": "d8d4d72cecdc22c961c350e62bb727126dc1a395"
-  },
-  "lib/openzeppelin-contracts": {
-    "rev": "c64a1edb67b6e3f4a15cca8909c9482ad33a02b0"
   }
 }
