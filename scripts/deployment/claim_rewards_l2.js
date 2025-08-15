@@ -4,8 +4,8 @@ const { ethers } = require("hardhat");
 const fs = require("fs");
 
 const main = async () => {
-    //const globalsFile = "scripts/deployment/globals_gnosis_chiado.json";
-    const globalsFile = "scripts/deployment/globals_base_sepolia.json";
+    const globalsFile = "scripts/deployment/globals_gnosis_chiado.json";
+    //const globalsFile = "scripts/deployment/globals_base_sepolia.json";
     const dataFromJSON = fs.readFileSync(globalsFile, "utf8");
     let parsedData = JSON.parse(dataFromJSON);
 

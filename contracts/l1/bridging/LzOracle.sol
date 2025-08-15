@@ -132,6 +132,7 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
 
             // Check for correctness of parameters
             if (!isEnabled || availableRewards == 0 || bytecodeHash != stakingImplementationBytecodeHash) {
+                // TODO
                 revert ();
             }
 
@@ -227,6 +228,7 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
             revert StakingModelAlreadyExists(stakingModelId);
         }
 
+        // TODO check accountChainId for not null
         AccountChainIdMsgType memory accountChainId = mapStakingHelperLzChainIds[chainId];
         bytes memory payload = _cmdGetStakingInfo(stakingProxy, accountChainId.account, accountChainId.chainId);
 

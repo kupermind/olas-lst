@@ -52,7 +52,7 @@ interface IToken {
 abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
     event OwnerUpdated(address indexed owner);
     event FundsReceived(address indexed sender, uint256 value);
-    event StakeRequestExecuted(address target, uint256 amount, bytes32 indexed batchHash);
+    event StakeRequestExecuted(address target, uint256 amount, bytes32 indexed batchHash, bytes32 operation);
     event StakeRequestQueued(bytes32 indexed queueHash, address target, uint256 amount,
         bytes32 indexed batchHash, bytes32 operation, uint256 olasBalance, uint256 paused);
     event UnstakeRequestQueued(bytes32 indexed queueHash, address target, uint256 amount,
@@ -177,7 +177,7 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
                 (success, ) = stakingManager.call(stakeData);
 
                 if (success) {
-                    emit StakeRequestExecuted(target, amount, batchHash);
+                    emit StakeRequestExecuted(target, amount, batchHash, operation);
                 }
             }
 
@@ -287,11 +287,6 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
                 // Approve OLAS for stakingManager
                 IToken(olas).approve(stakingManager, amount);
                 IStakingManager(stakingManager).stake(target, amount, operation);
-
-                emit StakeRequestExecuted(target, amount, batchHash);
-
-                // Remove processed queued nonce
-                queuedHashes[queueHash] = false;
             } else {
                 // OLAS balance is not enough for redeem
                 revert InsufficientBalance(olasBalance, amount);
@@ -302,6 +297,11 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
             // Must never happen
             revert OperationNotFound(operation);
         }
+
+        // Remove processed queued nonce
+        queuedHashes[queueHash] = false;
+
+        emit StakeRequestExecuted(target, amount, batchHash, operation);
 
         _locked = 1;
     }

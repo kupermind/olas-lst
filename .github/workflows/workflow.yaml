@@ -16,16 +16,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository and submodules
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
 
       - name: Install Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
 
       # Install modules
       - name: Install modules
         run: yarn install
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
 
       # Run linters
       - name: Run ESLint
@@ -33,12 +38,12 @@ jobs:
       - name: Run solhint
         run: ./node_modules/.bin/solhint 'contracts/**/*.sol'
 
-      # Compile the code and run tests and deploy script(s)
+      # Compile the code and run tests
       - name: Compile the code
-        run: ./node_modules/.bin/hardhat compile
+        run: forge build
       - name: Run tests
-        run: ./node_modules/.bin/hardhat test
+        run: forge test
 
       # Run hardhat coverage and upload codecov report
       #- name: Solidity coverage summary
-      #  run: export NODE_OPTIONS="--max-old-space-size=8192" && ./node_modules/.bin/hardhat coverage
+      #  run: export NODE_OPTIONS="--max-old-space-size=8192" && forge coverage
