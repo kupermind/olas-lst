@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
-import "hardhat/console.sol";
+
 import {ERC20, ERC4626, FixedPointMathLib} from  "../../lib/solmate/src/tokens/ERC4626.sol";
 
 /// @dev Only `owner` has a privilege, but the `sender` was provided.
@@ -132,23 +132,12 @@ contract stOLAS is ERC4626 {
         if (assets == 0) {
             revert ZeroValue();
         }
-console.log("stakedBalanceBefore", stakedBalance);
-console.log("vaultBalanceBefore", vaultBalance);
-console.log("reserveBalanceBefore", reserveBalance);
-console.log("totalBalanceBefore", totalReserves);
+
         uint256 curTotalReserves = updateTotalAssets();
-console.log("stakedBalanceAfter", stakedBalance);
-console.log("vaultBalanceAfter", vaultBalance);
-console.log("reserveBalanceAfter", reserveBalance);
-console.log("totalBalanceAfter", totalReserves);
 
         // Calculate shares
         shares = totalSupply;
         shares = shares == 0 ? assets : assets.mulDivDown(shares, curTotalReserves);
-
-        console.log("!!!!!!!!!!!!!! curTotalReserves", curTotalReserves);
-        console.log("assets", assets);
-        console.log("shares", shares);
 
         // Check for rounding error since we round down in mulDivDown
         if (shares == 0) {
@@ -353,9 +342,6 @@ console.log("totalBalanceAfter", totalReserves);
 
         uint256 shares = totalSupply;
         return shares == 0 ? assets : assets.mulDivDown(shares, curTotalReserves);
-
-        console.log("!!!!!!!!!!!!!! curTotalReserves", curTotalReserves);
-        console.log("shares", shares);
     }
 
     /// @dev Calculates current balances.
