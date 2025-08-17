@@ -133,7 +133,7 @@ contract stOLAS is ERC4626 {
             revert ZeroValue();
         }
 
-        uint256 curTotalReserves = updateTotalAssets();
+        (, , , uint256 curTotalReserves) = calculateCurrentBalances();
 
         // Calculate shares
         shares = totalSupply;
