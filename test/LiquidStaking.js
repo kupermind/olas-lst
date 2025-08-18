@@ -945,20 +945,22 @@ describe("Liquid Staking", function () {
             //let olasAmount = minStakingDeposit.mul(40);
             let olasAmount = (minStakingDeposit.mul(3)).sub(1);
 
+            const numStakes = 18;
+            const amountToStake = olasAmount.mul(numStakes);
+
             // Approve OLAS for depository
-            console.log("User approves OLAS for depository:", olasAmount.toString());
-            await olas.approve(depository.address, initSupply);
+            console.log("User approves OLAS for depository:", amountToStake.toString());
+            await olas.approve(depository.address, amountToStake);
 
             // Stake OLAS on L1
             console.log("User deposits OLAS for stOLAS");
             let numIters = 10;
-            const numStakes = 18;
             let chainIds = new Array(numStakes).fill(gnosisChainId);
             let stakingInstances = new Array(numStakes).fill(stakingTokenInstance.address);
             let bridgePayloads = new Array(numStakes).fill(bridgePayload);
             let values = new Array(numStakes).fill(0);
             for (let i = 0; i < numIters; i++) {
-                await depository.deposit(olasAmount.mul(numStakes), chainIds, stakingInstances, bridgePayloads, values);
+                await depository.deposit(amountToStake, chainIds, stakingInstances, bridgePayloads, values);
             }
 
             let stBalance = await st.balanceOf(deployer.address);
@@ -1118,7 +1120,7 @@ describe("Liquid Staking", function () {
             snapshot.restore();
         });
 
-        it("Multiple stakes-unstakes", async function () {
+        it.only("Multiple stakes-unstakes", async function () {
             // Max timeout 1600 sec for coverage
             this.timeout(1600000);
 
@@ -1141,14 +1143,15 @@ describe("Liquid Staking", function () {
 
                 // Increase every iteration by a factor of 4 - first one is to cover 2 staked services: 2 * 2 * minStakingDeposit
                 olasAmount = olasAmount.add(1);
+                const amountToStake = olasAmount.mul(numStakes);
 
                 // Approve OLAS for depository
-                console.log("User approves OLAS for depository:", olasAmount.toString());
-                await olas.approve(depository.address, olasAmount.mul(numStakes));
+                console.log("User approves OLAS for depository:", amountToStake.toString());
+                await olas.approve(depository.address, amountToStake);
 
                 // Stake OLAS on L1
                 console.log("User deposits OLAS for stOLAS");
-                await depository.deposit(olasAmount.mul(numStakes), chainIds, stakingInstances, bridgePayloads, values);
+                await depository.deposit(amountToStake, chainIds, stakingInstances, bridgePayloads, values);
                 let stBalance = await st.balanceOf(deployer.address);
                 console.log("User stOLAS balance now:", stBalance.toString());
                 let stTotalAssets = await st.totalAssets();
@@ -1174,7 +1177,9 @@ describe("Liquid Staking", function () {
                 await stakingTokenInstance.connect(agent).checkpoint();
 
                 let stakedServiceIds = await stakingManager.getStakedServiceIds(stakingTokenInstance.address);
-                console.log("Number of staked services: ", stakedServiceIds.length);
+                console.log("Number of staked services in StakingManager:", stakedServiceIds.length);
+                let numStakedServices = await stakingTokenInstance.getNumServiceIds();
+                expect(numStakedServices).to.equal(stakedServiceIds.length);
 
                 // Check sync of staked balances on both chains
                 let stakedBalanceL1 = await st.stakedBalance();
@@ -1360,20 +1365,22 @@ describe("Liquid Staking", function () {
             //let olasAmount = minStakingDeposit.mul(40);
             let olasAmount = (minStakingDeposit.mul(3)).sub(1);
 
+            const numStakes = 18;
+            const amountToStake = olasAmount.mul(numStakes);
+
             // Approve OLAS for depository
-            console.log("User approves OLAS for depository:", olasAmount.toString());
-            await olas.approve(depository.address, initSupply);
+            console.log("User approves OLAS for depository:", amountToStake.toString());
+            await olas.approve(depository.address, amountToStake);
 
             // Stake OLAS on L1
             console.log("User deposits OLAS for stOLAS");
             let numIters = 10;
-            const numStakes = 18;
             let chainIds = new Array(numStakes).fill(gnosisChainId);
             let stakingInstances = new Array(numStakes).fill(stakingTokenInstance.address);
             let bridgePayloads = new Array(numStakes).fill(bridgePayload);
             let values = new Array(numStakes).fill(0);
             for (let i = 0; i < numIters; i++) {
-                await depository.deposit(olasAmount.mul(numStakes), chainIds, stakingInstances, bridgePayloads, values);
+                await depository.deposit(amountToStake, chainIds, stakingInstances, bridgePayloads, values);
             }
 
             let stBalance = await st.balanceOf(deployer.address);
@@ -1515,7 +1522,7 @@ describe("Liquid Staking", function () {
                 previewAmount = await st.previewDeposit(olasAmount);
                 console.log("User stOLAS preview balance:", previewAmount.toString());
                 stBalanceBefore = await st.balanceOf(deployer.address);
-                reserveBalanceBefore = await st.reserveBalance();
+                const reserveBalanceBefore = await st.reserveBalance();
                 await depository.deposit(olasAmount, [gnosisChainId, gnosisChainId],
                     [stakingTokenInstance.address, stakingTokenInstance.address], [bridgePayload, bridgePayload], [0, 0]);
                 stBalanceAfter = await st.balanceOf(deployer.address);
