@@ -1151,7 +1151,13 @@ describe("Liquid Staking", function () {
 
                 // Stake OLAS on L1
                 console.log("User deposits OLAS for stOLAS");
+                let previewAmount = await st.previewDeposit(amountToStake);
+                let stBalanceBefore = await st.balanceOf(deployer.address);
                 await depository.deposit(amountToStake, chainIds, stakingInstances, bridgePayloads, values);
+                let stBalanceAfter = await st.balanceOf(deployer.address);
+                let stBalanceDiff = stBalanceAfter.sub(stBalanceBefore);
+                expect(stBalanceDiff).to.equal(previewAmount);
+
                 let stBalance = await st.balanceOf(deployer.address);
                 console.log("User stOLAS balance now:", stBalance.toString());
                 let stTotalAssets = await st.totalAssets();
@@ -1238,7 +1244,7 @@ describe("Liquid Staking", function () {
                 values = new Array(numUnstakes).fill(0);
                 // Request withdraw
                 console.log("User requests withdraw of half of stOLAS:", stAmount.toString());
-                const previewAmount = await st.previewRedeem(stAmount);
+                previewAmount = await st.previewRedeem(stAmount);
                 let tx = await treasury.requestToWithdraw(stAmount, chainIds, stakingInstances, bridgePayloads, values);
                 let res = await tx.wait();
                 // Get withdraw request Id
@@ -1506,9 +1512,7 @@ describe("Liquid Staking", function () {
             console.log("vaultBalance after 1st deposit:", vaultBalanceAfter.toString());
             console.log("reserveBalance after 1st deposit:", reserveBalanceAfter.toString());
 
-            if (reserveBalanceAfter.eq(0)) {
-                expect(stBalanceDiff).to.equal(previewAmount);
-            }
+            expect(stBalanceDiff).to.equal(previewAmount);
 
             // Estimate full first redeem
             previewAmount = await st.previewRedeem(stBalanceAfter);
@@ -1522,7 +1526,6 @@ describe("Liquid Staking", function () {
                 previewAmount = await st.previewDeposit(olasAmount);
                 console.log("User stOLAS preview balance:", previewAmount.toString());
                 stBalanceBefore = await st.balanceOf(deployer.address);
-                const reserveBalanceBefore = await st.reserveBalance();
                 await depository.deposit(olasAmount, [gnosisChainId, gnosisChainId],
                     [stakingTokenInstance.address, stakingTokenInstance.address], [bridgePayload, bridgePayload], [0, 0]);
                 stBalanceAfter = await st.balanceOf(deployer.address);
@@ -1542,9 +1545,7 @@ describe("Liquid Staking", function () {
                 console.log("reserveBalance:", reserveBalanceAfter.toString());
                 let totalComputedAssets = stakedBalanceAfter.add(vaultBalanceAfter).add(reserveBalanceAfter);
 
-                if (reserveBalanceBefore.eq(0)) {
-                    expect(stBalanceDiff).to.equal(previewAmount);
-                }
+                expect(stBalanceDiff).to.equal(previewAmount);
 
                 stTotalAssets = await st.totalAssets();
                 console.log("OLAS total assets on stOLAS now:", stTotalAssets.toString());
