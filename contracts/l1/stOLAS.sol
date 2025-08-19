@@ -241,10 +241,12 @@ contract stOLAS is ERC4626 {
         return curTotalReserves;
     }
 
-    /// @dev Calculates reserve and stake balances, and top-ups reserve balance via Depository, if required.
+    /// @dev Calculates reserve and stake balances, and top-ups stOLAS or address(this).
     /// @param reserveAmount Additional reserve OLAS amount.
     /// @param stakeAmount Additional stake OLAS amount.
-    function topUpReserveBalance(uint256 reserveAmount, uint256 stakeAmount) external {
+    /// @param topUp Top up amount to be sent or received.
+    /// @param direction To stOLAS, if true, and to address(this) otherwise
+    function syncStakeBalances(uint256 reserveAmount, uint256 stakeAmount, uint256 topUp, bool direction) external {
         if (msg.sender != depository) {
             revert DepositoryOnly(msg.sender, depository);
         }
@@ -252,10 +254,11 @@ contract stOLAS is ERC4626 {
         // Update balances accordingly
         // Reserve balance
         uint256 curReserveBalance = reserveBalance;
-        if (reserveAmount > 0) {
-            curReserveBalance += reserveAmount;
-            reserveBalance = curReserveBalance;
+        if (curReserveBalance != reserveAmount) {
+            curReserveBalance = reserveAmount;
+            reserveBalance = reserveAmount;
         }
+
         // Staked balance
         uint256 curStakedBalance = stakedBalance;
         if (stakeAmount > 0) {
@@ -263,16 +266,22 @@ contract stOLAS is ERC4626 {
             stakedBalance = curStakedBalance;
         }
 
-        // Either reserveAmount or stakeAmount are not zero
-        uint256 curTotalReserves = totalReserves + reserveAmount + stakeAmount;
+        // Update total reserves, since either reserveAmount or stakeAmount are not zero
+        // Current vault balance
+        uint256 curVaultBalance = vaultBalance;
+        // Total reserves
+        uint256 curTotalReserves = curStakedBalance + curVaultBalance + curReserveBalance;
         totalReserves = curTotalReserves;
 
-        // Deposit reserveAmount, if any
-        if (reserveAmount > 0) {
-            asset.transferFrom(msg.sender, address(this), reserveAmount);
+        // Direction is true if the transfer is from Depository to stOLAS, else the opposite direction
+        if (direction == true) {
+            asset.transferFrom(msg.sender, address(this), topUp);
+        } else if (topUp > 0) {
+            asset.approve(msg.sender, topUp);
+            asset.transfer(msg.sender, topUp);
         }
 
-        emit TotalReservesUpdated(curStakedBalance, vaultBalance, curReserveBalance, curTotalReserves);
+        emit TotalReservesUpdated(curStakedBalance, curVaultBalance, curReserveBalance, curTotalReserves);
     }
 
     /// @dev Top-ups vault balance via Distributor.
@@ -282,11 +291,17 @@ contract stOLAS is ERC4626 {
             revert DistributorOnly(msg.sender, distributor);
         }
 
+        // Update balances accordingly
+        // Vault balance
         uint256 curVaultBalance = vaultBalance + amount;
         vaultBalance = curVaultBalance;
+        // Total reserves
+        uint256 curTotalReserves = totalReserves + amount;
+        totalReserves = curTotalReserves;
+
         asset.transferFrom(msg.sender, address(this), amount);
 
-        emit TotalReservesUpdated(stakedBalance, curVaultBalance, reserveBalance, totalReserves + amount);
+        emit TotalReservesUpdated(stakedBalance, curVaultBalance, reserveBalance, curTotalReserves);
     }
 
     /// @dev Top-ups unstake balance from retired models via Depository: increase reserve balance and decrease staked one.
@@ -296,10 +311,16 @@ contract stOLAS is ERC4626 {
             revert UnstakeRelayerOnly(msg.sender, unstakeRelayer);
         }
 
+        // Update stakedBalance and possibly totalReserves
         uint256 curStakedBalance = stakedBalance;
+        uint256 curTotalReserves = totalReserves;
         // This can only happen if OLAS funds have been additionally transferred to UnstakeRelayer contract
         // The leftover difference is passed to reserve balance
         if (amount > curStakedBalance) {
+            // This needs totalReserves update for the amount exceeding stakedBalance
+            uint256 overDeposit = amount - curStakedBalance;
+            curTotalReserves += overDeposit;
+            totalReserves = curTotalReserves;
             curStakedBalance = 0;
         } else {
             curStakedBalance -= amount;
@@ -312,7 +333,7 @@ contract stOLAS is ERC4626 {
 
         asset.transferFrom(msg.sender, address(this), amount);
 
-        emit TotalReservesUpdated(curStakedBalance, vaultBalance, curReserveBalance, totalReserves);
+        emit TotalReservesUpdated(curStakedBalance, vaultBalance, curReserveBalance, curTotalReserves);
     }
 
     /// @dev Funds Depository with reserve balances.
