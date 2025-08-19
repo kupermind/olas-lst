@@ -275,8 +275,13 @@ contract stOLAS is ERC4626 {
 
         // Direction is true if the transfer is from Depository to stOLAS, else the opposite direction
         if (direction == true) {
+            // Pull OLAS from Depository
             asset.transferFrom(msg.sender, address(this), topUp);
         } else if (topUp > 0) {
+            // Top-up can be zero in case when it is not transferred to stOLAS as it is fully utilized in Depository
+            // Thus, no action is required and this block is skipped
+
+            // Approve and transfer OLAS to Depository
             asset.approve(msg.sender, topUp);
             asset.transfer(msg.sender, topUp);
         }
