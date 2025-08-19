@@ -1,7 +1,7 @@
 {
   "contractVerification": true,
-  "useLedger": false,
-  "derivationPath": "m/44'/60'/0'/0/0",
+  "useLedger": true,
+  "derivationPath": "m/44'/60'/2'/0/0",
   "providerName": "chiado",
   "chainId": "100",
   "networkURL": "https://rpc.gnosischain.com",
@@ -34,5 +34,6 @@
   "apyLimit": "3000000000000000000",
   "stakingVerifierAddress": "0x1D59DadE4FAeA7771eC7221420012d413175404C",
   "stakingFactoryAddress": "0xb0228CA253A88Bc8eb4ca70BCAC8f87b381f4700",
-  "stakingHelperAddress": "0x371f3Fd9f19298043DF60d2858719073EcFAc688"
+  "stakingHelperAddress": "0x371f3Fd9f19298043DF60d2858719073EcFAc688",
+  "stakingTokenLockedAddress": "0xA8e739a8A5D56b9ccF612020204B9C90A1b55099"
 }
