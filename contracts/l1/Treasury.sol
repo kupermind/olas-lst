@@ -2,7 +2,7 @@
 pragma solidity ^0.8.30;
 
 import {ERC6909} from "../../lib/solmate/src/tokens/ERC6909.sol";
-import {Implementation, OwnerOnly, ZeroAddress} from "../Implementation.sol";
+import {Implementation, OwnerOnly} from "../Implementation.sol";
 import {IToken} from "../interfaces/IToken.sol";
 
 interface IDepository {

@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import {IStaking} from "../interfaces/IStaking.sol";
-
 interface ICollector {
     function topUpBalance(uint256 amount, bytes32 operation) external;
 }

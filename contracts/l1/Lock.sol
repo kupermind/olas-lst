@@ -2,7 +2,6 @@
 pragma solidity ^0.8.30;
 
 import {Implementation, OwnerOnly, ZeroAddress} from "../Implementation.sol";
-import {Treasury} from "./Treasury.sol";
 
 interface IGovernor {
     /// @dev Create a new proposal to change the protocol / contract parameters.
