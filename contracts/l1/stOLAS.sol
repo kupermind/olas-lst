@@ -106,6 +106,7 @@ contract stOLAS is ERC4626 {
             revert OwnerOnly(msg.sender, owner);
         }
 
+        // Check for zero addresses
         if (newTreasury == address(0) || newDepository == address(0) || newDistributor == address(0) ||
             newUnstakeRelayer == address(0))
         {
@@ -116,6 +117,7 @@ contract stOLAS is ERC4626 {
         depository = newDepository;
         distributor = newDistributor;
         unstakeRelayer = newUnstakeRelayer;
+
         emit ManagersUpdated(newTreasury, newDepository, newDistributor, newUnstakeRelayer);
     }
 

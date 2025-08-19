@@ -3,9 +3,12 @@
 # Check if $1 is provided
 if [ -z "$1" ]; then
   echo "Usage: $0 <network>"
-  echo "Example: $0 eth_mainnet"
+  echo "Example: $0 base_mainnet"
   exit 1
 fi
+
+# Get L2 network name: gnosis, base, etc.
+networkL2=$2
 
 red=$(tput setaf 1)
 green=$(tput setaf 2)
@@ -24,8 +27,9 @@ derivationPath=$(jq -r '.derivationPath' $globals)
 chainId=$(jq -r '.chainId' $globals)
 networkURL=$(jq -r '.networkURL' $globals)
 
-depositoryProxyAddress=$(jq -r '.depositoryProxyAddress' $globals)
-lzOracleAddress=$(jq -r '.lzOracleAddress' $globals)
+olasAddress=$(jq -r ".olasAddress" $globals)
+depositProcessorL1Address=$(jq -r ".${networkL2}DepositProcessorL1Address" $globals)
+amount="500000000000000000000000"
 
 # Getting L1 API key
 if [ $chainId == 1 ]; then
@@ -54,8 +58,17 @@ fi
 
 castSendHeader="cast send --rpc-url $networkURL$API_KEY $walletArgs"
 
-echo "${green}Change LzOracle in Depository${reset}"
-castArgs="$depositoryProxyAddress changeLzOracle(address) $lzOracleAddress"
+relayer="0x63e47c5e3303dddcaf3b404b1ccf9eb633652e9e"
+
+echo "${green}Approve OLAS for relayer${reset}"
+castArgs="$olasAddress approve(address,uint256) $relayer $amount"
+echo $castArgs
+castCmd="$castSendHeader $castArgs"
+result=$($castCmd)
+echo "$result" | grep "status"
+
+echo "${green}Relay OLAS to L2${reset}"
+castArgs="$relayer relayTokens(address,uint256) $olasAddress $amount"
 echo $castArgs
 castCmd="$castSendHeader $castArgs"
 result=$($castCmd)
