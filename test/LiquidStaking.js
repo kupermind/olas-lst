@@ -1243,7 +1243,7 @@ describe("Liquid Staking", function () {
                 console.log("vaultBalance after distribute:", await st.vaultBalance());
                 console.log("reserveBalance after distribute:", await st.reserveBalance());
 
-                stTotalAssets = await st.totalAssets();
+                let stTotalAssets = await st.totalAssets();
                 console.log("OLAS total assets on stOLAS now:", stTotalAssets.toString());
 
                 console.log("User approves stOLAS for treasury:", stBalance.toString());
