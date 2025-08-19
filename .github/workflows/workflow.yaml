@@ -41,8 +41,10 @@ jobs:
       # Compile the code and run tests
       - name: Compile the code
         run: forge build
-      - name: Run tests
+      - name: Run Forge tests
         run: forge test
+      - name: Run Hardhat tests
+        run: yarn test:hardhat
 
       # Run hardhat coverage and upload codecov report
       #- name: Solidity coverage summary

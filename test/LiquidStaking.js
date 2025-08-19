@@ -945,20 +945,19 @@ describe("Liquid Staking", function () {
             //let olasAmount = minStakingDeposit.mul(40);
             let olasAmount = (minStakingDeposit.mul(3)).sub(1);
 
-            // Approve OLAS for depository
-            console.log("User approves OLAS for depository:", olasAmount.toString());
-            await olas.approve(depository.address, initSupply);
+            const numStakes = 18;
+            const amountToStake = olasAmount.mul(numStakes);
 
             // Stake OLAS on L1
             console.log("User deposits OLAS for stOLAS");
             let numIters = 10;
-            const numStakes = 18;
             let chainIds = new Array(numStakes).fill(gnosisChainId);
             let stakingInstances = new Array(numStakes).fill(stakingTokenInstance.address);
             let bridgePayloads = new Array(numStakes).fill(bridgePayload);
             let values = new Array(numStakes).fill(0);
             for (let i = 0; i < numIters; i++) {
-                await depository.deposit(olasAmount.mul(numStakes), chainIds, stakingInstances, bridgePayloads, values);
+                await olas.approve(depository.address, amountToStake);
+                await depository.deposit(amountToStake, chainIds, stakingInstances, bridgePayloads, values);
             }
 
             let stBalance = await st.balanceOf(deployer.address);
@@ -1023,8 +1022,18 @@ describe("Liquid Staking", function () {
             console.log("Calling OLAS total assets on stOLAS update by agent or manually");
             await st.updateTotalAssets();
 
+            let stakedBalanceAfter = await st.stakedBalance();
+            let vaultBalanceAfter = await st.vaultBalance();
+            let reserveBalanceAfter = await st.reserveBalance();
+
+            console.log("stakedBalance:", stakedBalanceAfter.toString());
+            console.log("vaultBalance:", vaultBalanceAfter.toString());
+            console.log("reserveBalance:", reserveBalanceAfter.toString());
+            let totalComputedAssets = stakedBalanceAfter.add(vaultBalanceAfter).add(reserveBalanceAfter);
+
             stTotalAssets = await st.totalAssets();
             console.log("OLAS total assets on stOLAS now:", stTotalAssets.toString());
+            expect(stTotalAssets).to.equal(totalComputedAssets);
 
             console.log("User approves stOLAS for treasury:", stBalance.toString());
             await st.approve(treasury.address, stBalance);
@@ -1034,13 +1043,16 @@ describe("Liquid Staking", function () {
             console.log("User requests full withdraw of stOLAS:", stBalance.toString());
             numIters = 10;
             const stAmount = stBalance.div(numIters);
-            const numUnstakes = 25;
+            const numUnstakes = 30;
             chainIds = new Array(numUnstakes).fill(gnosisChainId);
             stakingInstances = new Array(numUnstakes).fill(stakingTokenInstance.address);
             bridgePayloads = new Array(numUnstakes).fill(bridgePayload);
             values = new Array(numUnstakes).fill(0);
+            let totalOLASBalance = ethers.BigNumber.from(0);
             for (let i = 0; i < numIters; i++) {
+                console.log("Iteration:", i);
                 const previewAmount = await st.previewRedeem(stAmount);
+                console.log("previewAmount:", previewAmount.toString());
                 let tx = await treasury.requestToWithdraw(stAmount, chainIds, stakingInstances, bridgePayloads, values);
                 let res = await tx.wait();
                 // Get withdraw request Id
@@ -1073,6 +1085,22 @@ describe("Liquid Staking", function () {
                 let balanceDiff = balanceAfter.sub(balanceBefore);
                 expect(balanceDiff).to.equal(olasWithdrawAmount);
                 console.log("User got OLAS:", olasWithdrawAmount.toString());
+
+                totalOLASBalance = totalOLASBalance.add(balanceDiff);
+                console.log("User total OLAS balance after withdraw:", totalOLASBalance.toString());
+
+                stakedBalanceAfter = await st.stakedBalance();
+                vaultBalanceAfter = await st.vaultBalance();
+                reserveBalanceAfter = await st.reserveBalance();
+
+                console.log("stakedBalance:", stakedBalanceAfter.toString());
+                console.log("vaultBalance:", vaultBalanceAfter.toString());
+                console.log("reserveBalance:", reserveBalanceAfter.toString());
+                totalComputedAssets = stakedBalanceAfter.add(vaultBalanceAfter).add(reserveBalanceAfter);
+
+                stTotalAssets = await st.totalAssets();
+                console.log("OLAS total assets on stOLAS now:", stTotalAssets.toString());
+                expect(stTotalAssets).to.equal(totalComputedAssets);
             }
 
             console.log("stakedBalance:", await st.stakedBalance());
@@ -1101,7 +1129,7 @@ describe("Liquid Staking", function () {
             // Get initial OLAS amount to stake
             let olasAmount = (minStakingDeposit.mul(5)).div(4);
 
-            let numIters = 25;
+            let numIters = 40;
             const numStakes = 18;
             let chainIds = new Array(numStakes).fill(gnosisChainId);
             let stakingInstances = new Array(numStakes).fill(stakingTokenInstance.address);
@@ -1112,18 +1140,37 @@ describe("Liquid Staking", function () {
 
                 // Increase every iteration by a factor of 4 - first one is to cover 2 staked services: 2 * 2 * minStakingDeposit
                 olasAmount = olasAmount.add(1);
+                const amountToStake = olasAmount.mul(numStakes);
 
                 // Approve OLAS for depository
-                console.log("User approves OLAS for depository:", olasAmount.toString());
-                await olas.approve(depository.address, olasAmount.mul(numStakes));
+                console.log("User approves OLAS for depository:", amountToStake.toString());
+                await olas.approve(depository.address, amountToStake);
 
                 // Stake OLAS on L1
                 console.log("User deposits OLAS for stOLAS");
-                await depository.deposit(olasAmount.mul(numStakes), chainIds, stakingInstances, bridgePayloads, values);
+                let previewAmount = await st.previewDeposit(amountToStake);
+                let stTotalAssetsBefore = await st.totalAssets();
+                let stBalanceBefore = await st.balanceOf(deployer.address);
+                await depository.deposit(amountToStake, chainIds, stakingInstances, bridgePayloads, values);
+                console.log("stakedBalanceL1", await st.stakedBalance());
+                let stTotalAssetsAfter = await st.totalAssets();
+                let stTotalAssetsAfterDiff = stTotalAssetsAfter.sub(stTotalAssetsBefore);
+                // Check deposited OLAS accounts in totalAssets
+                expect(stTotalAssetsAfterDiff).to.equal(amountToStake);
+                let stBalanceAfter = await st.balanceOf(deployer.address);
+                let stBalanceDiff = stBalanceAfter.sub(stBalanceBefore);
+                // Check calculated stOLAS is equal to stOLAS additionally minted amount
+                expect(stBalanceDiff).to.equal(previewAmount);
+
+                // Estimate redeem if deployer were to redeem the obtained amount of stOLAS right away
+                previewAmount = await st.previewRedeem(stBalanceDiff);
+                // Preview amount could be just slightly different due to rounding error
+                let delta = amountToStake.sub(previewAmount);
+                expect(Number(delta)).to.lessThan(10);
+
                 let stBalance = await st.balanceOf(deployer.address);
                 console.log("User stOLAS balance now:", stBalance.toString());
-                let stTotalAssets = await st.totalAssets();
-                console.log("OLAS total assets on stOLAS:", stTotalAssets.toString());
+                console.log("OLAS total assets on stOLAS:", stTotalAssetsAfter.toString());
 
                 let veBalance = await ve.getVotes(lock.address);
                 console.log("Protocol current veOLAS balance:", veBalance.toString());
@@ -1145,7 +1192,9 @@ describe("Liquid Staking", function () {
                 await stakingTokenInstance.connect(agent).checkpoint();
 
                 let stakedServiceIds = await stakingManager.getStakedServiceIds(stakingTokenInstance.address);
-                console.log("Number of staked services: ", stakedServiceIds.length);
+                console.log("Number of staked services in StakingManager:", stakedServiceIds.length);
+                let numStakedServices = await stakingTokenInstance.getNumServiceIds();
+                expect(numStakedServices).to.equal(stakedServiceIds.length);
 
                 // Check sync of staked balances on both chains
                 let stakedBalanceL1 = await st.stakedBalance();
@@ -1180,7 +1229,8 @@ describe("Liquid Staking", function () {
                 await collector.relayTokens(rewardOperation, bridgePayload);
 
                 console.log("\nL1");
-
+                const distributorBalance = await olas.balanceOf(distributor.address);
+                console.log("Distributor balance now:", distributorBalance.toString());
                 // Distribute OLAS to veOLAS and stOLAS
                 console.log("Calling distribute obtained L2 to L1 OLAS to veOLAS and stOLAS by agent or manually");
                 await distributor.distribute();
@@ -1189,7 +1239,11 @@ describe("Liquid Staking", function () {
                 console.log("Calling OLAS total assets on stOLAS update by agent or manually");
                 await st.updateTotalAssets();
 
-                stTotalAssets = await st.totalAssets();
+                console.log("stakedBalance after distribute:", await st.stakedBalance());
+                console.log("vaultBalance after distribute:", await st.vaultBalance());
+                console.log("reserveBalance after distribute:", await st.reserveBalance());
+
+                let stTotalAssets = await st.totalAssets();
                 console.log("OLAS total assets on stOLAS now:", stTotalAssets.toString());
 
                 console.log("User approves stOLAS for treasury:", stBalance.toString());
@@ -1204,7 +1258,7 @@ describe("Liquid Staking", function () {
                 values = new Array(numUnstakes).fill(0);
                 // Request withdraw
                 console.log("User requests withdraw of half of stOLAS:", stAmount.toString());
-                const previewAmount = await st.previewRedeem(stAmount);
+                previewAmount = await st.previewRedeem(stAmount);
                 let tx = await treasury.requestToWithdraw(stAmount, chainIds, stakingInstances, bridgePayloads, values);
                 let res = await tx.wait();
                 // Get withdraw request Id
@@ -1298,8 +1352,6 @@ describe("Liquid Staking", function () {
                 console.log("stakedBalance:", await st.stakedBalance());
                 console.log("vaultBalance:", await st.vaultBalance());
                 console.log("reserveBalance:", await st.reserveBalance());
-
-                //if (i == 8) break;
             }
 
             stBalance = await st.balanceOf(deployer.address);
@@ -1333,20 +1385,19 @@ describe("Liquid Staking", function () {
             //let olasAmount = minStakingDeposit.mul(40);
             let olasAmount = (minStakingDeposit.mul(3)).sub(1);
 
-            // Approve OLAS for depository
-            console.log("User approves OLAS for depository:", olasAmount.toString());
-            await olas.approve(depository.address, initSupply);
+            const numStakes = 18;
+            const amountToStake = olasAmount.mul(numStakes);
 
             // Stake OLAS on L1
             console.log("User deposits OLAS for stOLAS");
             let numIters = 10;
-            const numStakes = 18;
             let chainIds = new Array(numStakes).fill(gnosisChainId);
             let stakingInstances = new Array(numStakes).fill(stakingTokenInstance.address);
             let bridgePayloads = new Array(numStakes).fill(bridgePayload);
             let values = new Array(numStakes).fill(0);
             for (let i = 0; i < numIters; i++) {
-                await depository.deposit(olasAmount.mul(numStakes), chainIds, stakingInstances, bridgePayloads, values);
+                await olas.approve(depository.address, amountToStake);
+                await depository.deposit(amountToStake, chainIds, stakingInstances, bridgePayloads, values);
             }
 
             let stBalance = await st.balanceOf(deployer.address);
@@ -1430,6 +1481,98 @@ describe("Liquid Staking", function () {
 
             stBalance = await st.totalAssets();
             console.log("Final OLAS total assets on stOLAS:", stBalance.toString());
+
+            // Restore a previous state of blockchain
+            snapshot.restore();
+        });
+
+        it("Check OLAS vs stOLAS amounts", async function () {
+            // Max timeout 1600 sec for coverage
+            this.timeout(1600000);
+
+            // Take a snapshot of the current state of the blockchain
+            const snapshot = await helpers.takeSnapshot();
+
+            console.log("L1");
+
+            // Get OLAS amount to stake
+            const olasAmount = minStakingDeposit.mul(8).div(3);
+            console.log("User deposits OLAS amount:", olasAmount.toString());
+
+            // Approve OLAS for depository
+            await olas.approve(depository.address, initSupply);
+
+            // Stake OLAS on L1 first deposit
+            console.log("User deposits OLAS for stOLAS");
+            let previewAmount = await st.previewDeposit(olasAmount);
+            console.log("User stOLAS preview balance:", previewAmount.toString());
+            let stBalanceBefore = await st.balanceOf(deployer.address);
+            // The deposit is made such that reserveBalance becomes > 0 on purpose
+            await depository.deposit(olasAmount, [gnosisChainId], [stakingTokenInstance.address], [bridgePayload], [0]);
+            let stBalanceAfter = await st.balanceOf(deployer.address);
+            let stBalanceDiff = stBalanceAfter.sub(stBalanceBefore);
+            console.log("User stOLAS balance now:", stBalanceAfter.toString());
+            let stTotalAssets = await st.totalAssets();
+            console.log("OLAS total assets on stOLAS:", stTotalAssets.toString());
+
+            let stakedBalanceAfter = await st.stakedBalance();
+            let vaultBalanceAfter = await st.vaultBalance();
+            let reserveBalanceAfter = await st.reserveBalance();
+
+            console.log("stakedBalance after 1st deposit:", stakedBalanceAfter.toString());
+            console.log("vaultBalance after 1st deposit:", vaultBalanceAfter.toString());
+            console.log("reserveBalance after 1st deposit:", reserveBalanceAfter.toString());
+
+            expect(stBalanceDiff).to.equal(previewAmount);
+
+            // Estimate full first redeem
+            previewAmount = await st.previewRedeem(stBalanceAfter);
+            console.log("User OLAS preview balance:", previewAmount.toString());
+            expect(olasAmount).to.equal(previewAmount);
+
+            // Stake OLAS on L1 multiple deposits
+            const numIters = 100;
+            for (let i = 0; i < numIters; i++) {
+                //console.log("Iteration:", i);
+                previewAmount = await st.previewDeposit(olasAmount);
+                //console.log("User stOLAS preview balance:", previewAmount.toString());
+                stBalanceBefore = await st.balanceOf(deployer.address);
+                await depository.deposit(olasAmount, [gnosisChainId, gnosisChainId],
+                    [stakingTokenInstance.address, stakingTokenInstance.address], [bridgePayload, bridgePayload], [0, 0]);
+                stBalanceAfter = await st.balanceOf(deployer.address);
+                //console.log("stOLAS balance after additional deposit:", stBalanceAfter.toString());
+                stBalanceDiff = stBalanceAfter.sub(stBalanceBefore);
+                //console.log("User new obtained stOLAS:", stBalanceDiff.toString());
+                //console.log("User stOLAS balance now:", stBalanceAfter.toString());
+                stTotalAssets = await st.totalAssets();
+                //console.log("OLAS total assets on stOLAS:", stTotalAssets.toString());
+
+                stakedBalanceAfter = await st.stakedBalance();
+                vaultBalanceAfter = await st.vaultBalance();
+                reserveBalanceAfter = await st.reserveBalance();
+
+                //console.log("stakedBalance:", stakedBalanceAfter.toString());
+                //console.log("vaultBalance:", vaultBalanceAfter.toString());
+                //console.log("reserveBalance:", reserveBalanceAfter.toString());
+                let totalComputedAssets = stakedBalanceAfter.add(vaultBalanceAfter).add(reserveBalanceAfter);
+
+                expect(stBalanceDiff).to.equal(previewAmount);
+
+                stTotalAssets = await st.totalAssets();
+                //console.log("OLAS total assets on stOLAS now:", stTotalAssets.toString());
+                expect(stTotalAssets).to.equal(totalComputedAssets);
+
+                // Estimate full redeem after more deposits
+                previewAmount = await st.previewRedeem(stBalanceAfter);
+                //console.log("User OLAS preview balance:", previewAmount.toString());
+                expect(previewAmount).to.equal(stTotalAssets);
+            }
+
+            console.log("stakedBalance after last deposit:", stakedBalanceAfter.toString());
+            console.log("vaultBalance after last deposit:", vaultBalanceAfter.toString());
+            console.log("reserveBalance after last deposit:", reserveBalanceAfter.toString());
+            console.log("OLAS total assets on stOLAS now:", stTotalAssets.toString());
+            console.log("User OLAS preview balance:", previewAmount.toString());
 
             // Restore a previous state of blockchain
             snapshot.restore();

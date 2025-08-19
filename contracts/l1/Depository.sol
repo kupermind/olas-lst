@@ -20,12 +20,12 @@ interface IST {
     /// @return shares stOLAS amount.
     function deposit(uint256 assets, address receiver) external returns (uint256 shares);
 
-    /// @dev Top-ups reserve balance via Depository.
-    /// @param amount OLAS amount.
-    function topUpReserveBalance(uint256 amount) external;
-
-    /// @dev Funds Depository with reserve balances.
-    function fundDepository() external;
+    /// @dev Calculates reserve and stake balances, and top-ups stOLAS or address(this).
+    /// @param reserveAmount Additional reserve OLAS amount.
+    /// @param stakeAmount Additional stake OLAS amount.
+    /// @param topUp Top up amount to be sent or received.
+    /// @param direction To stOLAS, if true, and to address(this) otherwise
+    function syncStakeBalances(uint256 reserveAmount, uint256 stakeAmount, uint256 topUp, bool direction) external;
 
     /// @dev stOLAS reserve balance.
     function reserveBalance() external view returns (uint256);
@@ -447,17 +447,14 @@ contract Depository is Implementation {
             revert WrongArrayLength();
         }
 
-        // Remainder is stake amount plus reserve balance
-        uint256 remainder = IST(st).reserveBalance();
-        // Pull OLAS reserve balance from stOLAS
-        if (remainder > 0) {
-            IST(st).fundDepository();
-        }
+        // Get stOLAS reserve balance for staking
+        uint256 stReserveBalance = IST(st).reserveBalance();
+        // Actual remainder is equal to stake amount plus reserve balance
+        // If stakeAmount is zero, stakes are performed from reserves
+        uint256 actualRemainder = stakeAmount + stReserveBalance;
 
-        // Add requested stake amount
-        remainder += stakeAmount;
         // Check for zero value
-        if (remainder == 0) {
+        if (actualRemainder == 0) {
             revert ZeroValue();
         }
 
@@ -478,17 +475,19 @@ contract Depository is Implementation {
                 revert WrongStakingModel(stakingModelId);
             }
 
-            // Skip potential zero funds models
+            // Skip zero available funds model
             if (stakingModel.remainder == 0) {
                 continue;
             }
 
             // Adjust staking amount to not overflow the max allowed one
-            amounts[i] = remainder;
+            amounts[i] = actualRemainder;
+            // Upper limit
             if (amounts[i] > stakingModel.stakeLimitPerSlot) {
                 amounts[i] = stakingModel.stakeLimitPerSlot;
             }
 
+            // Lower limit
             if (amounts[i] > stakingModel.remainder) {
                 amounts[i] = stakingModel.remainder;
                 // Update staking model remainder
@@ -498,12 +497,12 @@ contract Depository is Implementation {
                 mapStakingModels[stakingModelId].remainder = stakingModel.remainder - uint96(amounts[i]);
             }
 
-            // Adjust remainder
-            remainder -= amounts[i];
+            // Adjust actualRemainder
+            actualRemainder -= amounts[i];
             // Increase actual stake amount
             actualStakeAmount += amounts[i];
 
-            if (remainder == 0) {
+            if (actualRemainder == 0) {
                 break;
             }
         }
@@ -513,25 +512,44 @@ contract Depository is Implementation {
             // Increase total account deposit amount
             mapAccountDeposits[msg.sender] += stakeAmount;
 
+            // Calculates stAmount and mints stOLAS
+            stAmount = IST(st).deposit(stakeAmount, msg.sender);
+
             // Get OLAS from sender
             IToken(olas).transferFrom(msg.sender, address(this), stakeAmount);
         }
 
+        uint256 topUp;
+        // If provided stake amount is not fully utilized for stake, approve it for transfer to stOLAS
+        // The following holds true: actualRemainder + actualStakeAmount = stReserveBalance + stakeAmount
+        // There are two cases possible
+        if (actualRemainder > stReserveBalance) {
+            // Since actualRemainder accounts for partial stakeAmount as well if it exceeds stReserveBalance,
+            // that partial amount from stakeAmount must be deposited to stOLAS to cover that difference
+
+            // Calculate OLAS leftovers that are not going to be staked now
+            topUp = actualRemainder - stReserveBalance;
+            IToken(olas).approve(st, topUp);
+
+            // Top up stOLAS and record correct balances including leftovers for reserve and actual stake amount
+            IST(st).syncStakeBalances(actualRemainder, actualStakeAmount, topUp, true);
+        } else if (actualStakeAmount >= stakeAmount) {
+            // Since actualStakeAmount accounts for partial stReserveBalance as well if it exceeds stakeAmount,
+            // that partial amount from stReserveBalance must be deposited to address(this) to cover that difference
+            // Note that actualStakeAmount == stakeAmount results in a zero topUp value, meaning OLAS is reserved
+            // for sending to staking contracts, however st.stakedBalance must be updated
+
+            // Calculate OLAS to be additionally deposited to address(this)
+            topUp = actualStakeAmount - stakeAmount;
+
+            // Pull required funds from stOLAS and record correct balances
+            IST(st).syncStakeBalances(actualRemainder, actualStakeAmount, topUp, false);
+        }
+        // Note it is not possible such that actualRemainder > stReserveBalance && actualStakeAmount > stakeAmount,
+        // as this would result in strict inequality: actualRemainder + actualStakeAmount >> stReserveBalance + stakeAmount
+
         // Send funds to staking via relevant deposit processors
         _operationSendMessage(chainIds, stakingProxies, amounts, bridgePayloads, values, STAKE);
-
-        // If there are OLAS leftovers, transfer (back) to stOLAS
-        if (stakeAmount > actualStakeAmount) {
-            remainder = stakeAmount - actualStakeAmount;
-            IToken(olas).approve(st, remainder);
-            IST(st).topUpReserveBalance(remainder);
-        }
-
-        // Calculates stAmount and mints stOLAS
-        // If stakeAmount is zero, stakes are performed from reserves
-        if (stakeAmount > 0) {
-            stAmount = IST(st).deposit(stakeAmount, msg.sender);
-        }
 
         emit Deposit(msg.sender, stakeAmount, stAmount, chainIds, stakingProxies, amounts);
     }

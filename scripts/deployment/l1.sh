@@ -51,3 +51,6 @@
 
 # Set DepositProcessorL1-s and corresponding chainIds
 #./scripts/deployment/script_l1_04_set_deposit_processor_chain_ids.sh $1 $2 $3
+
+# Initial veOLAS lock
+#./scripts/deployment/script_l1_05_initial_lock.sh $1

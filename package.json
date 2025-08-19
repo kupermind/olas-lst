@@ -8,9 +8,10 @@
     "coverage:fast": "./scripts/optimize-test.sh && node --max-old-space-size=4096 node_modules/.bin/hardhat coverage --testfiles test/LiquidStakingOptimized.js",
     "coverage:minimal": "./scripts/optimize-test.sh && node --max-old-space-size=2048 node_modules/.bin/hardhat coverage --testfiles test/LiquidStakingOptimized.js",
     "coverage:script": "node scripts/run-coverage.js",
-    "test": "hardhat test",
-    "test:fast": "./scripts/optimize-test.sh && hardhat test test/LiquidStakingOptimized.js",
-    "test:original": "hardhat test test/LiquidStaking.js"
+    "test:hardhat": "mv contracts/l1/bridging/LzOracle.sol contracts/l1/bridging/LzOracle._sol && hardhat test && mv contracts/l1/bridging/LzOracle._sol contracts/l1/bridging/LzOracle.sol",
+    "test:fast": "mv contracts/l1/bridging/LzOracle.sol contracts/l1/bridging/LzOracle._sol && ./scripts/optimize-test.sh && hardhat test test/LiquidStakingOptimized.js && mv contracts/l1/bridging/LzOracle._sol contracts/l1/bridging/LzOracle.sol",
+    "test:original": "mv contracts/l1/bridging/LzOracle.sol contracts/l1/bridging/LzOracle._sol && hardhat test test/LiquidStaking.js && mv contracts/l1/bridging/LzOracle._sol contracts/l1/bridging/LzOracle.sol",
+    "test:forge": "forge test"
   },
   "repository": {
     "type": "git",
@@ -38,7 +39,7 @@
     "eslint": "^8.57.0",
     "solhint": "^5.0.5",
     "ethers": "^5.7.2",
-    "hardhat": "^2.26.0",
+    "hardhat": "^2.26.3",
     "hardhat-contract-sizer": "^2.10.0",
     "hardhat-deploy": "^0.12.1",
     "hardhat-deploy-ethers": "^0.4.1",

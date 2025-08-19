@@ -59,8 +59,6 @@ contract stOLAS is ERC4626 {
     uint256 public reserveBalance;
     // Total OLAS reserves that include staked, vault and reserve balance
     uint256 public totalReserves;
-    // Top-up reserve balance in on-going deposit
-    uint256 transient topUpBalance;
 
     // Owner address
     address public owner;
@@ -135,13 +133,7 @@ contract stOLAS is ERC4626 {
             revert ZeroValue();
         }
 
-        // Get all balances and update total reserves
-        (uint256 curStakedBalance, uint256 curVaultBalance, uint256 curReserveBalance, uint256 curTotalReserves) =
-            calculateDepositBalances(assets);
-
-        // Record updated balances
-        stakedBalance = curStakedBalance;
-        totalReserves = curTotalReserves;
+        (, , , uint256 curTotalReserves) = calculateCurrentBalances();
 
         // Calculate shares
         shares = totalSupply;
@@ -154,7 +146,6 @@ contract stOLAS is ERC4626 {
 
         _mint(receiver, shares);
 
-        emit TotalReservesUpdated(curStakedBalance, curVaultBalance, curReserveBalance, curTotalReserves);
         emit Deposit(msg.sender, receiver, assets, shares);
     }
 
@@ -239,7 +230,7 @@ contract stOLAS is ERC4626 {
     }
 
     /// @dev Updates total assets.
-    function updateTotalAssets() external returns (uint256) {
+    function updateTotalAssets() public returns (uint256) {
         (uint256 curStakedBalance, uint256 curVaultBalance, uint256 curReserveBalance, uint256 curTotalReserves) =
             calculateCurrentBalances();
 
@@ -250,19 +241,52 @@ contract stOLAS is ERC4626 {
         return curTotalReserves;
     }
 
-    /// @dev Top-ups reserve balance via Depository.
-    /// @param amount OLAS amount.
-    function topUpReserveBalance(uint256 amount) external {
+    /// @dev Calculates reserve and stake balances, and top-ups stOLAS or address(this).
+    /// @param reserveAmount Additional reserve OLAS amount.
+    /// @param stakeAmount Additional stake OLAS amount.
+    /// @param topUp Top up amount to be sent or received.
+    /// @param direction To stOLAS, if true, and to address(this) otherwise
+    function syncStakeBalances(uint256 reserveAmount, uint256 stakeAmount, uint256 topUp, bool direction) external {
         if (msg.sender != depository) {
             revert DepositoryOnly(msg.sender, depository);
         }
 
-        topUpBalance = amount;
-        uint256 curReserveBalance = reserveBalance + amount;
-        reserveBalance = curReserveBalance;
-        asset.transferFrom(msg.sender, address(this), amount);
+        // Update balances accordingly
+        // Reserve balance
+        uint256 curReserveBalance = reserveBalance;
+        if (curReserveBalance != reserveAmount) {
+            curReserveBalance = reserveAmount;
+            reserveBalance = reserveAmount;
+        }
 
-        emit TotalReservesUpdated(stakedBalance, vaultBalance, curReserveBalance, totalReserves + amount);
+        // Staked balance
+        uint256 curStakedBalance = stakedBalance;
+        if (stakeAmount > 0) {
+            curStakedBalance += stakeAmount;
+            stakedBalance = curStakedBalance;
+        }
+
+        // Update total reserves, since either reserveAmount or stakeAmount are not zero
+        // Current vault balance
+        uint256 curVaultBalance = vaultBalance;
+        // Total reserves
+        uint256 curTotalReserves = curStakedBalance + curVaultBalance + curReserveBalance;
+        totalReserves = curTotalReserves;
+
+        // Direction is true if the transfer is from Depository to stOLAS, else the opposite direction
+        if (direction == true) {
+            // Pull OLAS from Depository
+            asset.transferFrom(msg.sender, address(this), topUp);
+        } else if (topUp > 0) {
+            // Top-up can be zero in case when it is not transferred to stOLAS as it is fully utilized in Depository
+            // Thus, no action is required and this block is skipped
+
+            // Approve and transfer OLAS to Depository
+            asset.approve(msg.sender, topUp);
+            asset.transfer(msg.sender, topUp);
+        }
+
+        emit TotalReservesUpdated(curStakedBalance, curVaultBalance, curReserveBalance, curTotalReserves);
     }
 
     /// @dev Top-ups vault balance via Distributor.
@@ -272,11 +296,17 @@ contract stOLAS is ERC4626 {
             revert DistributorOnly(msg.sender, distributor);
         }
 
+        // Update balances accordingly
+        // Vault balance
         uint256 curVaultBalance = vaultBalance + amount;
         vaultBalance = curVaultBalance;
+        // Total reserves
+        uint256 curTotalReserves = totalReserves + amount;
+        totalReserves = curTotalReserves;
+
         asset.transferFrom(msg.sender, address(this), amount);
 
-        emit TotalReservesUpdated(stakedBalance, curVaultBalance, reserveBalance, totalReserves + amount);
+        emit TotalReservesUpdated(stakedBalance, curVaultBalance, reserveBalance, curTotalReserves);
     }
 
     /// @dev Top-ups unstake balance from retired models via Depository: increase reserve balance and decrease staked one.
@@ -286,10 +316,16 @@ contract stOLAS is ERC4626 {
             revert UnstakeRelayerOnly(msg.sender, unstakeRelayer);
         }
 
+        // Update stakedBalance and possibly totalReserves
         uint256 curStakedBalance = stakedBalance;
+        uint256 curTotalReserves = totalReserves;
         // This can only happen if OLAS funds have been additionally transferred to UnstakeRelayer contract
         // The leftover difference is passed to reserve balance
         if (amount > curStakedBalance) {
+            // This needs totalReserves update for the amount exceeding stakedBalance
+            uint256 overDeposit = amount - curStakedBalance;
+            curTotalReserves += overDeposit;
+            totalReserves = curTotalReserves;
             curStakedBalance = 0;
         } else {
             curStakedBalance -= amount;
@@ -302,7 +338,7 @@ contract stOLAS is ERC4626 {
 
         asset.transferFrom(msg.sender, address(this), amount);
 
-        emit TotalReservesUpdated(curStakedBalance, vaultBalance, curReserveBalance, totalReserves);
+        emit TotalReservesUpdated(curStakedBalance, vaultBalance, curReserveBalance, curTotalReserves);
     }
 
     /// @dev Funds Depository with reserve balances.
@@ -321,28 +357,6 @@ contract stOLAS is ERC4626 {
         emit DepositoryFunded(curReserveBalance);
     }
 
-    /// @dev Calculates balances for deposit.
-    /// @param assets Deposited assets amount.
-    /// @return curStakedBalance Current staked balance.
-    /// @return curVaultBalance Current vault balance.
-    /// @return curReserveBalance Current reserve balance.
-    /// @return curTotalReserves Current total reserves.
-    function calculateDepositBalances(uint256 assets) public view
-        returns (uint256 curStakedBalance, uint256 curVaultBalance, uint256 curReserveBalance, uint256 curTotalReserves)
-    {
-        // topUpBalance is subtracted as it is passed as part of the assets value and already deposited
-        // and accounted in reserveBalance via topUpReserveBalance() function call
-        curStakedBalance = stakedBalance + assets - topUpBalance;
-
-        // Get current vault balance
-        curVaultBalance = vaultBalance;
-        // Current reserve balance
-        curReserveBalance = reserveBalance;
-
-        // Update total assets
-        curTotalReserves = curStakedBalance + curVaultBalance + reserveBalance;
-    }
-
     /// @dev Previews deposit assets to shares amount.
     /// @notice This function can only be used for a strict amount of provided assets value.
     ///       It might not correlate with the Depository's `deposit()` function since the provided amount
@@ -350,7 +364,7 @@ contract stOLAS is ERC4626 {
     ///       `deposit()` function use its static call directly.
     /// @param assets Deposited assets amount.
     function previewDeposit(uint256 assets) public view override returns (uint256) {
-        (, , , uint256 curTotalReserves) = calculateDepositBalances(assets);
+        (, , , uint256 curTotalReserves) = calculateCurrentBalances();
 
         uint256 shares = totalSupply;
         return shares == 0 ? assets : assets.mulDivDown(shares, curTotalReserves);

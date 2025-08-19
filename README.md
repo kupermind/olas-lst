@@ -119,8 +119,8 @@ forge test -vvv
 # Run specific test file
 forge test --match-path "test/LiquidStaking.t.sol" -vv
 
-# Run JavaScript tests
-yarn test
+# Run Hardhat tests
+yarn test:hardhat
 ```
 
 ### Key Test Scenarios
