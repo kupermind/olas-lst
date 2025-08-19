@@ -27,9 +27,6 @@ interface IST {
     /// @param direction To stOLAS, if true, and to address(this) otherwise
     function syncStakeBalances(uint256 reserveAmount, uint256 stakeAmount, uint256 topUp, bool direction) external;
 
-    /// @dev Funds Depository with reserve balances.
-    function fundDepository() external;
-
     /// @dev stOLAS reserve balance.
     function reserveBalance() external view returns (uint256);
 }

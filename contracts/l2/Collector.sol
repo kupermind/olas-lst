@@ -131,6 +131,9 @@ contract Collector is Implementation {
         emit ProtocolFactorUpdated(newProtocolFactor);
     }
 
+    /// @dev Sets receiver addresses according operation type.
+    /// @param operations Operation types.
+    /// @param receivers Corresponding receiver addresses.
     function setOperationReceivers(bytes32[] memory operations, address[] memory receivers) external {
         // Check for ownership
         if (msg.sender != owner) {
@@ -160,6 +163,9 @@ contract Collector is Implementation {
         emit OperationReceiversSet(operations, receivers);
     }
 
+    /// @dev Tops up address(this) with a specified amount according to a selected operation.
+    /// @param amount OLAS amount.
+    /// @param operation Operation type.
     function topUpBalance(uint256 amount, bytes32 operation) external {
         // Reentrancy guard
         if (_locked == 2) {
@@ -167,6 +173,7 @@ contract Collector is Implementation {
         }
         _locked = 2;
 
+        // Get ReceiverBalance struct according to the operation type
         ReceiverBalance storage receiverBalance = mapOperationReceiverBalances[operation];
 
         // Get receiver address
@@ -176,6 +183,7 @@ contract Collector is Implementation {
             revert ZeroAddress();
         }
 
+        // Pull OLAS amount and increase corresponding balance
         IToken(olas).transferFrom(msg.sender, address(this), amount);
         uint256 balance = receiverBalance.balance + amount;
         receiverBalance.balance = balance;
@@ -195,6 +203,7 @@ contract Collector is Implementation {
         }
         _locked = 2;
 
+        // Get ReceiverBalance struct according to the operation type
         ReceiverBalance storage receiverBalance = mapOperationReceiverBalances[operation];
 
         // Get receiver address
@@ -233,6 +242,38 @@ contract Collector is Implementation {
 
         // Send tokens to L1
         IBridge(l2StakingProcessor).relayToL1{value: msg.value}(receiver, olasBalance, bridgePayload);
+
+        _locked = 1;
+    }
+
+    function fundExternal(address account, uint256 amount) external {
+        // Reentrancy guard
+        if (_locked == 2) {
+            revert ReentrancyGuard();
+        }
+        _locked = 2;
+
+        // Check for ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
+        }
+
+        // Get current protocol balance
+        uint256 curProtocolBalance = protocolBalance;
+
+        // Check for overflow
+        if (amount > curProtocolBalance) {
+            revert Overflow(amount, curProtocolBalance);
+        }
+
+        // Update protocol balance
+        curProtocolBalance -= amount;
+        protocolBalance = curProtocolBalance;
+
+        // Transfer tokens
+        IToken(olas).transfer(account, amount);
+
+        emit ProtocolBalanceUpdated(curProtocolBalance);
 
         _locked = 1;
     }
