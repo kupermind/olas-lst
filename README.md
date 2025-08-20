@@ -22,7 +22,7 @@ stOLAS is a comprehensive liquid staking solution for the OLAS token in the Auto
 - **Distributor**: Distributes rewards between veOLAS and stOLAS holders
 - **Lock**: Manages veOLAS (voting escrow) for governance participation
 
-### L2 Layer (Gnosis Chain)
+### L2 Layer (i.e. Base, etc)
 - **StakingManager**: Orchestrates service deployment and staking operations
 - **StakingTokenLocked**: Manages individual staking instances and reward distribution
 - **ActivityModule**: Handles service activity verification and reward claiming
@@ -142,33 +142,59 @@ The test suite covers comprehensive E2E scenarios:
 - **Bug Bounty**: Program under consideration post-audit
 
 ## Roadmap
+> This roadmap reflects the current design and audit notes. Items and ordering may be updated by governance. *(Last updated: 2025-08-20 12:14 UTC)*
 
-### Phase 1: Core Infrastructure ✅
-- [x] stOLAS vault deployment
-- [x] Cross-chain bridge implementation
-- [x] Basic staking operations
+### Phase 0 — Security & Ops Readiness [x]
+**Goal:** lock in correct configuration and observability before broader integrations.
+- **L2→L1 routing guardrails:** `REWARD → Distributor (L1)`, `UNSTAKE → Treasury (L1)`, `UNSTAKE_RETIRED → UnstakeRelayer (L1)`; add off‑chain preflight that reads back receivers and fails on mismatch.
+- **Docs for ERC4626 caveats:** `deposit` only via **Depository**, `redeem` only via **Treasury**; `mint/withdraw` are non‑standard and not for external use.
+- **Monitoring & dashboards:** `totalReserves` breakdown, PPS, outstanding withdraw tickets, `UNSTAKE` inflows to Treasury, bridge latency.
+- **Access control baseline:** `owner` under multisig, timelock prepared; incident runbooks.
+- **QA:** fork tests for withdrawals under low liquidity; batch‑size limits in UI/SDK; basic bug‑bounty process (`SECURITY.md`).
 
-### Phase 2: DeFi Integration 🚧
-- [ ] Uniswap V3 liquidity pools
-- [ ] Lending protocol integration
-- [ ] Yield aggregator partnerships
+**Exit criteria:**
+- Preflight/alerts in place; correct routing confirmed on staging/mainnet.
+- ≥1 full cycle of request→unstake→bridge→finalize validated end‑to‑end.
+- Dashboards live and reviewed by maintainers.
 
-### Phase 3: Governance Launch 📅
-- [ ] vstOLAS token deployment
-- [ ] On-chain governance processes
-- [ ] Community-driven protocol upgrades
+### Phase 1 — Core Protocol Stabilization / Mainnet Beta []
+**Goal:** operate with conservative limits and prove reliability.
+- Soft caps on deposits/withdraws; safe batch sizes enforced by UI/SDK.
+- SLO/SLA targets for bridge/unstake latency and ticket finalization windows.
+- Weekly PPS/liquidity reports and post‑mortems for any incidents.
 
-### Phase 4: Cross-Chain Expansion 📅
-- [ ] Multi-chain stOLAS deployment
-- [ ] Additional bridge protocols
-- [ ] Cross-chain yield strategies
+**Exit criteria:**
+- ≥N weeks without Sev‑1 incidents; metrics within SLO; negative scenarios rehearsed.
+
+### Phase 2 — DeFi Integration []
+**Goal:** expand utility once core flows are stable.
+- Uniswap V3 liquidity pools (strategy & monitoring for IL).
+- Lending integration starting with isolated markets; publish risk & oracle policy (Chainlink with TWAP fallback).
+- Yield‑aggregator partnerships after liquidity/pps stability is demonstrated.
+
+**Dependencies:** Phase 0 & 1 exit criteria met.
+
+### Phase 3 — Governance Launch []
+**Goal:** transition to community‑driven control.
+- Deploy **vstOLAS** (if applicable) and enable on‑chain governance processes.
+- Activate timelock as the execution layer; document upgrade runbooks (fork rehearsal + storage layout checks).
+- Define proposal thresholds, quorum, and emergency procedures.
+
+**Dependencies:** stable operations and monitoring from Phases 0–1.
+
+### Phase 4 — Cross‑Chain Expansion []
+**Goal:** scale to additional networks and diversify bridges.
+- Multi‑chain `stOLAS` deployments where strategic; provider‑diverse bridges with health checks/fallbacks.
+- Cross‑chain yield strategies gated by end‑to‑end monitoring and SLO adherence.
+
+**Dependencies:** governance in place; proven reliability and observability.
 
 ## Documentation
 
 - [Whitepaper (PDF)](doc/stolas_whitepaper_formatted.pdf)
 - [Whitepaper (Text)](doc/stolas_whitepaper.txt)
 - [Technical Architecture](doc/architecture.md)
-- [API Reference](doc/api.md)
+- [FAQ](doc/FAQ.md)
 
 ## Contributing
 
