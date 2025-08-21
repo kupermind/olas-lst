@@ -139,7 +139,7 @@ The test suite covers comprehensive E2E scenarios:
 ## Security
 
 - **Internal Audits**: Comprehensive internal code review completed
-- **External Audits**: Planned via Hunt platform (https://hunt.r.xyz)
+- **External Audits**: Reviewing options, TBD
 - **Open Source**: Full transparency with public repository
 - **Bug Bounty**: Program under consideration post-audit
 
