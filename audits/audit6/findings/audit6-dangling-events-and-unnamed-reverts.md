@@ -12,6 +12,7 @@
 ## Findings — Dangling Events (Production)
 - `ReserveBalanceTopUpped` — contracts/l1/stOLAS.sol:50
 - `VaultBalanceTopUpped` — contracts/l1/stOLAS.sol:51
+[x] Fixed
 
 ## Findings — Unnamed Reverts (Production)
 - contracts/l1/bridging/LzOracle.sol:135 — ```... odeHash) {                 // TODO                 revert ();             }              // Considering 1 agent per service: depos ...```

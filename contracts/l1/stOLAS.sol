@@ -43,13 +43,9 @@ error Overflow(uint256 provided, uint256 max);
 contract stOLAS is ERC4626 {
     using FixedPointMathLib for uint256;
 
-    event OwnerUpdated(address indexed owner);
-    event ManagersUpdated(address indexed treasury, address indexed depository, address indexed dstributor,
+    event Initialized(address indexed treasury, address indexed depository, address indexed dstributor,
         address unstakeRelayer);
     event TotalReservesUpdated(uint256 stakedBalance, uint256 vaultBalance, uint256 reserveBalance, uint256 totalReserves);
-    event ReserveBalanceTopUpped(uint256 amount);
-    event VaultBalanceTopUpped(uint256 amount);
-    event DepositoryFunded(uint256 amount);
 
     // Staked balance: funds allocated for staking contracts on different chains
     uint256 public stakedBalance;
@@ -60,8 +56,6 @@ contract stOLAS is ERC4626 {
     // Total OLAS reserves that include staked, vault and reserve balance
     uint256 public totalReserves;
 
-    // Owner address
-    address public owner;
     // Treasury address
     address public treasury;
     // Depository address
@@ -73,52 +67,36 @@ contract stOLAS is ERC4626 {
 
     /// @dev stOLAS constructor.
     /// @param _olas OLAS token address.
-    constructor(ERC20 _olas) ERC4626(_olas, "Staked OLAS", "stOLAS") {
-        owner = msg.sender;
-    }
+    constructor(ERC20 _olas)
+        ERC4626(_olas, "Staked OLAS", "stOLAS")
+    {}
 
-    /// @dev Changes the owner address.
-    /// @param newOwner Address of a new owner.
-    function changeOwner(address newOwner) external {
-        if (msg.sender != owner) {
-            revert OwnerOnly(msg.sender, owner);
-        }
-
-        if (newOwner == address(0)) {
-            revert ZeroAddress();
-        }
-
-        owner = newOwner;
-        emit OwnerUpdated(newOwner);
-    }
-
-    /// @dev Changes various managing contract addresses.
-    /// @param newTreasury New treasury address.
-    /// @param newDepository New depository address.
-    /// @param newDistributor New distributor address.
+    // TODO Change function name
+    /// @dev Initializes stOLAS with various managing contract addresses.
+    /// @param _treasury Treasury address.
+    /// @param _depository Depository address.
+    /// @param _distributor Distributor address.
+    /// @param _unstakeRelayer UnstakeRelayer address.
     function changeManagers(
-        address newTreasury,
-        address newDepository,
-        address newDistributor,
-        address newUnstakeRelayer
+        address _treasury,
+        address _depository,
+        address _distributor,
+        address _unstakeRelayer
     ) external {
-        if (msg.sender != owner) {
-            revert OwnerOnly(msg.sender, owner);
-        }
-
         // Check for zero addresses
-        if (newTreasury == address(0) || newDepository == address(0) || newDistributor == address(0) ||
-            newUnstakeRelayer == address(0))
+        if (_treasury == address(0) || _depository == address(0) || _distributor == address(0) ||
+            _unstakeRelayer == address(0))
         {
             revert ZeroAddress();
         }
 
-        treasury = newTreasury;
-        depository = newDepository;
-        distributor = newDistributor;
-        unstakeRelayer = newUnstakeRelayer;
+        // Set managing contract addresses
+        treasury = _treasury;
+        depository = _depository;
+        distributor = _distributor;
+        unstakeRelayer = _unstakeRelayer;
 
-        emit ManagersUpdated(newTreasury, newDepository, newDistributor, newUnstakeRelayer);
+        emit Initialized(_treasury, _depository, _distributor, _unstakeRelayer);
     }
 
     /// @dev Deposits OLAS in exchange for stOLAS tokens.
@@ -341,22 +319,6 @@ contract stOLAS is ERC4626 {
         asset.transferFrom(msg.sender, address(this), amount);
 
         emit TotalReservesUpdated(curStakedBalance, vaultBalance, curReserveBalance, curTotalReserves);
-    }
-
-    /// @dev Funds Depository with reserve balances.
-    function fundDepository() external {
-        if (msg.sender != depository) {
-            revert DepositoryOnly(msg.sender, depository);
-        }
-
-        uint256 curReserveBalance = reserveBalance;
-        if (curReserveBalance > 0) {
-            reserveBalance = 0;
-            totalReserves -= curReserveBalance;
-            asset.transfer(msg.sender, curReserveBalance);
-        }
-
-        emit DepositoryFunded(curReserveBalance);
     }
 
     /// @dev Previews deposit assets to shares amount.

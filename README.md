@@ -65,28 +65,30 @@ doc/                       # Documentation and whitepaper
 
 ### 1. Deposit Process
 1. User deposits OLAS into the stOLAS vault on L1
-2. stOLAS tokens are minted 1:1 (initially)
+2. stOLAS tokens are minted 1:1 initially, then adjusts proportionally as amount of OLAS starts to grow
 3. OLAS is bridged to L2 for active staking
 4. StakingManager deploys services and manages staking operations
+5. Each staked service is controlled by a corresponding ActivityModule proxy contract that shields access to funds
+6. Autonomous agents trigger each ActivityModule to perform actions and claim rewards
 
 ### 2. Staking Operations
 1. Services are deployed on L2 with OLAS backing
 2. Rewards accumulate based on service performance
-3. ActivityModule verifies service liveness
-4. Collector gathers rewards and bridges them back to L1
+3. ActivityModule verifies service liveness and required KPI performance
+4. Collector gathers rewards and bridges them back to L1 via a Distributor contract
 
 ### 3. Withdrawal Process
 1. User requests withdrawal through Treasury
 2. ERC6909 tokens are minted representing the withdrawal request
-3. If L1 has sufficient OLAS, immediate withdrawal
-4. If not, L2 unstaking is triggered and bridged back to L1
+3. If L1 has sufficient OLAS on stOLAS, it is immediately transferred to Treasury for finalized withdrawal
+4. If not, L2 unstaking is triggered in order to bridge required amount of OLAS back to L1 to fund Treasury directly
 5. User finalizes withdrawal after cool-down period
 
 ### 4. Reward Distribution
 1. Rewards are bridged from L2 to L1
-2. Distributor splits rewards between veOLAS and stOLAS
+2. Distributor contract takes a small percentage to lock OLAS into veOLAS, and sends the rest to stOLAS
 3. stOLAS holders receive their share of rewards
-4. veOLAS holders receive governance rewards
+4. veOLAS accumulated voting power allows protocol to vote for its continuous support
 
 ## Development
 
