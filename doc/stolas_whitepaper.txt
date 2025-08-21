@@ -250,25 +250,25 @@ Roadmap and Development Phases
 - Basic staking operations
 - Internal security audits
 
-**Phase 2: DeFi Integration (In Progress)**
+**Phase 2: DeFi Integration (In Progress - Q4 2025)**
 - Uniswap V3 liquidity pools
 - Lending protocol partnerships
 - Yield aggregator integrations
 - Advanced DeFi strategies
 
-**Phase 3: Governance Launch (Q2 2024)**
+**Phase 3: Governance Launch (Q1 2026)**
 - vstOLAS token deployment
 - On-chain governance processes
 - Community proposal system
 - Parameter adjustment mechanisms
 
-**Phase 4: Cross-Chain Expansion (Q3 2024)**
+**Phase 4: Cross-Chain Expansion (Q2 2026)**
 - Additional L2 deployments
 - Multi-chain staking strategies
 - Cross-chain yield optimization
 - Global market expansion
 
-**Phase 5: Ecosystem Maturity (Q4 2024)**
+**Phase 5: Ecosystem Maturity (Q4 2026)**
 - Advanced staking strategies
 - Insurance and risk management
 - Institutional adoption tools
@@ -381,5 +381,54 @@ For inquiries, partnership opportunities, and security reports, please contact t
 
 *This whitepaper represents the current vision and technical specifications of the stOLAS project as of [Publication Date]. The project team reserves the right to update this document as development progresses and new features are implemented.*
 
+---
 
+## [Technical Clarification] Technical Clarifications & Risk Disclosures (Non‑binding)
 
+> These clarifications **do not modify** the business/marketing language above. They document engineering dependencies observed in the current implementation (commit `a23db47`) so legal, product, and engineering stay aligned.
+
+### [Technical Clarification] L2 → L1 Withdrawal Routing (Configuration Dependency)
+- **What matters:** `UNSTAKE` returns **must** be routed to **Treasury (L1)** so withdrawal tickets can be paid.
+- **Status:** This is a **configuration requirement**, not a code defect. Intended mapping on L2 `Collector`:
+  - `REWARD → Distributor (L1)`
+  - `UNSTAKE → Treasury (L1)`
+  - `UNSTAKE_RETIRED → UnstakeRelayer (L1)`
+- **Operational ask:** add a preflight that reads back receivers; alert on mismatch; monitor `OperationReceiversSet`, `TokensRelayed` (L2) and `WithdrawRequest*` (L1).
+
+### [Technical Clarification] ERC4626 Entrypoints Are Non‑Standard by Design
+- `deposit()` — callable only by **Depository**; `redeem()` — only by **Treasury**.
+- `mint()` / `withdraw()` are not intended for external integrators.
+- **Why:** preserves end‑to‑end control while keeping ERC4626 math (PPS). Please reflect this in API docs/SDKs.
+
+### [Technical Clarification] Trust Model & Invariants (Depository → stOLAS)
+- Vault uses **internal reserve accounting**: `totalReserves = staked + vault + reserve`; `pps = totalReserves / totalSupply`.
+- `syncStakeBalances(...)` lets Depository **update accounting** and move assets for `topUp` only.
+- **Operational invariants:** keep internal totals aligned with real token movements; reconcile periodically off‑chain.
+
+### [Technical Clarification] Asset Assumption
+- The asset is **OLAS**, assumed to be a **plain ERC‑20** (no hooks/rebase/fee). Any change requires compatibility review.
+
+### [Technical Clarification] Upgrades & Control
+- Production ownership is expected to be **multisig → timelock**. Upgrades should follow fork rehearsals plus storage layout checks.
+
+### [Technical Clarification] Observability
+- Maintain dashboards for `totalReserves` breakdown, PPS, outstanding tickets, `UNSTAKE` inflows, and bridge latency.
+
+---
+
+## [Technical Clarification] Roadmap (Operational Gates Summary)
+
+**Phase 0 — Security & Ops Readiness (new)**  
+Guardrails for routing; ERC4626 caveat docs; monitoring dashboards; multisig+timelock; fork tests; bug‑bounty process.
+
+**Phase 1 — Core Protocol Stabilization**  
+Operate with soft caps & SLOs; weekly PPS/liquidity reports; incident post‑mortems.
+
+**Phase 2 — DeFi Integration**  
+Uniswap V3 pools; isolated lending; oracle policy (Chainlink + TWAP fallback).
+
+**Phase 3 — Governance Launch**  
+vstOLAS (if applicable); timelock as executor; upgrade runbooks.
+
+**Phase 4 — Cross‑Chain Expansion**  
+Additional networks; provider‑diverse bridges; cross‑chain yield strategies gated by monitoring.
