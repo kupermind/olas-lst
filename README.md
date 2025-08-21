@@ -168,15 +168,7 @@ The test suite covers comprehensive E2E scenarios:
 **Exit criteria:**
 - ≥N weeks without Sev‑1 incidents; metrics within SLO; negative scenarios rehearsed.
 
-### Phase 2 — DeFi Integration []
-**Goal:** expand utility once core flows are stable.
-- Uniswap V3 liquidity pools (strategy & monitoring for IL).
-- Lending integration starting with isolated markets; publish risk & oracle policy (Chainlink with TWAP fallback).
-- Yield‑aggregator partnerships after liquidity/pps stability is demonstrated.
-
-**Dependencies:** Phase 0 & 1 exit criteria met.
-
-### Phase 3 — Governance Launch []
+### Phase 2 — Governance Launch []
 **Goal:** transition to community‑driven control.
 - Deploy **vstOLAS** (if applicable) and enable on‑chain governance processes.
 - Activate timelock as the execution layer; document upgrade runbooks (fork rehearsal + storage layout checks).
@@ -184,12 +176,24 @@ The test suite covers comprehensive E2E scenarios:
 
 **Dependencies:** stable operations and monitoring from Phases 0–1.
 
-### Phase 4 — Cross‑Chain Expansion []
+### Phase 3 — Cross‑Chain Expansion []
 **Goal:** scale to additional networks and diversify bridges.
 - Multi‑chain `stOLAS` deployments where strategic; provider‑diverse bridges with health checks/fallbacks.
 - Cross‑chain yield strategies gated by end‑to‑end monitoring and SLO adherence.
 
 **Dependencies:** governance in place; proven reliability and observability.
+
+### Phase 4 — External service integration []
+**Goal:** utility expansion via external service performance.
+- Integrate LST performance with other services supported by the protocol and expand the flywheel of OLAS flow.
+- Launchpad for LST related KPI-performing services funded by the protocol via collected fees.
+
+**Dependencies:** continued reliability and observability.
+
+### Phase 5 — DeFi Integration []
+**Goal:** expand utility once core flows are stable.
+- Yield‑aggregator partnerships after liquidity/pps stability is demonstrated.
+- Liquidity pools (strategy & monitoring for IL).
 
 ## Documentation
 
