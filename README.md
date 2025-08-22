@@ -207,7 +207,9 @@ control the stake / unstake dynamics resulting in efficient PPS grow. Thus, the 
 them and start the deployment of all LST contracts.
 
 Proposal tx: https://etherscan.io/tx/0x7682f2042e1524a6aa971ec2438846c58282ed48546a5a7885caa096b4933178
+
 Proposal Id: `59025344683074789922169705239782887646995636661382504070382540682844243682748`
+
 Proposal State: [Active](https://etherscan.io/address/0x8e84b5055492901988b831817e4ace5275a3b401#readContract#F21)
 
 ## Documentation
