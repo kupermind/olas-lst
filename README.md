@@ -39,11 +39,12 @@ while maintaining exposure to staking rewards.
 ```
 contracts/
 ├── l1/                    # L1 (Ethereum) contracts
-│   ├── stOLAS.sol        # Main ERC4626 vault
-│   ├── Depository.sol    # Cross-chain deposit management
-│   ├── Treasury.sol      # Withdrawal and ERC6909 management
-│   ├── Distributor.sol   # Reward distribution
-│   ├── Lock.sol          # veOLAS management
+│   ├── stOLAS.sol         # Main ERC4626 vault
+│   ├── Depository.sol     # Cross-chain deposit management
+│   ├── Treasury.sol       # Withdrawal and ERC6909 management
+│   ├── Distributor.sol    # Reward distribution
+│   ├── Lock.sol           # veOLAS management
+│   ├── LzOracle.sol       # LzRead-driven staking model management
 │   └── UnstakeRelayer.sol # Unstake request handling
 ├── l2/                    # L2 (Gnosis Chain) contracts
 │   ├── StakingManager.sol    # Staking orchestration
@@ -200,6 +201,7 @@ The test suite covers comprehensive E2E scenarios:
 - [Whitepaper (PDF)](doc/stolas_whitepaper_formatted.pdf)
 - [Whitepaper (Text)](doc/stolas_whitepaper.txt)
 - [Technical Architecture](doc/architecture.md)
+- [Architecture Diagrams](doc/architecture-diagrams.md)
 - [FAQ](doc/FAQ.md)
 
 ## Contributing
@@ -215,6 +217,14 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgements
+stOLAS contracts were inspired and based on the following sources:
+- [Solmate](https://github.com/transmissions11/solmate).
+- [Autonolas Registries](https://github.com/valory-xyz/autonolas-registries).
+- [Safe Contracts](https://github.com/safe-global/safe-smart-account).
+- [Layer Zero](https://github.com/LayerZero-Labs/layerzero-v2).
+- [OpenZeppelin](https://github.com/OpenZeppelin/openzeppelin-contracts).
 
 ---
 
