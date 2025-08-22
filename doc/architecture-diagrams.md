@@ -10,6 +10,7 @@ flowchart LR
   A[Autonomous Agent]
 
   subgraph L1 [L1 — Ethereum]
+    Timelock@{ shape: div-rect, label: "Timelock" }
     U[User]
     D[Depository]
     V[stOLAS]
@@ -30,6 +31,8 @@ flowchart LR
     BP2[Staking Processor]
   end
 
+  Timelock -->|open, close staking model| D
+  U --> LZ
   LZ -->|open, close staking model| D
 
   %% A) Deposit / Mint
@@ -104,7 +107,7 @@ sequenceDiagram
   Dist-->>V: optional lock to veOLAS
 
   %% C) Withdraw with possible shortfall (UNSTAKE -> Treasury)
-  U->>T: request withdraw (ticket)
+  U->>T: request withdraw
   T->>V: redeem up to vault+reserve
   alt shortfall exists
     D->>SM: init UNSTAKE
@@ -131,7 +134,7 @@ sequenceDiagram
 **L1 components**
 - **Depository** — sole caller of `stOLAS.deposit()`; orchestrates staking/rebalancing; uses `topUp*` and `syncStakeBalances` to keep vault accounting aligned.
 - **stOLAS Vault (ERC4626)** — maintains internal reserves (`staked/vault/reserve`) and derives **PPS** as `totalReserves / totalSupply`. **Entrypoints are non-standard:** `deposit` only via Depository, `redeem` only via Treasury; `mint/withdraw` are not for external use.
-- **Treasury** — records **withdraw tickets** (ERC6909 semantics), enforces cooldown and **pays** OLAS on finalization.
+- **Treasury** — records **withdraw requests** (ERC6909 semantics), enforces cooldown and **pays** OLAS on finalization.
 - **Distributor** — receives **REWARD** from L2; can lock a portion to **veOLAS** and/or **top up** the vault.
 - **UnstakeRelayer** — receives **UNSTAKE_RETIRED** returns and forwards to `stOLAS.topUpRetiredBalance` (does not directly fund Treasury payouts).
 
