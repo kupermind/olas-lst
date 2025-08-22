@@ -30,7 +30,7 @@ Historical PPS and dashboard metrics are the best way to assess realized perform
 
 ## 5) What fee is applied by Liquid OLAS Staking?
 At the **contract level** (audited commit), we did **not** identify a protocol fee taken on deposit or withdrawal. 
-Protocol fee is taken from rewards on L2 in order to manage all the required maintenance costs. Another part of rewards fee is take on L1 in order to increase the protocol veOLAS lock.
+Protocol fee is taken from rewards on L2 in order to manage all the required maintenance costs. Another part of rewards fee is taken on L1 in order to increase the protocol veOLAS lock.
 Users pay **gas fees** and, if a withdrawal requires bridging/unstaking, **network/bridge costs** may apply. 
 Third party integrations (DEXes, aggregators) may charge their own fees. Governance can introduce changes in the future; always check the app for current parameters.
 
