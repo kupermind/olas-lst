@@ -201,9 +201,10 @@ The test suite covers comprehensive E2E scenarios:
 
 Olas Staking enables Launchers to deploy staking contracts via [launch.olas.network](https://launch.olas.network).
 
-The protocol limits what kind of staking contracts can be deployed. For the OLAS LST, the current `StakingToken` implementation
-is less restrictive than required: any service that corresponds to a given staking setup can be staked freely.
-A new `StakingTokenLocked` implementation is needed such that it limits the number of stakers to just one contract - OLAS LST `StakingManager`.
+The protocol limits what kind of staking contracts can be deployed. For the OLAS LST, the current `StakingToken` [`StakingToken`](https://github.com/valory-xyz/autonolas-registries/blob/main/contracts/staking/StakingToken.sol)
+implementation is less restrictive than required: any service that corresponds to a given staking setup can be staked freely.
+A new [`StakingTokenLocked`](contracts/l2/StakingTokenLocked.sol) implementation is needed such that it limits the number of stakers
+to just one contract - OLAS LST [`StakingManager`](contracts/l2/StakingManager.sol).
 
 This setup allows to have a full internal control of cross-chain OLAS balances without intervention by other parties and
 possible misalignment of deposits. Also, `StakingTokenLocked`-created and nominated staking proxies are guaranteed
@@ -214,7 +215,7 @@ A governance proposal is live with the following intent:
 
 Whitelist `StakingTokenLocked` implementation contract on Gnosis and Base. Passing of the proposal allows enabling OLAS
 protocol staking inflation to be directed towards LST-compatible staking contracts, enabling the whole LST workflow.
-LST specific `StakingTokenLocked` contracts are more lightweight compared to original [`StakingToken`](https://github.com/valory-xyz/autonolas-registries/blob/main/contracts/staking/StakingToken.sol)
+LST specific `StakingTokenLocked` contracts are more lightweight compared to original `StakingToken`
 ones. However, they are more restricted and designed in a way such that only the internals of LST ecosystem are able
 to control the stake / unstake dynamics resulting in efficient accumulation of OLAS incentives. Adoption of the proposal would
 mark the start of the deployment of all LST contracts.
