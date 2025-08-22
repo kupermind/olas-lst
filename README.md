@@ -198,11 +198,11 @@ The test suite covers comprehensive E2E scenarios:
 
 ## Documentation
 
-- [Whitepaper (PDF)](doc/stolas_whitepaper_formatted.pdf)
-- [Whitepaper (Text)](doc/stolas_whitepaper.txt)
 - [Technical Architecture](doc/architecture.md)
 - [Architecture Diagrams](doc/architecture-diagrams.md)
 - [FAQ](doc/FAQ.md)
+- [Whitepaper (PDF)](doc/stolas_whitepaper_formatted.pdf) (Under liquid edition)
+- [Whitepaper (Text)](doc/stolas_whitepaper.txt)
 
 ## Contributing
 
