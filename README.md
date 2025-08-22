@@ -180,15 +180,13 @@ The test suite covers comprehensive E2E scenarios:
 
 ### Phase 3 — Cross‑Chain Expansion []
 **Goal:** scale to additional networks and diversify bridges.
-- Multi‑chain `stOLAS` deployments where strategic; provider‑diverse bridges with health checks/fallbacks.
-- Cross‑chain yield strategies gated by end‑to‑end monitoring and SLO adherence.
+- Multi-chain `stOLAS` deployments where strategic, with provider-diverse bridges including health checks and fallbacks.
 
 **Dependencies:** governance in place; proven reliability and observability.
 
 ### Phase 4 — External service integration []
 **Goal:** utility expansion via external service performance.
 - Integrate LST performance with other services supported by the protocol and expand the flywheel of OLAS flow.
-- Launchpad for LST related KPI-performing services funded by the protocol via collected fees.
 
 **Dependencies:** continued reliability and observability.
 
