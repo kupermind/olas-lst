@@ -210,7 +210,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ## Contact
 
-- **Website**: [https://lstolas.xyz](https://lstolas.xyz)
+- **Website**: [https://lstolas.xyz](https://lstolas.xyz) (Under construction)
 - **Repository**: https://github.com/kupermind/olas-lst
 - **Security**: security@lstolas.xyz
 
