@@ -7,50 +7,61 @@ This file provides two complementary Mermaid diagrams (a **flowchart** and a **s
 
 ```mermaid
 flowchart LR
+  A[Autonomous Agent]
+
   subgraph L1 [L1 — Ethereum]
     U[User]
     D[Depository]
-    V[stOLAS Vault (ERC4626)]
-    T[Treasury<br/>(Withdraw tickets, ERC6909)]
+    V[stOLAS]
+    VEO[veOLAS]
+    T[Treasury]
     Dist[Distributor]
     UR[UnstakeRelayer]
-    BP1[Bridge Processor (L1)]
+    BP1[Deposit Processor]
+    LZ[LZ Oracle]
   end
 
-  subgraph L2 [L2 — e.g., Gnosis]
+  subgraph L2 [L2 — Gnosis, Base]
     SM[StakingManager]
     STL[StakingTokenLocked]
     Coll[Collector]
     Svc[Services]
-    BP2[Bridge Processor (L2)]
+    AM@{ shape: notch-rect, label: "ActivityModule" }
+    BP2[Staking Processor]
   end
 
+  LZ -->|open, close staking model| D
+
   %% A) Deposit / Mint
-  U -->|deposit OLAS via app| D
+  U -->|deposit OLAS| D
   D -->|deposit / topUp →| V
+  D -->|bridge and stake OLAS| BP1
   V -->|mint stOLAS| U
+  BP1 ==>|OLAS bridge for stake →| BP2
 
   %% B) Rewards (REWARD → Distributor)
-  Svc -->|rewards accrue| SM
-  SM --> STL
-  STL -->|REWARD| Coll
-  Coll -->|bridge →| BP2 --> BP1 --> Dist
+  SM -->|deploy, terminate| Svc
+  Svc -->|rewards accrue| Coll
+  SM -->|stake / claim / unstake| STL
+  STL -->|stake, claim| Svc
+  Coll -->|relay tokens| BP2
+  BP2 ==>|OLAS bridge for rewards →| Dist
   Dist -->|top up reserves| V
-  Dist -.->|optional lock| VEO[Lock / veOLAS]
+  Dist -.->|lock| VEO
+  A-->|claim|AM
+  AM-->|claim|SM
+  AM-->|controls|Svc
 
   %% C) Withdraw & Unstake (UNSTAKE → Treasury)
-  U -->|withdraw request| T
+  U -->|request to withdraw and finalize| T
+  BP2 ==>|OLAS bridge for unstake and withdraw →| T
   T -->|redeem up to vault+reserve| V
-  D -.->|init UNSTAKE| SM
-  SM --> STL
-  STL -->|UNSTAKE| Coll
-  Coll -->|bridge →| BP2 --> BP1 --> T
-  U -->|finalize after cooldown| T -->|pay OLAS| U
+  STL -->|REWARD, UNSTAKE, UNSTAKE_RETIRED| Coll
+  T -->|pay OLAS| U
 
   %% D) Retired Unstake (UNSTAKE_RETIRED → UnstakeRelayer)
-  STL -->|UNSTAKE_RETIRED| Coll
-  Coll -->|bridge →| BP2 --> BP1 --> UR
-  UR -->|topUpRetiredBalance| V
+  BP2 ==>|OLAS bridge for permanent unstake →| UR
+  UR -->|top up retired balance| V
 ```
 
 ---
@@ -89,7 +100,7 @@ sequenceDiagram
   Coll->>BP2: bridge OLAS+msg
   BP2->>BP1: relay
   BP1->>Dist: deliver OLAS (REWARD)
-  Dist->>V: topUpVaultBalance (increase reserves)
+  Dist->>V: top up vault balance
   Dist-->>V: optional lock to veOLAS
 
   %% C) Withdraw with possible shortfall (UNSTAKE -> Treasury)
@@ -110,7 +121,7 @@ sequenceDiagram
   Coll->>BP2: bridge
   BP2->>BP1: relay
   BP1->>UR: deliver OLAS (UNSTAKE_RETIRED)
-  UR->>V: topUpRetiredBalance
+  UR->>V: top up retired balance
 ```
 
 ---
