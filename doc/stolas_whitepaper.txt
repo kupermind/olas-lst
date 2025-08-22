@@ -365,10 +365,10 @@ Glossary
 
 Contact Information
 
-**Official Website**: https://URL/
+**Official Website**: https://lstolas.xyz
 **Repository**: https://github.com/kupermind/olas-lst
-**Documentation**: https://docs.project.com
-**Security**: security@project.com
+**Documentation**: https://github.com/kupermind/olas-lst/doc/
+**Security**: security@lstolas.xyz
 
 For inquiries, partnership opportunities, and security reports, please contact the development team via the official website contact form or security email address.
 
