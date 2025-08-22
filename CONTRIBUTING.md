@@ -32,7 +32,7 @@ First off, thank you for taking the time to contribute! This document describes 
 
 ## Code of Conduct
 
-This project adheres to the [Contributor Covenant](https://www.contributor-covenant.org/version/2/1/code_of_conduct/) Code of Conduct. By participating, you are expected to uphold this code. Please report unacceptable behavior to **maintainers@yourdomain.tld**.
+This project adheres to the [Contributor Covenant](https://www.contributor-covenant.org/version/2/1/code_of_conduct/) Code of Conduct. By participating, you are expected to uphold this code. Please report unacceptable behavior to **maintainers@lstolas.xyz**.
 
 ---
 
@@ -69,7 +69,7 @@ Common top-level directories include:
 
 **Do not** open public GitHub issues for security vulnerabilities. Instead:
 
-- Email **security@yourdomain.tld** with a detailed report.
+- Email **security@lstolas.xyz** with a detailed report.
 - Include steps to reproduce, the affected components, and potential impact.
 - If you propose a fix, include a patch or PR against a private fork when appropriate.
 
@@ -243,7 +243,7 @@ test/
 
 ## Contact
 
-- General questions: **maintainers@yourdomain.tld**
-- Security: **security@yourdomain.tld**
+- General questions: **maintainers@lstolas.xyz**
+- Security: **security@lstolas.xyz**
 
 Thank you for contributing! 🚀
