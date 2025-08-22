@@ -164,6 +164,7 @@ The test suite covers comprehensive E2E scenarios:
 
 ### Phase 1 — Core Protocol Stabilization / Mainnet Beta []
 **Goal:** operate with conservative limits and prove reliability.
+- veOLAS vote to whitelist StakingTokenLocked implementation in OLAS staking economy ecosystem.
 - Soft caps on deposits/withdraws; safe batch sizes enforced by UI/SDK.
 - SLO/SLA targets for bridge/unstake latency and ticket finalization windows.
 - Weekly PPS/liquidity reports and post‑mortems for any incidents.
@@ -195,6 +196,19 @@ The test suite covers comprehensive E2E scenarios:
 **Goal:** expand utility once core flows are stable.
 - Yield‑aggregator partnerships after liquidity/pps stability is demonstrated.
 - Liquidity pools (strategy & monitoring for IL).
+
+## OLAS Protocol Proposal to Jump Start LST Deployment
+
+The whitelisting of `StakingTokenLocked` implementation contract is required for OLAS LST functioning on Gnosis and Base.
+Passing that proposal allows enabling OLAS protocol staking inflation to be directed towards LST fueling and activates
+the whole LST workflow. LST specific `StakingTokenLocked` contracts are more lightweight than original [`StakingToken`](https://github.com/valory-xyz/autonolas-registries/blob/main/contracts/staking/StakingToken.sol)
+ones. However, they are more restricted and designed in a way such that only the internals of LST ecosystem are able to 
+control the stake / unstake dynamics resulting in efficient PPS grow. Thus, the community support is required to whitelist
+them and start the deployment of all LST contracts.
+
+Proposal tx: https://etherscan.io/tx/0x7682f2042e1524a6aa971ec2438846c58282ed48546a5a7885caa096b4933178
+Proposal Id: `59025344683074789922169705239782887646995636661382504070382540682844243682748`
+Proposal State: [Active](https://etherscan.io/address/0x8e84b5055492901988b831817e4ace5275a3b401#readContract#F21)
 
 ## Documentation
 
