@@ -3,14 +3,16 @@
 
 ## Overview
 
-stOLAS is a comprehensive liquid staking solution for the OLAS token in the Autonolas ecosystem. It enables users to stake OLAS tokens and receive stOLAS (staked OLAS) tokens in return, providing liquidity while maintaining exposure to staking rewards.
+stOLAS is a comprehensive liquid staking solution for the OLAS token in the Autonolas ecosystem.
+It enables users to stake OLAS tokens and receive stOLAS (staked OLAS) tokens in return, providing liquidity
+while maintaining exposure to staking rewards.
 
 ## Key Features
 
 - **ERC4626 Vault Standard**: Fully compliant with the ERC4626 vault standard for maximum DeFi composability
-- **Cross-Chain Architecture**: L1 (Ethereum) for deposits/withdrawals, L2 (Gnosis Chain) for active staking
+- **Cross-Chain Architecture**: L1 (Ethereum) for deposits/withdrawals, L2 (Gnosis Chain, then Base, etc.) for active staking
 - **Automated Staking Management**: Intelligent service deployment and reward distribution
-- **Liquidity Preservation**: stOLAS tokens can be freely traded, transferred, and used in DeFi protocols
+- **Liquidity Preservation**: stOLAS tokens can be freely traded, transferred, and used in DeFi protocols and products
 - **Governance Separation**: Future vstOLAS token for governance, keeping stOLAS purely utility-focused
 
 ## Architecture Overview
