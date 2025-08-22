@@ -250,29 +250,24 @@ Roadmap and Development Phases
 - Basic staking operations
 - Internal security audits
 
-**Phase 2: DeFi Integration (In Progress - Q4 2025)**
-- Uniswap V3 liquidity pools
-- Lending protocol partnerships
-- Yield aggregator integrations
-- Advanced DeFi strategies
-
-**Phase 3: Governance Launch (Q1 2026)**
+**Phase 2: Governance Launch (In Progress - Q4 2025)**
 - vstOLAS token deployment
 - On-chain governance processes
 - Community proposal system
 - Parameter adjustment mechanisms
 
-**Phase 4: Cross-Chain Expansion (Q2 2026)**
+**Phase 3: Cross‑Chain Expansion (Q1 2026)**
 - Additional L2 deployments
 - Multi-chain staking strategies
 - Cross-chain yield optimization
-- Global market expansion
 
-**Phase 5: Ecosystem Maturity (Q4 2026)**
-- Advanced staking strategies
-- Insurance and risk management
-- Institutional adoption tools
-- Full ecosystem integration
+**Phase 4: External service integration (Q2 2026)**
+- Integrate LST performance with other services
+- Launchpad for LST related KPI-performing services
+
+**Phase 5: DeFi Integration (Q4 2026)**
+- Yield‑aggregator partnerships
+- Liquidity pools
 
 Economic Model and Tokenomics
 
@@ -424,11 +419,14 @@ Guardrails for routing; ERC4626 caveat docs; monitoring dashboards; multisig+tim
 **Phase 1 — Core Protocol Stabilization**  
 Operate with soft caps & SLOs; weekly PPS/liquidity reports; incident post‑mortems.
 
-**Phase 2 — DeFi Integration**  
-Uniswap V3 pools; isolated lending; oracle policy (Chainlink + TWAP fallback).
-
-**Phase 3 — Governance Launch**  
+**Phase 2 — Governance Launch**
 vstOLAS (if applicable); timelock as executor; upgrade runbooks.
 
-**Phase 4 — Cross‑Chain Expansion**  
+**Phase 3 — Cross‑Chain Expansion**
 Additional networks; provider‑diverse bridges; cross‑chain yield strategies gated by monitoring.
+
+**Phase 4 - External service integration **
+Integrate with other services, support launchpad for LST related KPI-performing services.
+
+**Phase 5: DeFi Integration**
+Yield‑aggregator partnerships and liquidity pools considerations.
