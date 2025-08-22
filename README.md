@@ -250,11 +250,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Acknowledgements
 stOLAS contracts were inspired and based on the following sources:
-- [Solmate](https://github.com/transmissions11/solmate).
-- [Autonolas Registries](https://github.com/valory-xyz/autonolas-registries).
-- [Safe Contracts](https://github.com/safe-global/safe-smart-account).
-- [Layer Zero](https://github.com/LayerZero-Labs/layerzero-v2).
-- [OpenZeppelin](https://github.com/OpenZeppelin/openzeppelin-contracts).
+- [Solmate](https://github.com/transmissions11/solmate)
+- [Autonolas Registries](https://github.com/valory-xyz/autonolas-registries)
+- [Safe Contracts](https://github.com/safe-global/safe-smart-account)
+- [Layer Zero](https://github.com/LayerZero-Labs/layerzero-v2)
+- [OpenZeppelin](https://github.com/OpenZeppelin/openzeppelin-contracts)
 
 ---
 
