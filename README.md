@@ -180,7 +180,7 @@ The test suite covers comprehensive E2E scenarios:
 
 ### Phase 3 — Cross‑Chain Expansion []
 **Goal:** scale to additional networks and diversify bridges.
-- Multi‑chain `stOLAS` deployments where strategic; provider‑diverse bridges with health checks/fallbacks.
+- Multi-chain `stOLAS` deployments where strategic, with provider-diverse bridges including health checks and fallbacks.
 
 **Dependencies:** governance in place; proven reliability and observability.
 
