@@ -215,7 +215,7 @@ describe("Liquid Staking", function () {
 
         // Change managers for stOLAS
         // Only Treasury contract can mint OLAS
-        await st.changeManagers(treasury.address, depository.address, distributor.address, unstakeRelayer.address);
+        await st.initialize(treasury.address, depository.address, distributor.address, unstakeRelayer.address);
 
         // Change treasury address in depository
         await depository.changeTreasury(treasury.address);
