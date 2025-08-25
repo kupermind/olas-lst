@@ -327,6 +327,8 @@ contract Depository is Implementation {
         emit LzOracleUpdated(newLzOracle);
     }
 
+    /// @dev Changes product type.
+    /// @param newProductType New product type.
     function changeProductType(ProductType newProductType) external {
         // Check for ownership
         if (msg.sender != owner) {

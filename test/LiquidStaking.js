@@ -203,6 +203,9 @@ describe("Liquid Staking", function () {
         await depositoryProxy.deployed();
         depository = await ethers.getContractAt("Depository", depositoryProxy.address);
 
+        // Change product type to Final
+        await depository.changeProductType(2);
+
         const Treasury = await ethers.getContractFactory("Treasury");
         treasury = await Treasury.deploy(olas.address, st.address, depository.address);
         await treasury.deployed();
