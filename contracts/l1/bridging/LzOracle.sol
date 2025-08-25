@@ -227,8 +227,13 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
             revert StakingModelAlreadyExists(stakingModelId);
         }
 
-        // TODO check accountChainId for not null
         AccountChainIdMsgType memory accountChainId = mapStakingHelperLzChainIds[chainId];
+        // Check for existing struct
+        if (accountChainId.account == address(0)) {
+            revert ZeroAddress();
+        }
+
+        // Get lzRead payload
         bytes memory payload = _cmdGetStakingInfo(stakingProxy, accountChainId.account, accountChainId.chainId);
 
         // TODO Figure out the correct quote check

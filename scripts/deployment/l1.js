@@ -255,7 +255,7 @@ const main = async () => {
     // Only Treasury contract can mint OLAS
     console.log("Changing stOLAS managers");
     st = await ethers.getContractAt("stOLAS", parsedData.stOLASAddress);
-    await st.changeManagers(parsedData.treasuryProxyAddress, parsedData.depositoryProxyAddress);
+    await st.initialize(parsedData.treasuryProxyAddress, parsedData.depositoryProxyAddress);
 
     // Change treasury address in depository
     console.log("Change treasury address in depository");

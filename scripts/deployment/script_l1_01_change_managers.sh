@@ -58,7 +58,7 @@ fi
 castSendHeader="cast send --rpc-url $networkURL$API_KEY $walletArgs"
 
 echo "${green}Change stOLAS managers${reset}"
-castArgs="$stOLASAddress changeManagers(address,address,address,address) $treasuryProxyAddress $depositoryProxyAddress $distributorProxyAddress $unstakeRelayerProxyAddress"
+castArgs="$stOLASAddress initialize(address,address,address,address) $treasuryProxyAddress $depositoryProxyAddress $distributorProxyAddress $unstakeRelayerProxyAddress"
 echo $castArgs
 castCmd="$castSendHeader $castArgs"
 result=$($castCmd)

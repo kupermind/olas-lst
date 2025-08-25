@@ -76,7 +76,7 @@ contract MockStOLAS {
         totalAssets += amount;
     }
     
-    function changeManagers(address treasury, address depository, address distributor, address unstakeRelayer) external {
+    function initialize(address treasury, address depository, address distributor, address unstakeRelayer) external {
         // Mock implementation
     }
 }
@@ -411,7 +411,7 @@ contract LiquidStakingTest is Test {
         
         console.log("Setting up stOLAS managers...");
         // Setup stOLAS managers
-        st.changeManagers(address(treasury), address(depository), address(distributor), address(unstakeRelayer));
+        st.initialize(address(treasury), address(depository), address(distributor), address(unstakeRelayer));
         console.log("stOLAS managers set");
         
         console.log("Setting up depository treasury...");

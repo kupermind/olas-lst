@@ -3,10 +3,19 @@ pragma solidity ^0.8.30;
 
 import {ERC20, ERC4626, FixedPointMathLib} from  "../../lib/solmate/src/tokens/ERC4626.sol";
 
-/// @dev Only `owner` has a privilege, but the `sender` was provided.
-/// @param sender Sender address.
-/// @param owner Required owner address.
-error OwnerOnly(address sender, address owner);
+/// @dev Provided zero address.
+error ZeroAddress();
+
+/// @dev Provided zero value.
+error ZeroValue();
+
+/// @dev Value overflow.
+/// @param provided Overflow value.
+/// @param max Maximum possible value.
+error Overflow(uint256 provided, uint256 max);
+
+/// @dev The contract is already initialized.
+error AlreadyInitialized();
 
 /// @dev Only `treasury` has a privilege, but the `sender` was provided.
 /// @param sender Sender address.
@@ -28,16 +37,9 @@ error DistributorOnly(address sender, address distributor);
 /// @param unstakeRelayer Required sender address as an unstakeRelayer.
 error UnstakeRelayerOnly(address sender, address unstakeRelayer);
 
-/// @dev Provided zero address.
-error ZeroAddress();
+/// @dev The function is not implemented.
+error NotImplemented();
 
-/// @dev Provided zero value.
-error ZeroValue();
-
-/// @dev Value overflow.
-/// @param provided Overflow value.
-/// @param max Maximum possible value.
-error Overflow(uint256 provided, uint256 max);
 
 /// @title stOLAS - Smart contract for the stOLAS token.
 contract stOLAS is ERC4626 {
@@ -71,18 +73,23 @@ contract stOLAS is ERC4626 {
         ERC4626(_olas, "Staked OLAS", "stOLAS")
     {}
 
-    // TODO Change function name
     /// @dev Initializes stOLAS with various managing contract addresses.
+    /// @notice The initialization is checked offchain before integration with other contracts.
     /// @param _treasury Treasury address.
     /// @param _depository Depository address.
     /// @param _distributor Distributor address.
     /// @param _unstakeRelayer UnstakeRelayer address.
-    function changeManagers(
+    function initialize(
         address _treasury,
         address _depository,
         address _distributor,
         address _unstakeRelayer
     ) external {
+        // Check for already being initialized
+        if (treasury != address(0)) {
+            revert AlreadyInitialized();
+        }
+
         // Check for zero addresses
         if (_treasury == address(0) || _depository == address(0) || _distributor == address(0) ||
             _unstakeRelayer == address(0))
@@ -201,12 +208,12 @@ contract stOLAS is ERC4626 {
 
     /// @dev Overrides mint function that is never used.
     function mint(uint256, address) public pure override returns (uint256) {
-        return 0;
+        revert NotImplemented();
     }
 
     /// @dev Overrides withdraw function that is never used.
     function withdraw(uint256, address, address) public pure override returns (uint256) {
-        return 0;
+        revert NotImplemented();
     }
 
     /// @dev Updates total assets.

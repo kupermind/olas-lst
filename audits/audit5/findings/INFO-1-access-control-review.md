@@ -12,14 +12,6 @@ This report provides a comprehensive review of the access control mechanisms imp
 
 **Examples**:
 ```solidity
-// In stOLAS.sol
-function changeOwner(address newOwner) external {
-    if (msg.sender != owner) {
-        revert OwnerOnly(msg.sender, owner);
-    }
-    // ... rest of function
-}
-
 // In Depository.sol
 function setDepositProcessorChainIds(address[] memory depositProcessors, uint256[] memory chainIds) external {
     if (msg.sender != owner) {
@@ -107,7 +99,6 @@ function _calculateStakingRewards() internal returns (...) {
 ### L1 Contracts
 
 #### stOLAS.sol
-- **Owner Functions**: `changeOwner()`, `changeManagers()`
 - **Role Functions**: `deposit()` (depository), `redeem()` (treasury), `topUpReserveBalance()` (depository)
 - **Public Functions**: `previewDeposit()`, `previewRedeem()`, `totalAssets()`
 
@@ -162,23 +153,7 @@ function _calculateStakingRewards() internal returns (...) {
 
 ## Recommendations
 
-### 1. Consider Multi-Signature Implementation
-For critical functions like owner changes, consider implementing multi-signature requirements:
-
-```solidity
-struct MultiSigConfig {
-    address[] signers;
-    uint256 requiredSignatures;
-    uint256 nonce;
-}
-
-function changeOwnerWithMultiSig(address newOwner, bytes[] memory signatures) external {
-    require(validateMultiSig(signatures, keccak256(abi.encodePacked(newOwner, nonce)), "Invalid signatures");
-    // ... change owner logic
-}
-```
-
-### 2. Add Timelock for Critical Changes
+### 1. Add Timelock for Critical Changes
 Implement timelock for parameter changes:
 
 ```solidity
@@ -195,8 +170,9 @@ function executeChange(bytes32 changeId, bytes memory data) external onlyOwner {
     // ... execute change
 }
 ```
+[x] Noted, owner will be changed to Timelock
 
-### 3. Implement Emergency Pause
+### 2. Implement Emergency Pause
 Add emergency pause functionality:
 
 ```solidity
@@ -214,6 +190,7 @@ modifier whenNotPaused() {
     _;
 }
 ```
+[x] Fixed
 
 ## Conclusion
 

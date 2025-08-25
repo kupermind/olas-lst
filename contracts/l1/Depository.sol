@@ -48,6 +48,11 @@ error AlreadyInitialized();
 /// @dev Wrong length of arrays.
 error WrongArrayLength();
 
+/// @dev Product type deposit overflow.
+/// @param productType Current product type.
+/// @param depositAmount Deposit amount.
+error ProductTypeOverflow(uint8 productType, uint256 depositAmount);
+
 /// @dev Value overflow.
 /// @param provided Overflow value.
 /// @param max Maximum possible value.
@@ -68,13 +73,25 @@ error UnauthorizedAccount(address account);
 /// @dev Caught reentrancy violation.
 error ReentrancyGuard();
 
+/// @dev Contract is paused.
+error Paused();
+
+
+// Product type enum
+enum ProductType {
+    Alpha,
+    Beta,
+    Final
+}
+
+// Staking model status enum
 enum StakingModelStatus {
     Retired,
     Active,
     Inactive
 }
 
-// StakingModel struct
+// Staking model struct
 struct StakingModel {
     // Max available supply
     uint96 supply;
@@ -91,6 +108,7 @@ struct StakingModel {
 contract Depository is Implementation {
     event TreasuryUpdated(address indexed treasury);
     event LzOracleUpdated(address indexed lzOracle);
+    event ProductTypeUpdated(ProductType productType);
     event SetDepositProcessorChainIds(address[] depositProcessors, uint256[] chainIds);
     event StakingModelActivated(uint256 indexed chainId, address indexed stakingProxy, uint256 stakeLimitPerSlots,
         uint256 numSlots);
@@ -100,6 +118,8 @@ contract Depository is Implementation {
     event Unstake(address indexed sender, uint256 unstakeAmount, uint256[] chainIds, address[] stakingProxies,
         uint256[] amounts);
     event Retired(uint256[] chainIds, address[] stakingProxies);
+    event PausedDepository();
+    event UnpausedDepository();
 
     // Depository version
     string public constant VERSION = "0.1.0";
@@ -109,6 +129,10 @@ contract Depository is Implementation {
     bytes32 public constant UNSTAKE = 0x8ca9a95e41b5eece253c93f5b31eed1253aed6b145d8a6e14d913fdf8e732293;
     // Unstake-retired operation
     bytes32 public constant UNSTAKE_RETIRED = 0x9065ad15d9673159e4597c86084aff8052550cec93c5a6e44b3f1dba4c8731b3;
+    // Alpha product type deposit amount limit
+    uint256 public constant ALPHA_DEPOSIT_LIMIT = 1_000 ether;
+    // Beta product type deposit amount limit
+    uint256 public constant BETA_DEPOSIT_LIMIT = 10_000 ether;
 
     // OLAS contract address
     address public immutable olas;
@@ -122,6 +146,10 @@ contract Depository is Implementation {
 
     // Lock factor in 10_000 value
     uint256 public lockFactor;
+    // Contract pause status
+    bool public paused;
+    // Product type value
+    ProductType public productType;
 
     // Reentrancy lock
     bool transient _locked;
@@ -261,6 +289,7 @@ contract Depository is Implementation {
             revert AlreadyInitialized();
         }
 
+        productType = ProductType.Alpha;
         owner = msg.sender;
     }
 
@@ -296,6 +325,18 @@ contract Depository is Implementation {
 
         lzOracle = newLzOracle;
         emit LzOracleUpdated(newLzOracle);
+    }
+
+    /// @dev Changes product type.
+    /// @param newProductType New product type.
+    function changeProductType(ProductType newProductType) external {
+        // Check for ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
+        }
+        
+        productType = newProductType;
+        emit ProductTypeUpdated(newProductType);
     }
 
     /// @dev Sets deposit processor contracts addresses and L2 chain Ids.
@@ -435,6 +476,18 @@ contract Depository is Implementation {
             revert ReentrancyGuard();
         }
         _locked = true;
+
+        // Check if contract is paused
+        if (paused) {
+            revert Paused();
+        }
+
+        // Check for contract product type and limits
+        if ((productType == ProductType.Alpha && stakeAmount > ALPHA_DEPOSIT_LIMIT) ||
+            (productType == ProductType.Beta && stakeAmount > BETA_DEPOSIT_LIMIT))
+        {
+            revert ProductTypeOverflow(uint8(productType), stakeAmount);
+        }
 
         // Check for overflow
         if (stakeAmount > type(uint96).max) {
@@ -738,6 +791,28 @@ contract Depository is Implementation {
         }
 
         emit Retired(chainIds, stakingProxies);
+    }
+
+    /// @dev Pauses contract.
+    function pause() external {
+        // Check for ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
+        }
+
+        paused = true;
+        emit PausedDepository();
+    }
+
+    /// @dev Unpauses contract.
+    function unpause() external {
+        // Check for ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
+        }
+
+        paused = false;
+        emit UnpausedDepository();
     }
 
     /// @dev Gets number of all staking models that have been activated.

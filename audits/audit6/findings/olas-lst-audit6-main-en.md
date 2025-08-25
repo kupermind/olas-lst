@@ -37,6 +37,9 @@ For the audited commit, the architecture is coherent; **no critical logic bugs**
 - Include an automated preflight (off-chain/script): read back the current receivers and compare to expected; abort if they differ.
 - Operational monitoring: subscribe to `OperationReceiversSet` and `TokensRelayed` on L2, and to `WithdrawRequest*` on L1; alert on volume mismatches and delays in `UNSTAKE` inflows to `Treasury`.
 
+[x] Noted, static audit is required and is already planned
+
+
 ---
 
 ### 2) ERC4626: **non-standard** entrypoints — **Medium**
@@ -51,6 +54,9 @@ This is an intentional design to centralize flow control. **However**, it diverg
 **Procedural recommendations:**
 - Document in README/API that only `deposit` (via `Depository`) and `redeem` (via `Treasury`) are meant to be used; `mint/withdraw` are **non-standard** and not for external use.
 - Reflect the same model in SDKs/integration tests to prevent accidental misuse by apps/aggregators.
+
+[x] Fixed
+
 
 ---
 
@@ -73,6 +79,9 @@ Consequently, `Depository` is a trusted party; correctness of its parameters is 
 
 **Risks.** Incorrect `syncStakeBalances` parameters could **distort `pps`** (price-per-share) by desynchronizing internal accounting and real assets. Within the current trust model, this is acceptable but requires discipline and monitoring.
 
+[x] Noted, static audit is required and is already planned
+
+
 ---
 
 ### 4) Safety of asset transfers (OLAS) — **Low**
@@ -84,6 +93,9 @@ Consequently, `Depository` is a trusted party; correctness of its parameters is 
 **Procedural recommendations:**
 - State explicitly in documentation that the asset must be a **plain** ERC-20 without transfer side effects.
 - If the asset is ever replaced, run a mini-compatibility audit (hooks, fee-on-transfer, rebase, etc.).
+
+[x] Noted, the OLAS token is verified
+
 
 ---
 
@@ -97,6 +109,9 @@ Consequently, `Depository` is a trusted party; correctness of its parameters is 
 **Procedural recommendations:**
 - Adopt a “two-check” upgrade procedure: off-chain state-migration plan + on-chain rehearsal (e.g., fork network) before broadcasting.
 - Publish a table: `contract → type (proxy/immutable), current owner / post-DAO owner, timelock parameters`.
+
+[x] Noted, the table will be added during contract deployments
+
 
 ---
 
@@ -112,6 +127,9 @@ Consequently, `Depository` is a trusted party; correctness of its parameters is 
 - Explicitly document in README that `pps` and calculations derive from **internal reserves** (`totalReserves`), not from raw token balances.
 - Maintain a minimal monitoring dashboard (key metrics: component breakdown of `totalReserves`, outstanding withdraw tickets, `UNSTAKE` inflows to `Treasury`).
 
+[x] Noted for UX
+
+
 ---
 
 ## Invariants Currently Satisfied
@@ -121,6 +139,9 @@ Consequently, `Depository` is a trusted party; correctness of its parameters is 
 - **Reentrancy guards** are present in sensitive entrypoints (`Treasury`, bridge processors, etc.).
 - **Zero-dust protection.** Calculations (ERC4626 math) include checks/constraints that prevent rounding “dust” issues.
 - **Event coverage.** Most critical actions emit events (`OperationReceiversSet`, `WithdrawRequest*`, `Deposit/Unstake/Retired`, `TotalReservesUpdated`, etc.), aiding traceability.
+
+[x] Noted
+
 
 ---
 
