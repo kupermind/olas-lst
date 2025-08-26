@@ -28,12 +28,12 @@
 # Deploy BaseStakingProcessorL2
 #./scripts/deployment/deploy_l2_10_base_staking_processor.sh $1
 
+# Change staking processors in CollectorProxy and StakingManagerProxy
+./scripts/deployment/script_l2_01_change_staking_processors.sh $1
+
+# Fund StakingManagerProxy
+./scripts/deployment/script_l2_02_fund_staking_manager.sh $1
+
 ##### !!!! For mainnet - this is subject to the DAO vote
 # Whitelist staking implementation
 ./scripts/deployment/script_l2_01_whitelist_staking_implementation.sh $1
-
-# Change staking processors in CollectorProxy and StakingManagerProxy
-./scripts/deployment/script_l2_02_change_staking_processors.sh $1
-
-# Fund StakingManagerProxy
-./scripts/deployment/script_l2_03_fund_staking_manager.sh $1

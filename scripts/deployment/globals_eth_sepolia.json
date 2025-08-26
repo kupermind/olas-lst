@@ -22,7 +22,7 @@
   "distributorProxyAddress": "0xe2d2A2f998305dA0b03cED4B83a574db4A5428fC",
   "unstakeRelayerAddress": "0xf5bF86e0ac32bC053267683F22655f24b4b8dCCb",
   "unstakeRelayerProxyAddress": "0x27862C44De47213c91b547FD0C3243Fa7518c1ea",
-  "depositoryAddress": "0xc740fBA75Cab974a556995fA069fFdda6F868A34",
+  "depositoryAddress": "0xe096c6fD2Af1A4B6aA135FaFAC565df91989f65e",
   "depositoryProxyAddress": "0x972e3484378B9B7100a87766BFe82Da3B2931138",
   "withdrawDelay": "3600",
   "treasuryAddress": "0x91DE4c84facdF691F211Ac10bDF906b4f7E41F41",

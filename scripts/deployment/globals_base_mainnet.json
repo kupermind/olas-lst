@@ -30,5 +30,9 @@
   "stakingVerifierAddress": "0x10c5525F77F13b28f42c5626240c001c2D57CAd4",
   "stakingFactoryAddress": "0x1cEe30D08943EB58EFF84DD1AB44a6ee6FEff63a",
   "stakingHelperAddress": "0xA8BbdB28767900092f1eA0F22B1dF64B80387987",
-  "stakingTokenLockedAddress": "0xA8e739a8A5D56b9ccF612020204B9C90A1b55099"
+  "stakingTokenLockedAddress": "0xA8e739a8A5D56b9ccF612020204B9C90A1b55099",
+  "collectorAddress": "0x60b9dA6E2431E16262d5193035B0a2887ce3c8fA",
+  "collectorProxyAddress": "0xab4C5BB0797Ca25e93a4af2E8FECD7Fcac0F2c9b",
+  "activityModuleAddress": "0x62a7033dCB94486F3dA962BfC10631C9f5eF311e",
+  "beaconAddress": "0x535e274Ef8447B112c3d12CFA33D73b6fd693AaA"
 }

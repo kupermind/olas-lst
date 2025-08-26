@@ -34,6 +34,7 @@
   "stakingFactoryAddress": "0xb1ae1Ab21f872bCD17f706Ee73327fB58e9A0Da6",
   "distributorProxyAddress": "0x26E27872e9116ff35Cb796D8500b59D2671A7786",
   "treasuryProxyAddress": "0x6401532D75CA14009D260ceB27E322E9a6fE9beB",
+  "unstakeRelayerProxyAddress": "0x27862C44De47213c91b547FD0C3243Fa7518c1ea",
   "gnosisDepositProcessorL1Address": "0x88df9Cc0709a1e26A6fF3944cef86D91a394A591",
   "collectorAddress": "0x86A7d7547C29f46bC8980d9404e89Fe0ff191314",
   "collectorProxyAddress": "0x9C70ACC9753ea485799DCbdcb2023f8494eE2F0A",
