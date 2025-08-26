@@ -29,9 +29,6 @@ error ZeroValueOnly();
 
 /// @title GnosisStakingProcessorL2 - Smart contract for processing tokens and data received on Gnosis L2, and tokens sent back to L1.
 contract GnosisStakingProcessorL2 is DefaultStakingProcessorL2 {
-    // Bridge payload length
-    uint256 public constant BRIDGE_PAYLOAD_LENGTH = 32;
-
     /// @dev GnosisTargetDispenserL2 constructor.
     /// @param _olas OLAS token address.
     /// @param _proxyFactory Service staking proxy factory address.
