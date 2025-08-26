@@ -34,6 +34,9 @@
 # Fund StakingManagerProxy
 ./scripts/deployment/script_l2_02_fund_staking_manager.sh $1
 
+# Set operation receivers in Collector
+./scripts/deployment/script_l2_03_set_operation_receivers_collector.sh $1
+
 ##### !!!! For mainnet - this is subject to the DAO vote
 # Whitelist staking implementation
-./scripts/deployment/script_l2_01_whitelist_staking_implementation.sh $1
+./scripts/deployment/script_l2_06_whitelist_staking_implementation.sh $1
