@@ -15,7 +15,7 @@ Who can call this function?
 In which network (chainid)?
 What happens if it is called with obviously incorrect parameters?
 ``` 
-[]
+[x] Noted, all as designed
 
 ### Issue? Access control for Oracle function
 ```
@@ -24,7 +24,7 @@ Who can call this function?
 In which network (chainid)?
 What happens if it is called with obviously incorrect parameters?
 ``` 
-[]
+[x] Noted, all as designed
 
 
 ## Notes

@@ -203,6 +203,9 @@ describe("Liquid Staking", function () {
         await depositoryProxy.deployed();
         depository = await ethers.getContractAt("Depository", depositoryProxy.address);
 
+        // Change product type to Final
+        await depository.changeProductType(2);
+
         const Treasury = await ethers.getContractFactory("Treasury");
         treasury = await Treasury.deploy(olas.address, st.address, depository.address);
         await treasury.deployed();
@@ -215,7 +218,7 @@ describe("Liquid Staking", function () {
 
         // Change managers for stOLAS
         // Only Treasury contract can mint OLAS
-        await st.changeManagers(treasury.address, depository.address, distributor.address, unstakeRelayer.address);
+        await st.initialize(treasury.address, depository.address, distributor.address, unstakeRelayer.address);
 
         // Change treasury address in depository
         await depository.changeTreasury(treasury.address);
