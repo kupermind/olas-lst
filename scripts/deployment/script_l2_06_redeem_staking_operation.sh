@@ -7,9 +7,6 @@ if [ -z "$1" ]; then
   exit 1
 fi
 
-# Get L2 network name: gnosis, base, etc.
-networkL2=$2
-
 red=$(tput setaf 1)
 green=$(tput setaf 2)
 reset=$(tput sgr0)
@@ -27,21 +24,22 @@ derivationPath=$(jq -r '.derivationPath' $globals)
 chainId=$(jq -r '.chainId' $globals)
 networkURL=$(jq -r '.networkURL' $globals)
 
-olasAddress=$(jq -r ".olasAddress" $globals)
-depositoryProxyAddress=$(jq -r ".depositoryProxyAddress" $globals)
-amount="30000000000000000000000"
+# Get network name from network_mainnet or network_sepolia or another testnet
+network=${1%_*}
 
-# Getting L1 API key
-if [ $chainId == 1 ]; then
-  API_KEY=$ALCHEMY_API_KEY_MAINNET
+stakingProcessorL2Address=$(jq -r ".${network}StakingProcessorL2Address" $globals)
+
+# Check for Polygon keys only since on other networks those are not needed
+if [ $chainId == 137 ]; then
+  API_KEY=$ALCHEMY_API_KEY_MATIC
   if [ "$API_KEY" == "" ]; then
-      echo "set ALCHEMY_API_KEY_MAINNET env variable"
+      echo "set ALCHEMY_API_KEY_MATIC env variable"
       exit 0
   fi
-elif [ $chainId == 11155111 ]; then
-    API_KEY=$ALCHEMY_API_KEY_SEPOLIA
+elif [ $chainId == 80002 ]; then
+    API_KEY=$ALCHEMY_API_KEY_AMOY
     if [ "$API_KEY" == "" ]; then
-        echo "set ALCHEMY_API_KEY_SEPOLIA env variable"
+        echo "set ALCHEMY_API_KEY_AMOY env variable"
         exit 0
     fi
 fi
@@ -58,21 +56,8 @@ fi
 
 castSendHeader="cast send --rpc-url $networkURL$API_KEY $walletArgs"
 
-echo "${green}Approve OLAS for DepositoryProxy${reset}"
-castArgs="$olasAddress approve(address,uint256) $depositoryProxyAddress $amount"
-echo $castArgs
-castCmd="$castSendHeader $castArgs"
-result=$($castCmd)
-echo "$result" | grep "status"
-
-
-chainIds="[100,100]"
-stakingProxies="[0x30e3d6b505b0123522803419a498e4dc315982bb,0x30e3d6b505b0123522803419a498e4dc315982bb]"
-bridgePayloads="[0x,0x]"
-values="[0,0]"
-
-echo "${green}Deposit OLAS for stOLAS${reset}"
-castArgs="$depositoryProxyAddress deposit(uint256,uint256[],address[],bytes[],uint256[]) $amount $chainIds $stakingProxies $bridgePayloads $values"
+echo "${green}Redeem staking operation${reset}"
+castArgs="$stakingProcessorL2Address redeem(address,uint256,bytes32,bytes32) 0x90b043b4D4416cad893f62284bd545d1d55E5081 20000000000000000000000 0x8db6c58e75201b4919943bd871c570d917a07f3fb19ff175a4115d1a361b22b4 0x1bcc0f4c3fad314e585165815f94ecca9b96690a26d6417d7876448a9a867a69"
 echo $castArgs
 castCmd="$castSendHeader $castArgs"
 result=$($castCmd)

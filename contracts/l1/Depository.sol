@@ -51,7 +51,7 @@ error WrongArrayLength();
 /// @dev Product type deposit overflow.
 /// @param productType Current product type.
 /// @param depositAmount Deposit amount.
-error ProductTypeOverflow(uint8 productType, uint256 depositAmount);
+error ProductTypeDepositOverflow(uint8 productType, uint256 depositAmount);
 
 /// @dev Value overflow.
 /// @param provided Overflow value.
@@ -486,7 +486,7 @@ contract Depository is Implementation {
         if ((productType == ProductType.Alpha && stakeAmount > ALPHA_DEPOSIT_LIMIT) ||
             (productType == ProductType.Beta && stakeAmount > BETA_DEPOSIT_LIMIT))
         {
-            revert ProductTypeOverflow(uint8(productType), stakeAmount);
+            revert ProductTypeDepositOverflow(uint8(productType), stakeAmount);
         }
 
         // Check for overflow

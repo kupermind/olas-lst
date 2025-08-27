@@ -25,8 +25,8 @@ chainId=$(jq -r '.chainId' $globals)
 networkURL=$(jq -r '.networkURL' $globals)
 
 olasAddress=$(jq -r ".olasAddress" $globals)
-stakingProxyAddress=$(jq -r ".stakingProxyAddress" $globals)
-amount="100000000000000000000000"
+lockProxyAddress=$(jq -r ".lockProxyAddress" $globals)
+olasGovernorAddress=$(jq -r ".olasGovernorAddress" $globals)
 
 # Getting L1 API key
 if [ $chainId == 1 ]; then
@@ -55,15 +55,15 @@ fi
 
 castSendHeader="cast send --rpc-url $networkURL$API_KEY $walletArgs"
 
-echo "${green}Approve OLAS for StakingProxy${reset}"
-castArgs="$olasAddress approve(address,uint256) $stakingProxyAddress $amount"
+echo "${green}Transfer 1 OLAS to LockProxy${reset}"
+castArgs="$olasAddress transfer(address,uint256) $lockProxyAddress 1000000000000000000"
 echo $castArgs
 castCmd="$castSendHeader $castArgs"
 result=$($castCmd)
 echo "$result" | grep "status"
 
-echo "${green}Fund StakingProxy contract${reset}"
-castArgs="$stakingProxyAddress deposit(uint256) $amount"
+echo "${green}veOLAS initial lock${reset}"
+castArgs="$lockProxyAddress setGovernorAndCreateFirstLock(address) $olasGovernorAddress"
 echo $castArgs
 castCmd="$castSendHeader $castArgs"
 result=$($castCmd)

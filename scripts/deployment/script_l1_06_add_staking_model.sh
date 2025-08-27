@@ -3,7 +3,7 @@
 # Check if $1 is provided
 if [ -z "$1" ]; then
   echo "Usage: $0 <network>"
-  echo "Example: $0 eth_mainnet"
+  echo "Example: $0 base_mainnet"
   exit 1
 fi
 
@@ -24,11 +24,8 @@ derivationPath=$(jq -r '.derivationPath' $globals)
 chainId=$(jq -r '.chainId' $globals)
 networkURL=$(jq -r '.networkURL' $globals)
 
-stOLASAddress=$(jq -r '.stOLASAddress' $globals)
-treasuryProxyAddress=$(jq -r '.treasuryProxyAddress' $globals)
-depositoryProxyAddress=$(jq -r '.depositoryProxyAddress' $globals)
-distributorProxyAddress=$(jq -r '.distributorProxyAddress' $globals)
-unstakeRelayerProxyAddress=$(jq -r '.unstakeRelayerProxyAddress' $globals)
+depositoryProxyAddress=$(jq -r ".depositoryProxyAddress" $globals)
+stakingTokenAddress=$(jq -r ".stakingTokenAddress" $globals)
 
 # Getting L1 API key
 if [ $chainId == 1 ]; then
@@ -57,15 +54,8 @@ fi
 
 castSendHeader="cast send --rpc-url $networkURL$API_KEY $walletArgs"
 
-echo "${green}Change stOLAS managers${reset}"
-castArgs="$stOLASAddress initialize(address,address,address,address) $treasuryProxyAddress $depositoryProxyAddress $distributorProxyAddress $unstakeRelayerProxyAddress"
-echo $castArgs
-castCmd="$castSendHeader $castArgs"
-result=$($castCmd)
-echo "$result" | grep "status"
-
-echo "${green}Change Treasury in Depository${reset}"
-castArgs="$depositoryProxyAddress changeTreasury(address) $treasuryProxyAddress"
+echo "${green}Add staking models${reset}"
+castArgs="$depositoryProxyAddress createAndActivateStakingModels(uint256[],address[],uint256[],uint256[]) [100] [0x90b043b4D4416cad893f62284bd545d1d55E5081] [20000000000000000000000] [20]"
 echo $castArgs
 castCmd="$castSendHeader $castArgs"
 result=$($castCmd)
