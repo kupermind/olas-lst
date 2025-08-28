@@ -95,6 +95,7 @@ interface IBridgeErrors {
     error WrongAccount(address account);
 
     /// @dev Operation not found.
+    /// @param batchHash Batch hash.
     /// @param operation Funds operation type.
-    error OperationNotFound(bytes32 operation);
+    error OperationNotFound(bytes32 batchHash, bytes32 operation);
 }

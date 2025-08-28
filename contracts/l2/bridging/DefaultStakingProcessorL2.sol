@@ -52,11 +52,10 @@ interface IToken {
 abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
     event OwnerUpdated(address indexed owner);
     event FundsReceived(address indexed sender, uint256 value);
-    event StakeRequestExecuted(address target, uint256 amount, bytes32 indexed batchHash, bytes32 operation);
-    event StakeRequestQueued(bytes32 indexed queueHash, address target, uint256 amount,
-        bytes32 indexed batchHash, bytes32 operation, uint256 olasBalance, uint256 paused);
-    event UnstakeRequestQueued(bytes32 indexed queueHash, address target, uint256 amount,
-        bytes32 indexed batchHash, bytes32 operation, uint256 paused);
+    event StakeOperationLacksFunds(bytes32 indexed batchHash, uint256 olasAmountToStake, uint256 olasBalance);
+    event RequestExecuted(address target, uint256 amount, bytes32 indexed batchHash, bytes32 operation);
+    event RequestQueued(bytes32 indexed queueHash, address indexed target, uint256 amount, bytes32 indexed batchHash,
+        bytes32 operation, uint256 paused);
     event MessageReceived(address indexed sender, uint256 chainId, bytes data);
     event Drain(address indexed owner, uint256 amount);
     event Migrated(address indexed sender, address indexed newL2TargetDispenser, uint256 amount);
@@ -161,53 +160,45 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
         }
         processedHashes[batchHash] = true;
 
-        if (operation == STAKE) {
-            // Get current OLAS balance
-            uint256 olasBalance = IToken(olas).balanceOf(address(this));
-
-            bool success;
-
-            // Check the OLAS balance and the contract being unpaused
-            if (olasBalance >= amount && paused == 1) {
-                // Approve OLAS for stakingManager
-                IToken(olas).approve(stakingManager, amount);
-
-                // This is a low level call since it must never revert
-                bytes memory stakeData = abi.encodeCall(IStakingManager.stake, (target, amount, operation));
-                (success, ) = stakingManager.call(stakeData);
-
-                if (success) {
-                    emit StakeRequestExecuted(target, amount, batchHash, operation);
+        bool success;
+        uint256 localPaused = paused;
+        if (localPaused == 1) {
+            if (operation == STAKE) {
+                // Get current OLAS balance
+                uint256 olasBalance = IToken(olas).balanceOf(address(this));
+    
+                // Check the OLAS balance and the contract being unpaused
+                if (olasBalance >= amount) {
+                    // Approve OLAS for stakingManager
+                    IToken(olas).approve(stakingManager, amount);
+    
+                    // This is a low level call since it must never revert
+                    bytes memory stakeData = abi.encodeCall(IStakingManager.stake, (target, amount, operation));
+                    (success, ) = stakingManager.call(stakeData);
+                } else {
+                    emit StakeOperationLacksFunds(batchHash, amount, olasBalance);
                 }
+            } else if (operation == UNSTAKE || operation == UNSTAKE_RETIRED) {
+                // This is a low level call since it must never revert
+                bytes memory unstakeData = abi.encodeCall(IStakingManager.unstake, (target, amount, operation));
+                (success, ) = stakingManager.call(unstakeData);
+            } else {
+                // This must never happen
+                revert OperationNotFound(batchHash, operation);
             }
+        }
 
-            // If anything went wrong, queue the staking request
-            if (!success) {
-                // Hash of target + amount + batchHash + operation + current target dispenser address (migration-proof)
-                bytes32 queueHash =
-                    keccak256(abi.encode(target, amount, batchHash, operation, block.chainid, address(this)));
-                // Queue the hash for further redeem
-                queuedHashes[queueHash] = true;
-
-                emit StakeRequestQueued(queueHash, target, amount, batchHash, operation, olasBalance, paused);
-            }
-        } else if (operation == UNSTAKE || operation == UNSTAKE_RETIRED) {
-            // This is a low level call since it must never revert
-            bytes memory unstakeData = abi.encodeCall(IStakingManager.unstake, (target, amount, operation));
-            (bool success, ) = stakingManager.call(unstakeData);
-
-            if (!success) {
-                // Hash of target + amount + batchHash + operation + current target dispenser address (migration-proof)
-                bytes32 queueHash =
-                    keccak256(abi.encode(target, amount, batchHash, operation, block.chainid, address(this)));
-                // Queue the hash for further redeem
-                queuedHashes[queueHash] = true;
-
-                emit UnstakeRequestQueued(queueHash, target, amount, batchHash, operation, paused);
-            }
+        // Check for operation success and queue, if required
+        if (success) {
+            emit RequestExecuted(target, amount, batchHash, operation);
         } else {
-            // This must never happen
-            revert OperationNotFound(operation);
+            // Hash of target + amount + batchHash + operation + current target dispenser address (migration-proof)
+            bytes32 queueHash =
+                keccak256(abi.encode(target, amount, batchHash, operation, block.chainid, address(this)));
+            // Queue the hash for further redeem
+            queuedHashes[queueHash] = true;
+
+            emit RequestQueued(queueHash, target, amount, batchHash, operation, localPaused);
         }
 
         _locked = 1;
@@ -295,13 +286,13 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
             IStakingManager(stakingManager).unstake(target, amount, operation);
         } else {
             // Must never happen
-            revert OperationNotFound(operation);
+            revert OperationNotFound(batchHash, operation);
         }
 
         // Remove processed queued nonce
         queuedHashes[queueHash] = false;
 
-        emit StakeRequestExecuted(target, amount, batchHash, operation);
+        emit RequestExecuted(target, amount, batchHash, operation);
 
         _locked = 1;
     }
