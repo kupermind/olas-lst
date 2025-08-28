@@ -6,8 +6,26 @@ This file provides agent workflow description section.
 ## Workflow Diagram
 
 ```mermaid
-flowchart LR
-  A[Autonomous Agent]
+graph LR
+  StartRound
+  CheckAnyWorkRound
+  WaitingRound
+
+  StartRound-->|DONE|CheckAnyWorkRound
+  CheckAnyWorkRound-->|CLAIM_BRIDGED_TOKEN|ClaimBridgedTokensRound
+  CheckAnyWorkRound-->|CALL_REDEEM|RedeemRound
+  CheckAnyWorkRound-->|CLAIM_REWARDS|ClaimRewardTokensRound
+  CheckAnyWorkRound-->|CALL_CHECKPOINTS|CheckpointRound 
+  CheckAnyWorkRound-->|TRIGGER_L2_TO_L1|TriggerL2ToL1BridgeRound
+  CheckAnyWorkRound-->|NO_WORK|WaitingRound
+  
+
+  ClaimRewardTokensRound-->|DONE|CheckAnyWorkRound
+  ClaimBridgedTokensRound-->|DONE|CheckAnyWorkRound
+  TriggerL2ToL1BridgeRound-->|DONE|CheckAnyWorkRound
+  CheckpointRound-->|DONE|CheckAnyWorkRound
+  RedeemRound-->|DONE|CheckAnyWorkRound
+  WaitingRound-->|DONE|CheckAnyWorkRound
 ```
 
 ---
