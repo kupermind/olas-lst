@@ -21,7 +21,7 @@ Each native bridge is specific to its fund transfer finalization times and routi
 
 ### Redeem Stake Operations
 
-There could be scenarios when STAKE / UNSTAKE operations do not complete the automatic way on L2 when triggered on L1.
+There could be scenarios when **STAKE** / **UNSTAKE** operations are not complete in an automatic way on L2 when triggered on L1.
 For example, OLAS funds arrive across bridge later than the message with the instruction about where funds need to be relayed.
 In this case, the `RequestQueued()` event in each [DefaultStakingProcessorL2](../contracts/l2/bridging/DefaultStakingProcessorL2.sol)
 is emitted with the following variables:
