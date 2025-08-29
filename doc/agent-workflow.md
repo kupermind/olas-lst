@@ -13,6 +13,7 @@ graph LR
 
   StartRound-->|DONE|CheckAnyWorkRound
   CheckAnyWorkRound-->|CLAIM_BRIDGED_TOKEN|ClaimBridgedTokensRound
+  CheckAnyWorkRound-->|FINALIZE_BRIDGED_TOKEN|FinalizeBridgedTokensRound
   CheckAnyWorkRound-->|CALL_REDEEM|RedeemRound
   CheckAnyWorkRound-->|CLAIM_REWARDS|ClaimRewardTokensRound
   CheckAnyWorkRound-->|CALL_CHECKPOINTS|CheckpointRound 
@@ -55,7 +56,7 @@ However, there is a script that facilitates a required sequence of calls for bri
 
 It is advised to use documentation and workflow provided [here](https://github.com/valory-xyz/l2_withdraws/tree/main?tab=readme-ov-file#base).
 
-#### Finalize Bridged Tokens Destination
+### Finalize Bridged Tokens on L1
 
 Once tokens are fully bridged on L1 in their corresponding contracts, the last step is to direct them to designated destinations.
 Currently, there are two contracts that require L2-L1 bridged funds forwarding further:
@@ -122,6 +123,37 @@ This check is going to skip the `checkpoint()` call if the checkpoint has been a
 
 ### Trigger L2 to L1 Tokens Bridging
 
+Each L2 [Collector](../contracts/l2/Collector.sol) proxy contract collects OLAS from **REWARD** / **UNSTAKE** / **UNSTAKE_RETIRED**
+operations that are sent to L1.
 
+The following event is emitted when the Collector is top upped:
+```solidity
+event OperationReceiverBalancesUpdated(bytes32 indexed operation, address indexed receiver, uint256 balance);
+```
+
+At the same time, each corresponding operation balance can be fetched any moment using the following public getter:
+```solidity
+function mapOperationReceiverBalances(bytes32 operation) external view returns (ReceiverBalance memory);
+```
+
+If balances are not smaller than the `Collector.MIN_OLAS_BALANCE()` value, the following function can be triggered by agents:
+```solidity
+/// @dev Relays tokens to L1.
+/// @param operation Operation type related to L1 receiver.
+/// @param bridgePayload Bridge payload.
+function relayTokens(bytes32 operation, bytes memory bridgePayload) external payable;
+```
+
+Here is the values of currently supported operations:
+```
+// Reward operation
+REWARD = "0x0b9821ae606ebc7c79bf3390bdd3dc93e1b4a7cda27aad60646e7b88ff55b001";
+
+// Unstake operation
+UNSTAKE = "0x8ca9a95e41b5eece253c93f5b31eed1253aed6b145d8a6e14d913fdf8e732293";
+
+// Unstake-retired operation
+UNSTAKE_RETIRED = "0x9065ad15d9673159e4597c86084aff8052550cec93c5a6e44b3f1dba4c8731b3";
+```
 
 ---

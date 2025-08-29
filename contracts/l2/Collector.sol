@@ -56,7 +56,7 @@ struct ReceiverBalance {
 contract Collector is Implementation {
     event StakingProcessorUpdated(address indexed stakingProcessorL2);
     event OperationReceiversSet(bytes32[] operations, address[] receivers);
-    event OperationReceiverBalancesUpdated(bytes32 indexed operations, address indexed receiver, uint256 balance);
+    event OperationReceiverBalancesUpdated(bytes32 indexed operation, address indexed receiver, uint256 balance);
     event ProtocolFactorUpdated(uint256 protocolFactor);
     event ProtocolBalanceUpdated(uint256 protocolBalance);
     event TokensRelayed(address indexed l1Distributor, uint256 amount);
