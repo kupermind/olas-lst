@@ -22,6 +22,7 @@ graph LR
   
 
   ClaimRewardTokensRound-->|DONE|CheckAnyWorkRound
+  FinalizeBridgedTokensRound-->|DONE|CheckAnyWorkRound
   ClaimBridgedTokensRound-->|DONE|CheckAnyWorkRound
   TriggerL2ToL1BridgeRound-->|DONE|CheckAnyWorkRound
   CheckpointRound-->|DONE|CheckAnyWorkRound
