@@ -1060,8 +1060,23 @@ describe("Liquid Staking", function () {
                 let res = await tx.wait();
                 // Get withdraw request Id
                 //console.log(res.logs);
-                let requestId = ethers.BigNumber.from(res.logs[5].topics[3] ?? res.logs[4].topics[3]);
-                let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data ?? res.logs[4].data);
+                let requestId;
+                let idx = 5;
+                try {
+                      // Try with the 5th event index
+                      requestId = ethers.BigNumber.from(res.logs[idx].topics[3]);
+                } catch (err) {
+                    console.warn("Failed to parse requestId from log[5], falling back to stack without a transfer event:");
+                    idx -= 1;
+                    try {
+                        // Fallback to the 4th log index
+                        requestId = ethers.BigNumber.from(res.logs[idx].topics[3]);
+                    } catch (fallbackErr) {
+                        console.error("Failed to parse requestId from fallback log[4]:", fallbackErr);
+                        requestId = null;
+                    }
+                }
+                let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[idx].data);
                 let olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
                 expect(olasWithdrawAmount).to.equal(previewAmount);
                 console.log("Withdraw requestId:", requestId.toString());
@@ -1266,8 +1281,23 @@ describe("Liquid Staking", function () {
                 let res = await tx.wait();
                 // Get withdraw request Id
                 //console.log(res.logs);
-                let requestId = ethers.BigNumber.from(res.logs[5].topics[3]);
-                let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
+                let requestId;
+                let idx = 5;
+                try {
+                      // Try with the 5th event index
+                      requestId = ethers.BigNumber.from(res.logs[idx].topics[3]);
+                } catch (err) {
+                    console.warn("Failed to parse requestId from log[5], falling back to stack without a transfer event:");
+                    idx -= 1;
+                    try {
+                        // Fallback to the 4th log index
+                        requestId = ethers.BigNumber.from(res.logs[idx].topics[3]);
+                    } catch (fallbackErr) {
+                        console.error("Failed to parse requestId from fallback log[4]:", fallbackErr);
+                        requestId = null;
+                    }
+                }
+                let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[idx].data);
                 let olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
                 expect(olasWithdrawAmount).to.equal(previewAmount);
                 console.log("Withdraw requestId:", requestId.toString());
@@ -1323,8 +1353,23 @@ describe("Liquid Staking", function () {
                 let res = await tx.wait();
                 // Get withdraw request Id
                 //console.log(res.logs);
-                let requestId = ethers.BigNumber.from(res.logs[5].topics[3]);
-                let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
+                let requestId;
+                let idx = 5;
+                try {
+                      // Try with the 5th event index
+                      requestId = ethers.BigNumber.from(res.logs[idx].topics[3]);
+                } catch (err) {
+                    console.warn("Failed to parse requestId from log[5], falling back to stack without a transfer event:");
+                    idx -= 1;
+                    try {
+                        // Fallback to the 4th log index
+                        requestId = ethers.BigNumber.from(res.logs[idx].topics[3]);
+                    } catch (fallbackErr) {
+                        console.error("Failed to parse requestId from fallback log[4]:", fallbackErr);
+                        requestId = null;
+                    }
+                }
+                let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[idx].data);
                 let olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
                 expect(olasWithdrawAmount).to.equal(previewAmount);
                 console.log("Withdraw requestId:", requestId.toString());
