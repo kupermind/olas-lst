@@ -53,6 +53,17 @@ In order to finalize token transfer on L1, the [`relayMessage()`](https://ethers
 function needs to be called on [L1CrossDomainMessenger](https://docs.base.org/base-chain/network-information/base-contracts#ethereum-mainnet) contract.
 However, there is a script that facilitates a required sequence of calls for bridging assets from L2 to L1.
 
+It is advised to use documentation and workflow provided [here](https://github.com/valory-xyz/l2_withdraws/tree/main?tab=readme-ov-file#base).
+
+#### Finalize Bridged Tokens Destination
+
+Once tokens are fully bridged on L1 in their corresponding contracts, the last step is to direct them to designated destinations.
+Currently, there are two contracts that require L2-L1 bridged funds forwarding further:
+- [Distributor](../contracts/l1/Distributor.sol): call function `distribute()`;
+- [UnstakeRelayer](../contracts/l1/UnstakeRelayer.sol): call function `relay()`.
+
+It is advised to check `olas.balanceOf(distributorProxyAddress)` and `olas.balanceOf(unstakeRelayerProxyAddress)` before executing function calls.
+
 ### Redeem Stake Operations
 
 There could be scenarios when **STAKE** / **UNSTAKE** operations are not complete in an automatic way on L2 when triggered on L1.

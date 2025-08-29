@@ -1060,8 +1060,8 @@ describe("Liquid Staking", function () {
                 let res = await tx.wait();
                 // Get withdraw request Id
                 //console.log(res.logs);
-                let requestId = ethers.BigNumber.from(res.logs[5].topics[3]);
-                let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
+                let requestId = ethers.BigNumber.from(res.logs[5].topics[3] ?? res.logs[4].topics[3]);
+                let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data ?? res.logs[4].data);
                 let olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
                 expect(olasWithdrawAmount).to.equal(previewAmount);
                 console.log("Withdraw requestId:", requestId.toString());
