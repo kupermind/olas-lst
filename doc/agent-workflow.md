@@ -49,7 +49,9 @@ Read full Gnosis guide of how to call execute signatures [here](https://docs.gno
 
 #### Base bridge
 
-
+In order to finalize token transfer on L1, the [`relayMessage()`](https://etherscan.io/address/0x866E82a600A1414e583f7F13623F1aC5d58b0Afa#writeProxyContract#F2)
+function needs to be called on [L1CrossDomainMessenger](https://docs.base.org/base-chain/network-information/base-contracts#ethereum-mainnet) contract.
+However, there is a script that facilitates a required sequence of calls for bridging assets from L2 to L1.
 
 ### Redeem Stake Operations
 
