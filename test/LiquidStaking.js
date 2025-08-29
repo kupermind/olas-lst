@@ -1063,8 +1063,8 @@ describe("Liquid Staking", function () {
                 let requestId;
                 let idx = 5;
                 try {
-                      // Try with the 5th event index
-                      requestId = ethers.BigNumber.from(res.logs[idx].topics[3]);
+                    // Try with the 5th event index
+                    requestId = ethers.BigNumber.from(res.logs[idx].topics[3]);
                 } catch (err) {
                     console.warn("Failed to parse requestId from log[5], falling back to stack without a transfer event:");
                     idx -= 1;
@@ -1284,8 +1284,8 @@ describe("Liquid Staking", function () {
                 let requestId;
                 let idx = 5;
                 try {
-                      // Try with the 5th event index
-                      requestId = ethers.BigNumber.from(res.logs[idx].topics[3]);
+                    // Try with the 5th event index
+                    requestId = ethers.BigNumber.from(res.logs[idx].topics[3]);
                 } catch (err) {
                     console.warn("Failed to parse requestId from log[5], falling back to stack without a transfer event:");
                     idx -= 1;
@@ -1356,8 +1356,8 @@ describe("Liquid Staking", function () {
                 let requestId;
                 let idx = 5;
                 try {
-                      // Try with the 5th event index
-                      requestId = ethers.BigNumber.from(res.logs[idx].topics[3]);
+                    // Try with the 5th event index
+                    requestId = ethers.BigNumber.from(res.logs[idx].topics[3]);
                 } catch (err) {
                     console.warn("Failed to parse requestId from log[5], falling back to stack without a transfer event:");
                     idx -= 1;
