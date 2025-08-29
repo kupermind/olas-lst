@@ -67,10 +67,10 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
     event StakingProcessorL2Updated(address indexed l2StakingProcessor);
     event StakingBalanceUpdated(bytes32 indexed operation, address indexed stakingProxy, uint256 numStakes,
         uint256 balance);
-    event CreateAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig,
-        address activityModule);
-    event DeployAndStake(address indexed stakingProxy, uint256 indexed serviceId, address indexed multisig,
-        address activityModule);
+    event Staked(address indexed stakingProxy, uint256 indexed serviceId, address activityModule);
+    event Unstaked(address indexed stakingProxy, uint256 indexed serviceId, address activityModule);
+    event CreatedAndDeployed(uint256 indexed serviceId, address indexed multisig, address indexed activityModule);
+    event ReDeployed(uint256 indexed serviceId, address indexed multisig, address indexed activityModule);
     event Claimed(address indexed activityModule, uint256 reward);
     event NativeTokenReceived(uint256 amount);
 
@@ -284,6 +284,8 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
 
         // Increase initial module activity
         IActivityModule(activityModule).increaseInitialActivity();
+
+        emit Staked(stakingProxy, serviceId, activityModule);
     }
     
     /// @dev Creates and deploys a service, and stakes it with a specified staking contract.
@@ -302,7 +304,7 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         // Push new service into its corresponding set
         mapStakedServiceIds[stakingProxy].push(serviceId);
 
-        emit CreateAndStake(stakingProxy, serviceId, multisig, activityModule);
+        emit CreatedAndDeployed(serviceId, multisig, activityModule);
     }
 
     /// @dev Stakes the already deployed service.
@@ -332,7 +334,7 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         // Stake the service
         _stake(stakingProxy, serviceId, instances[0]);
 
-        emit DeployAndStake(stakingProxy, serviceId, multisig, instances[0]);
+        emit ReDeployed(serviceId, multisig, instances[0]);
     }
 
     /// @dev Stakes OLAS into specified staking proxy contract if deposit + balance is enough for staking.
@@ -382,7 +384,6 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
 
             // Traverse all required stakes
             for (uint256 i = 0; i < numStakes; ++i) {
-
                 // Next index must always be bigger than the last one staked
                 nextIdx++;
 
@@ -475,6 +476,8 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
                 IActivityModule(activityModule).drain();
 
                 lastIdx--;
+
+                emit Unstaked(stakingProxy, serviceId, activityModule);
             }
 
             // Update last staked service Id
