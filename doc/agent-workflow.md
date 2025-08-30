@@ -74,7 +74,7 @@ In this case, the `RequestQueued()` event in each [DefaultStakingProcessorL2](..
 is emitted with the following variables:
 
 ```solidity
-event RequestQueued(bytes32 indexed queueHash, address indexed target, uint256 amount, bytes32 indexed batchHash, bytes32 operation, uint256 issueType);
+event RequestQueued(bytes32 indexed queueHash, address indexed target, uint256 amount, bytes32 indexed batchHash, bytes32 operation, uint256 status);
 ```
 
 In order to complete the queued request, the agent must call the `redeem()` function using values from the `RequestQueued()` event:

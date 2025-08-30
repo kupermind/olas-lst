@@ -54,7 +54,7 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
     event FundsReceived(address indexed sender, uint256 value);
     event RequestExecuted(address target, uint256 amount, bytes32 indexed batchHash, bytes32 operation);
     event RequestQueued(bytes32 indexed queueHash, address indexed target, uint256 amount, bytes32 indexed batchHash,
-        bytes32 operation, uint256 issueType);
+        bytes32 operation, uint256 status);
     event MessageReceived(address indexed sender, uint256 chainId, bytes data);
     event Drain(address indexed owner, uint256 amount);
     event Migrated(address indexed sender, address indexed newL2TargetDispenser, uint256 amount);
@@ -161,12 +161,12 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
 
         bool success;
 
-        // Issue type to be emitted for failing scenarios, since reverts cannot be engaged in this function call
+        // Status to be emitted for failing scenarios, since reverts cannot be engaged in this function call
         // 0: default one, external call has failed
         // 1: insufficient OLAS balance
         // 2: unsupported operation type
         // 3: contract is paused
-        uint256 issueType;
+        uint256 status;
         if (paused == 1) {
             if (operation == STAKE) {
                 // Get current OLAS balance
@@ -181,20 +181,20 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
                     bytes memory stakeData = abi.encodeCall(IStakingManager.stake, (target, amount, operation));
                     (success, ) = stakingManager.call(stakeData);
                 } else {
-                    // Issue type 1: insufficient OLAS balance
-                    issueType = 1;
+                    // Status 1: insufficient OLAS balance
+                    status = 1;
                 }
             } else if (operation == UNSTAKE || operation == UNSTAKE_RETIRED) {
                 // This is a low level call since it must never revert
                 bytes memory unstakeData = abi.encodeCall(IStakingManager.unstake, (target, amount, operation));
                 (success, ) = stakingManager.call(unstakeData);
             } else {
-                // Issue type 2: unsupported operation type
-                issueType = 2;
+                // Status 2: unsupported operation type
+                status = 2;
             }
         } else {
-            // Issue type 3: contract is paused
-            issueType = 3;
+            // Status 3: contract is paused
+            status = 3;
         }
 
         // Check for operation success and queue, if required
@@ -206,7 +206,7 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
             // Queue the hash for further redeem
             queuedHashes[queueHash] = true;
 
-            emit RequestQueued(queueHash, target, amount, batchHash, operation, issueType);
+            emit RequestQueued(queueHash, target, amount, batchHash, operation, status);
         }
 
         _locked = 1;
