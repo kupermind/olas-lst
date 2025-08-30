@@ -202,8 +202,7 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
             emit RequestExecuted(target, amount, batchHash, operation);
         } else {
             // Hash of target + amount + batchHash + operation + current target dispenser address (migration-proof)
-            bytes32 queueHash =
-                keccak256(abi.encode(target, amount, batchHash, operation, block.chainid, address(this)));
+            bytes32 queueHash = getQueuedHash(target, amount, batchHash, operation);
             // Queue the hash for further redeem
             queuedHashes[queueHash] = true;
 
@@ -277,7 +276,7 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
         bool queued = queuedHashes[queueHash];
         // Check if the target and amount are queued
         if (!queued) {
-            revert TargetAmountNotQueued(target, amount, batchHash, operation);
+            revert RequestNotQueued(target, amount, batchHash, operation);
         }
 
         if (operation == STAKE) {
@@ -434,6 +433,21 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
     /// @param olasAmount OLAS amount.
     /// @param bridgePayload Bridge payload.
     function relayToL1(address to, uint256 olasAmount, bytes memory bridgePayload) external virtual payable;
+
+    /// @dev Gets failed request queued hash.
+    /// @param target Staking target address.
+    /// @param amount Staking amount.
+    /// @param batchHash Batch hash.
+    /// @param operation Funds operation: stake / unstake.
+    function getQueuedHash(
+        address target,
+        uint256 amount,
+        bytes32 batchHash,
+        bytes32 operation
+    ) public view returns (bytes32) {
+        // Hash of target + amount + batchHash + operation + current target dispenser address (migration-proof)
+        return keccak256(abi.encode(target, amount, batchHash, operation, block.chainid, address(this)));
+    }
 
     /// @dev Gets the maximum number of token decimals able to be transferred across the bridge.
     /// @return Number of supported decimals.

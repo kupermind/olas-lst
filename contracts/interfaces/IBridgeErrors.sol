@@ -48,12 +48,12 @@ interface IBridgeErrors {
     /// @param expected Expected chain Id.
     error WrongChainId(uint256 provided, uint256 expected);
 
-    /// @dev Target and its corresponding amount are not found in the queue.
+    /// @dev Request with specified params is not found in the queue.
     /// @param target Target address.
     /// @param amount Token amount.
     /// @param batchHash Reference batch hash.
     /// @param operation Funds operation: stake / unstake.
-    error TargetAmountNotQueued(address target, uint256 amount, bytes32 batchHash, bytes32 operation);
+    error RequestNotQueued(address target, uint256 amount, bytes32 batchHash, bytes32 operation);
 
     /// @dev Insufficient token balance.
     /// @param provided Provided balance.
