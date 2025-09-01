@@ -26,7 +26,7 @@ networkURL=$(jq -r '.networkURL' $globals)
 
 olasAddress=$(jq -r ".olasAddress" $globals)
 stakingProxyAddress=$(jq -r ".stakingProxyAddress" $globals)
-amount="100000000000000000000000"
+amount="10000000000000000000000"
 
 # Getting L1 API key
 if [ $chainId == 1 ]; then

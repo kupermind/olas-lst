@@ -74,17 +74,17 @@ In this case, the `RequestQueued()` event in each [DefaultStakingProcessorL2](..
 is emitted with the following variables:
 
 ```solidity
-event RequestQueued(bytes32 indexed queueHash, address indexed target, uint256 amount, bytes32 indexed batchHash, bytes32 operation, uint256 status);
+event RequestQueued(bytes32 indexed batchHash, address indexed target, uint256 amount, bytes32 operation, uint256 status);
 ```
 
 In order to complete the queued request, the agent must call the `redeem()` function using values from the `RequestQueued()` event:
 ```solidity
 /// @dev Redeems queued staking deposit / withdraw.
+/// @param batchHash Batch hash.
 /// @param target Staking target address.
 /// @param amount Staking amount.
-/// @param batchHash Batch hash.
 /// @param operation Funds operation: stake / unstake.
-function redeem(address target, uint256 amount, bytes32 batchHash, bytes32 operation) external;
+function redeem(bytes32 batchHash, address target, uint256 amount, bytes32 operation) external;
 ```
 
 ### Claim Reward Tokens

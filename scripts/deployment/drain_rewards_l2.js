@@ -37,7 +37,7 @@ const main = async () => {
         // Get activity module proxy address
         const owners = await multisig.getOwners();
         const activityModuleProxy = await ethers.getContractAt("ActivityModule", owners[0]);
-        const tx = await activityModuleProxy.claim({ gasLimit: 2000000 });
+        const tx = await activityModuleProxy.drain({ gasLimit: 2000000 });
         await tx.wait();
     }
 };

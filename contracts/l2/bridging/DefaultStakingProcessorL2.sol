@@ -52,9 +52,8 @@ interface IToken {
 abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
     event OwnerUpdated(address indexed owner);
     event FundsReceived(address indexed sender, uint256 value);
-    event RequestExecuted(address target, uint256 amount, bytes32 indexed batchHash, bytes32 operation);
-    event RequestQueued(bytes32 indexed queueHash, address indexed target, uint256 amount, bytes32 indexed batchHash,
-        bytes32 operation, uint256 status);
+    event RequestExecuted(bytes32 indexed batchHash, address target, uint256 amount, bytes32 operation);
+    event RequestQueued(bytes32 indexed batchHash, address indexed target, uint256 amount, bytes32 operation, uint256 status);
     event MessageReceived(address indexed sender, uint256 chainId, bytes data);
     event Drain(address indexed owner, uint256 amount);
     event Migrated(address indexed sender, address indexed newL2TargetDispenser, uint256 amount);
@@ -199,14 +198,14 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
 
         // Check for operation success and queue, if required
         if (success) {
-            emit RequestExecuted(target, amount, batchHash, operation);
+            emit RequestExecuted(batchHash, target, amount, operation);
         } else {
-            // Hash of target + amount + batchHash + operation + current target dispenser address (migration-proof)
-            bytes32 queueHash = getQueuedHash(target, amount, batchHash, operation);
+            // Hash of batchHash + target + amount + operation + current target dispenser address (migration-proof)
+            bytes32 queueHash = getQueuedHash(batchHash, target, amount, operation);
             // Queue the hash for further redeem
             queuedHashes[queueHash] = true;
 
-            emit RequestQueued(queueHash, target, amount, batchHash, operation, status);
+            emit RequestQueued(batchHash, target, amount, operation, status);
         }
 
         _locked = 1;
@@ -255,11 +254,11 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
     }
 
     /// @dev Redeems queued staking deposit / withdraw.
+    /// @param batchHash Batch hash.
     /// @param target Staking target address.
     /// @param amount Staking amount.
-    /// @param batchHash Batch hash.
     /// @param operation Funds operation: stake / unstake.
-    function redeem(address target, uint256 amount, bytes32 batchHash, bytes32 operation) external {
+    function redeem(bytes32 batchHash, address target, uint256 amount, bytes32 operation) external {
         // Reentrancy guard
         if (_locked > 1) {
             revert ReentrancyGuard();
@@ -271,8 +270,8 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
             revert Paused();
         }
 
-        // Hash of target + amount + batchHash + operation + chainId + current target dispenser address (migration-proof)
-        bytes32 queueHash = keccak256(abi.encode(target, amount, batchHash, operation, block.chainid, address(this)));
+        // Hash of batchHash + target + amount + operation + chainId + current target dispenser address (migration-proof)
+        bytes32 queueHash = getQueuedHash(batchHash, target, amount, operation);
         bool queued = queuedHashes[queueHash];
         // Check if the target and amount are queued
         if (!queued) {
@@ -300,7 +299,7 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
         // Remove processed queued nonce
         queuedHashes[queueHash] = false;
 
-        emit RequestExecuted(target, amount, batchHash, operation);
+        emit RequestExecuted(batchHash, target, amount, operation);
 
         _locked = 1;
     }
@@ -435,18 +434,18 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
     function relayToL1(address to, uint256 olasAmount, bytes memory bridgePayload) external virtual payable;
 
     /// @dev Gets failed request queued hash.
+    /// @param batchHash Batch hash.
     /// @param target Staking target address.
     /// @param amount Staking amount.
-    /// @param batchHash Batch hash.
     /// @param operation Funds operation: stake / unstake.
     function getQueuedHash(
+        bytes32 batchHash,
         address target,
         uint256 amount,
-        bytes32 batchHash,
         bytes32 operation
     ) public view returns (bytes32) {
-        // Hash of target + amount + batchHash + operation + current target dispenser address (migration-proof)
-        return keccak256(abi.encode(target, amount, batchHash, operation, block.chainid, address(this)));
+        // Hash of batchHash + target + amount + operation + current target dispenser address (migration-proof)
+        return keccak256(abi.encode(batchHash, target, amount, operation, block.chainid, address(this)));
     }
 
     /// @dev Gets the maximum number of token decimals able to be transferred across the bridge.

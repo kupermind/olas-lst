@@ -71,7 +71,7 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
     event Unstaked(address indexed stakingProxy, uint256 indexed serviceId, address activityModule);
     event CreatedAndDeployed(uint256 indexed serviceId, address indexed multisig, address indexed activityModule);
     event ReDeployed(uint256 indexed serviceId, address indexed multisig, address indexed activityModule);
-    event Claimed(address indexed activityModule, uint256 reward);
+    event Claimed(address indexed stakingProxy, uint256 indexed serviceId, address indexed activityModule, uint256 reward);
     event NativeTokenReceived(uint256 amount);
 
     // Staking Manager version
@@ -511,7 +511,7 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
 
         reward = IStaking(stakingProxy).claim(serviceId);
 
-        emit Claimed(activityModule, reward);
+        emit Claimed(stakingProxy, serviceId, activityModule, reward);
     }
 
     /// @dev Gets staked service Ids for a specific staking proxy.
