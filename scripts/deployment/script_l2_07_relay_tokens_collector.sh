@@ -60,7 +60,7 @@ fi
 castSendHeader="cast send --rpc-url $networkURL$API_KEY $walletArgs"
 
 echo "${green}Relay tokens${reset}"
-castArgs="$collectorProxyAddress relayTokens(bytes32,bytes) $UNSTAKE 0x"
+castArgs="$collectorProxyAddress relayTokens(bytes32,bytes) $REWARD 0x"
 echo $castArgs
 castCmd="$castSendHeader $castArgs"
 result=$($castCmd)

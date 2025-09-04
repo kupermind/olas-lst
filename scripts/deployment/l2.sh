@@ -37,6 +37,9 @@
 # Set operation receivers in Collector
 ./scripts/deployment/script_l2_03_set_operation_receivers_collector.sh $1
 
+# Change protocol factor in Collector
+./scripts/deployment/script_l2_0n_change_protocol_factor_collector.sh $1
+
 ##### !!!! For mainnet - this is subject to the DAO vote
 # Whitelist staking implementation
 ./scripts/deployment/script_l2_06_whitelist_staking_implementation.sh $1
