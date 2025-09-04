@@ -638,11 +638,6 @@ contract Depository is Implementation {
             revert UnauthorizedAccount(msg.sender);
         }
 
-        // Check for the max number of operations
-        if (chainIds.length > maxNumOperations) {
-            revert Overflow(chainIds.length, maxNumOperations);
-        }
-
         // Check array lengths
         if (chainIds.length == 0 || chainIds.length != stakingProxies.length ||
             chainIds.length != bridgePayloads.length || chainIds.length != values.length) {
