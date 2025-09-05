@@ -200,7 +200,9 @@ contract stOLAS is ERC4626 {
         curTotalReserves = curStakedBalance + curVaultBalance + curReserveBalance;
         totalReserves = curTotalReserves;
 
-        asset.transfer(receiver, transferAmount);
+        if (transferAmount > 0) {
+            asset.transfer(receiver, transferAmount);
+        }
 
         emit TotalReservesUpdated(curStakedBalance, curVaultBalance, curReserveBalance, curTotalReserves);
         emit Withdraw(msg.sender, receiver, tokenOwner, assets, shares);

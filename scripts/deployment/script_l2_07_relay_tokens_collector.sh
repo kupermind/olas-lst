@@ -24,21 +24,25 @@ derivationPath=$(jq -r '.derivationPath' $globals)
 chainId=$(jq -r '.chainId' $globals)
 networkURL=$(jq -r '.networkURL' $globals)
 
-olasAddress=$(jq -r ".olasAddress" $globals)
-stakingTokenAddress=$(jq -r ".stakingTokenAddress" $globals)
-amount="100000000000000000000000"
+collectorProxyAddress=$(jq -r ".collectorProxyAddress" $globals)
+# Reward operation
+REWARD="0x0b9821ae606ebc7c79bf3390bdd3dc93e1b4a7cda27aad60646e7b88ff55b001"
+# Unstake operation
+UNSTAKE="0x8ca9a95e41b5eece253c93f5b31eed1253aed6b145d8a6e14d913fdf8e732293"
+# Unstake-retired operation
+UNSTAKE_RETIRED="0x9065ad15d9673159e4597c86084aff8052550cec93c5a6e44b3f1dba4c8731b3"
 
-# Getting L1 API key
-if [ $chainId == 1 ]; then
-  API_KEY=$ALCHEMY_API_KEY_MAINNET
+# Check for Polygon keys only since on other networks those are not needed
+if [ $chainId == 137 ]; then
+  API_KEY=$ALCHEMY_API_KEY_MATIC
   if [ "$API_KEY" == "" ]; then
-      echo "set ALCHEMY_API_KEY_MAINNET env variable"
+      echo "set ALCHEMY_API_KEY_MATIC env variable"
       exit 0
   fi
-elif [ $chainId == 11155111 ]; then
-    API_KEY=$ALCHEMY_API_KEY_SEPOLIA
+elif [ $chainId == 80002 ]; then
+    API_KEY=$ALCHEMY_API_KEY_AMOY
     if [ "$API_KEY" == "" ]; then
-        echo "set ALCHEMY_API_KEY_SEPOLIA env variable"
+        echo "set ALCHEMY_API_KEY_AMOY env variable"
         exit 0
     fi
 fi
@@ -55,15 +59,8 @@ fi
 
 castSendHeader="cast send --rpc-url $networkURL$API_KEY $walletArgs"
 
-echo "${green}Approve OLAS for StakingProxy${reset}"
-castArgs="$olasAddress approve(address,uint256) $stakingTokenAddress $amount"
-echo $castArgs
-castCmd="$castSendHeader $castArgs"
-result=$($castCmd)
-echo "$result" | grep "status"
-
-echo "${green}Fund StakingProxy contract${reset}"
-castArgs="$stakingTokenAddress deposit(uint256) $amount"
+echo "${green}Relay tokens${reset}"
+castArgs="$collectorProxyAddress relayTokens(bytes32,bytes) $REWARD 0x"
 echo $castArgs
 castCmd="$castSendHeader $castArgs"
 result=$($castCmd)

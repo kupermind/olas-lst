@@ -47,10 +47,13 @@
 ./scripts/deployment/script_l1_02_change_lz_oracle.sh $1
 
 # Set StakingProcessorL2 in DepositProcessorL1
-#./scripts/deployment/script_l1_03_set_l2_staking_processor.sh $1 $2
+./scripts/deployment/script_l1_03_set_l2_staking_processor.sh $1 $2
 
 # Set DepositProcessorL1-s and corresponding chainIds
-#./scripts/deployment/script_l1_04_set_deposit_processor_chain_ids.sh $1 $2 $3
+./scripts/deployment/script_l1_04_set_deposit_processor_chain_ids.sh $1 $2 $3
 
 # Initial veOLAS lock
-#./scripts/deployment/script_l1_05_initial_lock.sh $1
+./scripts/deployment/script_l1_05_ve_initial_lock.sh $1
+
+# Add staking model
+./scripts/deployment/script_l1_06_add_staking_model.sh $1 $2 $3

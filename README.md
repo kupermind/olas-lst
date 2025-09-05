@@ -230,6 +230,7 @@ Proposal State: [Executed](https://etherscan.io/address/0x8e84b5055492901988b831
 
 - [Technical Architecture](doc/architecture.md)
 - [Architecture Diagrams](doc/architecture-diagrams.md)
+- [Agent Workflow](doc/agent-workflow.md)
 - [FAQ](doc/FAQ.md)
 - [Whitepaper (PDF)](doc/stolas_whitepaper_formatted.pdf) (Under liquid edition)
 - [Whitepaper (Text)](doc/stolas_whitepaper.txt) (Under liquid edition)

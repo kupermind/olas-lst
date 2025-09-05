@@ -3,9 +3,12 @@
 # Check if $1 is provided
 if [ -z "$1" ]; then
   echo "Usage: $0 <network>"
-  echo "Example: $0 eth_mainnet"
+  echo "Example: $0 base_mainnet"
   exit 1
 fi
+
+# Get L2 network name: gnosis, base, etc.
+networkL2=$2
 
 red=$(tput setaf 1)
 green=$(tput setaf 2)
@@ -24,11 +27,9 @@ derivationPath=$(jq -r '.derivationPath' $globals)
 chainId=$(jq -r '.chainId' $globals)
 networkURL=$(jq -r '.networkURL' $globals)
 
-stOLASAddress=$(jq -r '.stOLASAddress' $globals)
-treasuryProxyAddress=$(jq -r '.treasuryProxyAddress' $globals)
-depositoryProxyAddress=$(jq -r '.depositoryProxyAddress' $globals)
-distributorProxyAddress=$(jq -r '.distributorProxyAddress' $globals)
-unstakeRelayerProxyAddress=$(jq -r '.unstakeRelayerProxyAddress' $globals)
+stOLASAddress=$(jq -r ".stOLASAddress" $globals)
+treasuryProxyAddress=$(jq -r ".treasuryProxyAddress" $globals)
+amount="10000000000000000000000"
 
 # Getting L1 API key
 if [ $chainId == 1 ]; then
@@ -57,15 +58,23 @@ fi
 
 castSendHeader="cast send --rpc-url $networkURL$API_KEY $walletArgs"
 
-echo "${green}Change stOLAS managers${reset}"
-castArgs="$stOLASAddress initialize(address,address,address,address) $treasuryProxyAddress $depositoryProxyAddress $distributorProxyAddress $unstakeRelayerProxyAddress"
+echo "${green}Approve stOLAS for TreasuryProxy${reset}"
+castArgs="$stOLASAddress approve(address,uint256) $treasuryProxyAddress $amount"
 echo $castArgs
 castCmd="$castSendHeader $castArgs"
 result=$($castCmd)
 echo "$result" | grep "status"
 
-echo "${green}Change Treasury in Depository${reset}"
-castArgs="$depositoryProxyAddress changeTreasury(address) $treasuryProxyAddress"
+
+#chainIds="[100]"
+#stakingProxies="[0x90b043b4D4416cad893f62284bd545d1d55E5081]"
+chainIds="[8453]"
+stakingProxies="[0x71756B35E3ba7688C75A948EdCA5E040C7C2DDf4]"
+bridgePayloads="[0x]"
+values="[0]"
+
+echo "${green}Request to withdraw stOLAS for OLAS${reset}"
+castArgs="$treasuryProxyAddress requestToWithdraw(uint256,uint256[],address[],bytes[],uint256[]) $amount $chainIds $stakingProxies $bridgePayloads $values"
 echo $castArgs
 castCmd="$castSendHeader $castArgs"
 result=$($castCmd)

@@ -51,7 +51,7 @@ error WrongArrayLength();
 /// @dev Product type deposit overflow.
 /// @param productType Current product type.
 /// @param depositAmount Deposit amount.
-error ProductTypeOverflow(uint8 productType, uint256 depositAmount);
+error ProductTypeDepositOverflow(uint8 productType, uint256 depositAmount);
 
 /// @dev Value overflow.
 /// @param provided Overflow value.
@@ -144,8 +144,6 @@ contract Depository is Implementation {
     // Layer Zero oracle
     address public lzOracle;
 
-    // Lock factor in 10_000 value
-    uint256 public lockFactor;
     // Contract pause status
     bool public paused;
     // Product type value
@@ -165,6 +163,9 @@ contract Depository is Implementation {
     // Set of staking model Ids
     uint256[] public setStakingModelIds;
 
+    /// @dev Depository constructor.
+    /// @param _olas OLAS address.
+    /// @param _st stOLAS address.
     constructor(address _olas, address _st) {
         olas = _olas;
         st = _st;
@@ -457,6 +458,8 @@ contract Depository is Implementation {
     }
 
     /// @dev Calculates amounts and initiates cross-chain stake request for specified models.
+    /// @notice It is solely caller responsibility not to run out of gas when calling this function.
+    ///         Subject to gas estimation as the number of array elements is proportional to gas usage increase.
     /// @param stakeAmount Total incoming amount to stake.
     /// @param chainIds Set of chain Ids with staking proxies.
     /// @param stakingProxies Set of staking proxies corresponding to each chain Id.
@@ -486,7 +489,7 @@ contract Depository is Implementation {
         if ((productType == ProductType.Alpha && stakeAmount > ALPHA_DEPOSIT_LIMIT) ||
             (productType == ProductType.Beta && stakeAmount > BETA_DEPOSIT_LIMIT))
         {
-            revert ProductTypeOverflow(uint8(productType), stakeAmount);
+            revert ProductTypeDepositOverflow(uint8(productType), stakeAmount);
         }
 
         // Check for overflow
@@ -609,6 +612,8 @@ contract Depository is Implementation {
 
     /// @dev Calculates amounts and initiates cross-chain unstake request for specified models by Treasury.
     /// @notice This action deducts reserves from their staked part and get them back as vault assets.
+    /// @notice It is solely caller responsibility not to run out of gas when calling this function.
+    ///         Subject to gas estimation as the number of array elements is proportional to gas usage increase.
     /// @param unstakeAmount Total amount to unstake.
     /// @param chainIds Set of chain Ids with staking proxies.
     /// @param stakingProxies Set of staking proxies corresponding to each chain Id.
@@ -689,6 +694,8 @@ contract Depository is Implementation {
 
     /// @dev Calculates amounts and initiates cross-chain unstake request for specified retired models.
     /// @notice This action deducts reserves from their staked part and get them back as assets reserved for staking.
+    /// @notice It is solely caller responsibility not to run out of gas when calling this function.
+    ///         Subject to gas estimation as the number of array elements is proportional to gas usage increase.
     /// @param chainIds Set of chain Ids with staking proxies.
     /// @param stakingProxies Set of staking proxies corresponding to each chain Id.
     /// @param bridgePayloads Bridge payloads corresponding to each chain Id.

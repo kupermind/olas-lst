@@ -114,6 +114,11 @@ error ReentrancyGuard();
 /// @param manager Required sender address as a manager.
 error ManagerOnly(address sender, address manager);
 
+/// @dev Execution has failed.
+/// @param target Target address.
+/// @param payload Payload data.
+error ExecutionFailed(address target, bytes payload);
+
 /// @title ActivityModule - Smart contract for multisig activity tracking
 contract ActivityModule {
     event ActivityIncreased(uint256 activityChange);
@@ -181,7 +186,12 @@ contract ActivityModule {
             msPayload = abi.encodeCall(IMultiSend.multiSend, (msPayload));
 
             // Execute module call
-            ISafe(multisig).execTransactionFromModule(multiSend, 0, msPayload, ISafe.Operation.DelegateCall);
+            bool success = ISafe(multisig).execTransactionFromModule(multiSend, 0, msPayload, ISafe.Operation.DelegateCall);
+
+            // Check for success
+            if (!success) {
+                revert ExecutionFailed(multiSend, msPayload);
+            }
 
             emit Drained(balance);
         }
@@ -277,7 +287,7 @@ contract ActivityModule {
         }
     }
 
-    /// @dev Drains unclaimed rewards after service unstake.
+    /// @dev Drains multisig failed or unclaimed rewards.
     /// @return balance Amount drained.
     function drain() external returns (uint256 balance) {
         if (msg.sender != stakingManager) {

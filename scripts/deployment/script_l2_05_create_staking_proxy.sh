@@ -74,15 +74,15 @@ castArgs="$stakingFactoryAddress createStakingInstance(address,bytes) $stakingTo
 echo $castArgs
 castCmd="$castSendHeader $castArgs"
 result=$($castCmd)
-stakingContractProxyAddress=$(echo "$result" | grep "topics" | sed "s/^logs *//" | jq -r '.[0].topics[2] | "0x" + (.[26:])')
+stakingProxyAddress=$(echo "$result" | grep "topics" | sed "s/^logs *//" | jq -r '.[0].topics[2] | "0x" + (.[26:])')
 
-echo "${green}StakingProxy deployed at: $stakingContractProxyAddress${reset}"
+echo "${green}StakingProxy deployed at: $stakingProxyAddress${reset}"
 
 # Verify contract
 contractName="StakingTokenLocked"
 contractPath="contracts/l2/$contractName.sol:$contractName"
 constructorArgs="$stakingTokenLockedAddress"
-contractParams="$stakingContractProxyAddress $contractPath --constructor-args $(cast abi-encode "constructor(address)" $constructorArgs)"
+contractParams="$stakingProxyAddress $contractPath --constructor-args $(cast abi-encode "constructor(address)" $constructorArgs)"
 echo "Verification contract params: $contractParams"
 
 echo "${green}Verifying contract on Etherscan...${reset}"

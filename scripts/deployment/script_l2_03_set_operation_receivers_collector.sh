@@ -7,9 +7,6 @@ if [ -z "$1" ]; then
   exit 1
 fi
 
-# Get L2 network name: gnosis, base, etc.
-networkL2=$2
-
 red=$(tput setaf 1)
 green=$(tput setaf 2)
 reset=$(tput sgr0)
@@ -27,21 +24,22 @@ derivationPath=$(jq -r '.derivationPath' $globals)
 chainId=$(jq -r '.chainId' $globals)
 networkURL=$(jq -r '.networkURL' $globals)
 
-olasAddress=$(jq -r ".olasAddress" $globals)
-depositoryProxyAddress=$(jq -r ".depositoryProxyAddress" $globals)
-amount="30000000000000000000000"
+collectorProxyAddress=$(jq -r ".collectorProxyAddress" $globals)
+distributorProxyAddress=$(jq -r ".distributorProxyAddress" $globals)
+treasuryProxyAddress=$(jq -r ".treasuryProxyAddress" $globals)
+unstakeRelayerProxyAddress=$(jq -r ".unstakeRelayerProxyAddress" $globals)
 
-# Getting L1 API key
-if [ $chainId == 1 ]; then
-  API_KEY=$ALCHEMY_API_KEY_MAINNET
+# Check for Polygon keys only since on other networks those are not needed
+if [ $chainId == 137 ]; then
+  API_KEY=$ALCHEMY_API_KEY_MATIC
   if [ "$API_KEY" == "" ]; then
-      echo "set ALCHEMY_API_KEY_MAINNET env variable"
+      echo "set ALCHEMY_API_KEY_MATIC env variable"
       exit 0
   fi
-elif [ $chainId == 11155111 ]; then
-    API_KEY=$ALCHEMY_API_KEY_SEPOLIA
+elif [ $chainId == 80002 ]; then
+    API_KEY=$ALCHEMY_API_KEY_AMOY
     if [ "$API_KEY" == "" ]; then
-        echo "set ALCHEMY_API_KEY_SEPOLIA env variable"
+        echo "set ALCHEMY_API_KEY_AMOY env variable"
         exit 0
     fi
 fi
@@ -58,21 +56,12 @@ fi
 
 castSendHeader="cast send --rpc-url $networkURL$API_KEY $walletArgs"
 
-echo "${green}Approve OLAS for DepositoryProxy${reset}"
-castArgs="$olasAddress approve(address,uint256) $depositoryProxyAddress $amount"
-echo $castArgs
-castCmd="$castSendHeader $castArgs"
-result=$($castCmd)
-echo "$result" | grep "status"
+STAKE="0x0b9821ae606ebc7c79bf3390bdd3dc93e1b4a7cda27aad60646e7b88ff55b001"
+UNSTAKE="0x8ca9a95e41b5eece253c93f5b31eed1253aed6b145d8a6e14d913fdf8e732293"
+UNSTAKE_RETIRED="0x9065ad15d9673159e4597c86084aff8052550cec93c5a6e44b3f1dba4c8731b3"
 
-
-chainIds="[100,100]"
-stakingProxies="[0x30e3d6b505b0123522803419a498e4dc315982bb,0x30e3d6b505b0123522803419a498e4dc315982bb]"
-bridgePayloads="[0x,0x]"
-values="[0,0]"
-
-echo "${green}Deposit OLAS for stOLAS${reset}"
-castArgs="$depositoryProxyAddress deposit(uint256,uint256[],address[],bytes[],uint256[]) $amount $chainIds $stakingProxies $bridgePayloads $values"
+echo "${green}Set operation receivers in Collector${reset}"
+castArgs="$collectorProxyAddress setOperationReceivers(bytes32[],address[]) [$STAKE,$UNSTAKE,$UNSTAKE_RETIRED] [$distributorProxyAddress,$treasuryProxyAddress,$unstakeRelayerProxyAddress]"
 echo $castArgs
 castCmd="$castSendHeader $castArgs"
 result=$($castCmd)
