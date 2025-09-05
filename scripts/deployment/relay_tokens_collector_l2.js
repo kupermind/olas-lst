@@ -21,8 +21,15 @@ const main = async () => {
     const deployer = new ethers.Wallet(account, provider);
     console.log("Deployer address:", deployer.address);
 
+    // Reward operation
+    const REWARD = "0x0b9821ae606ebc7c79bf3390bdd3dc93e1b4a7cda27aad60646e7b88ff55b001";
+    // Unstake operation
+    const UNSTAKE = "0x8ca9a95e41b5eece253c93f5b31eed1253aed6b145d8a6e14d913fdf8e732293";
+    // Unstake-retired operation
+    const UNSTAKE_RETIRED = "0x9065ad15d9673159e4597c86084aff8052550cec93c5a6e44b3f1dba4c8731b3";
+
     const collector = await ethers.getContractAt("Collector", parsedData.collectorProxyAddress);
-    await collector.relayRewardTokens();
+    await collector.relayTokens(REWARD, "0x" , { gasLimit: 1000000 });
 };
 
 main()

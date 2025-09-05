@@ -32,7 +32,7 @@ chainId=$(jq -r '.chainId' $globals)
 networkURL=$(jq -r '.networkURL' $globals)
 
 olasAddress=$(jq -r '.olasAddress' $globals)
-collectorAddress=$(jq -r '.collectorAddress' $globals)
+collectorProxyAddress=$(jq -r '.collectorProxyAddress' $globals)
 multiSendCallOnlyAddress=$(jq -r '.multiSendCallOnlyAddress' $globals)
 
 # Check for Polygon keys only since on other networks those are not needed
@@ -52,7 +52,7 @@ fi
 
 contractName="ActivityModule"
 contractPath="contracts/l2/$contractName.sol:$contractName"
-constructorArgs="$olasAddress $collectorAddress $multiSendCallOnlyAddress"
+constructorArgs="$olasAddress $collectorProxyAddress $multiSendCallOnlyAddress"
 contractArgs="$contractPath --constructor-args $constructorArgs"
 
 # Get deployer based on the ledger flag

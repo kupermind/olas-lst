@@ -66,8 +66,10 @@ result=$($castCmd)
 echo "$result" | grep "status"
 
 
-chainIds="[100,100]"
-stakingProxies="[0x90b043b4D4416cad893f62284bd545d1d55E5081,0x90b043b4D4416cad893f62284bd545d1d55E5081]"
+#chainIds="[100,100]"
+#stakingProxies="[0x90b043b4D4416cad893f62284bd545d1d55E5081,0x90b043b4D4416cad893f62284bd545d1d55E5081]"
+chainIds="[8453,8453]"
+stakingProxies="[0x71756B35E3ba7688C75A948EdCA5E040C7C2DDf4,0x71756B35E3ba7688C75A948EdCA5E040C7C2DDf4]"
 bridgePayloads="[0x,0x]"
 values="[0,0]"
 

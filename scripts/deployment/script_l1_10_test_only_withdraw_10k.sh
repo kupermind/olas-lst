@@ -7,6 +7,9 @@ if [ -z "$1" ]; then
   exit 1
 fi
 
+# Get L2 network name: gnosis, base, etc.
+networkL2=$2
+
 red=$(tput setaf 1)
 green=$(tput setaf 2)
 reset=$(tput sgr0)
@@ -24,9 +27,9 @@ derivationPath=$(jq -r '.derivationPath' $globals)
 chainId=$(jq -r '.chainId' $globals)
 networkURL=$(jq -r '.networkURL' $globals)
 
-olasAddress=$(jq -r ".olasAddress" $globals)
-stakingProxyAddress=$(jq -r ".stakingProxyAddress" $globals)
-amount="100000000000000000000000"
+stOLASAddress=$(jq -r ".stOLASAddress" $globals)
+treasuryProxyAddress=$(jq -r ".treasuryProxyAddress" $globals)
+amount="10000000000000000000000"
 
 # Getting L1 API key
 if [ $chainId == 1 ]; then
@@ -55,15 +58,23 @@ fi
 
 castSendHeader="cast send --rpc-url $networkURL$API_KEY $walletArgs"
 
-echo "${green}Approve OLAS for StakingProxy${reset}"
-castArgs="$olasAddress approve(address,uint256) $stakingProxyAddress $amount"
+echo "${green}Approve stOLAS for TreasuryProxy${reset}"
+castArgs="$stOLASAddress approve(address,uint256) $treasuryProxyAddress $amount"
 echo $castArgs
 castCmd="$castSendHeader $castArgs"
 result=$($castCmd)
 echo "$result" | grep "status"
 
-echo "${green}Fund StakingProxy contract${reset}"
-castArgs="$stakingProxyAddress deposit(uint256) $amount"
+
+#chainIds="[100]"
+#stakingProxies="[0x90b043b4D4416cad893f62284bd545d1d55E5081]"
+chainIds="[8453]"
+stakingProxies="[0x71756B35E3ba7688C75A948EdCA5E040C7C2DDf4]"
+bridgePayloads="[0x]"
+values="[0]"
+
+echo "${green}Request to withdraw stOLAS for OLAS${reset}"
+castArgs="$treasuryProxyAddress requestToWithdraw(uint256,uint256[],address[],bytes[],uint256[]) $amount $chainIds $stakingProxies $bridgePayloads $values"
 echo $castArgs
 castCmd="$castSendHeader $castArgs"
 result=$($castCmd)

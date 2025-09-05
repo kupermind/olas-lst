@@ -24,20 +24,21 @@ derivationPath=$(jq -r '.derivationPath' $globals)
 chainId=$(jq -r '.chainId' $globals)
 networkURL=$(jq -r '.networkURL' $globals)
 
-depositoryProxyAddress=$(jq -r ".depositoryProxyAddress" $globals)
-stakingTokenAddress=$(jq -r ".stakingTokenAddress" $globals)
+olasAddress=$(jq -r ".olasAddress" $globals)
+stakingProxyAddress=$(jq -r ".stakingProxyAddress" $globals)
+amount="10000000000000000000000"
 
-# Getting L1 API key
-if [ $chainId == 1 ]; then
-  API_KEY=$ALCHEMY_API_KEY_MAINNET
+# Check for Polygon keys only since on other networks those are not needed
+if [ $chainId == 137 ]; then
+  API_KEY=$ALCHEMY_API_KEY_MATIC
   if [ "$API_KEY" == "" ]; then
-      echo "set ALCHEMY_API_KEY_MAINNET env variable"
+      echo "set ALCHEMY_API_KEY_MATIC env variable"
       exit 0
   fi
-elif [ $chainId == 11155111 ]; then
-    API_KEY=$ALCHEMY_API_KEY_SEPOLIA
+elif [ $chainId == 80002 ]; then
+    API_KEY=$ALCHEMY_API_KEY_AMOY
     if [ "$API_KEY" == "" ]; then
-        echo "set ALCHEMY_API_KEY_SEPOLIA env variable"
+        echo "set ALCHEMY_API_KEY_AMOY env variable"
         exit 0
     fi
 fi
@@ -54,9 +55,15 @@ fi
 
 castSendHeader="cast send --rpc-url $networkURL$API_KEY $walletArgs"
 
-echo "${green}Add staking models${reset}"
-#castArgs="$depositoryProxyAddress createAndActivateStakingModels(uint256[],address[],uint256[],uint256[]) [100] [0x90b043b4D4416cad893f62284bd545d1d55E5081] [20000000000000000000000] [20]"
-castArgs="$depositoryProxyAddress createAndActivateStakingModels(uint256[],address[],uint256[],uint256[]) [8453] [0x71756B35E3ba7688C75A948EdCA5E040C7C2DDf4] [20000000000000000000000] [20]"
+echo "${green}Approve OLAS for StakingProxy${reset}"
+castArgs="$olasAddress approve(address,uint256) $stakingProxyAddress $amount"
+echo $castArgs
+castCmd="$castSendHeader $castArgs"
+result=$($castCmd)
+echo "$result" | grep "status"
+
+echo "${green}Fund StakingProxy contract${reset}"
+castArgs="$stakingProxyAddress deposit(uint256) $amount"
 echo $castArgs
 castCmd="$castSendHeader $castArgs"
 result=$($castCmd)
