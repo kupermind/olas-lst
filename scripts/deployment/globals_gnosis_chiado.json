@@ -42,7 +42,7 @@
   "beaconAddress": "0xCFbc775e021d9a39cA376d5E1b2e2Fd0D4d700fa",
   "agentId": "1",
   "configHash": "0x0000000000000000000000000000000000000000000000000000000000000001",
-  "stakingManagerAddress": "0xDd41838F9ba327bA84d38526A194D6C6d6C90287",
+  "stakingManagerAddress": "0xD7Dd95c9EF697e06B0f69B2480fBacAb281D45b8",
   "stakingManagerProxyAddress": "0x2d7C703aeD2D2d063c51ae23d0DAD202378D03e6",
   "l1ChainId": "11155111",
   "gnosisStakingProcessorL2Address": "0xfB8a90AE8D925DC3AAE77d4b5B835689eca84c5d",

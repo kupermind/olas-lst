@@ -115,8 +115,7 @@ contract Depository is Implementation {
     event StakingModelStatusSet(uint256 indexed chainId, address indexed stakingProxy, StakingModelStatus status);
     event Deposit(address indexed sender, uint256 stakeAmount, uint256 stAmount, uint256[] chainIds,
         address[] stakingProxies, uint256[] amounts);
-    event Unstake(address indexed sender, uint256 unstakeAmount, uint256[] chainIds, address[] stakingProxies,
-        uint256[] amounts);
+    event Unstake(address indexed sender, uint256[] chainIds, address[] stakingProxies, uint256[] amounts);
     event Retired(uint256[] chainIds, address[] stakingProxies);
     event PausedDepository();
     event UnpausedDepository();
@@ -689,7 +688,7 @@ contract Depository is Implementation {
         // Request unstake via relevant deposit processors
         _operationSendMessage(chainIds, stakingProxies, amounts, bridgePayloads, values, UNSTAKE);
 
-        emit Unstake(msg.sender, unstakeAmount, chainIds, stakingProxies, amounts);
+        emit Unstake(msg.sender, chainIds, stakingProxies, amounts);
     }
 
     /// @dev Calculates amounts and initiates cross-chain unstake request for specified retired models.
@@ -755,14 +754,12 @@ contract Depository is Implementation {
 
             // Update staking model remainder
             mapStakingModels[stakingModelId].remainder += uint96(amounts[i]);
-
-            unstakeAmount += amounts[i];
         }
 
         // Request unstake for retired models via relevant deposit processors
         _operationSendMessage(chainIds, stakingProxies, amounts, bridgePayloads, values, UNSTAKE_RETIRED);
 
-        emit Unstake(msg.sender, unstakeAmount, chainIds, stakingProxies, amounts);
+        emit Unstake(msg.sender, chainIds, stakingProxies, amounts);
     }
 
     /// @dev Close specified retired models.
