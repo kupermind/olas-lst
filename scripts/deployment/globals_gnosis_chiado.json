@@ -50,5 +50,5 @@
   "moduleActivityCheckerAddress": "0x172a8aad93FD797e2aec742FeC44a2ac3C26ce67",
   "stakingTokenLockedAddress": "0x841017fc5b56209712b125366081B1113709e358",
   "stakingHelperAddress": "0xFD1ACD598eC03680d6a416f82bfc5f26Ee5442dB",
-  "stakingProxyAddress": "0x90b043b4D4416cad893f62284bd545d1d55E5081"
+  "stakingProxyAddresses": ["0x90b043b4D4416cad893f62284bd545d1d55E5081", "0x97c0De79e5F7c3ACa284f209e4490bFf9C392E3d"]
 }

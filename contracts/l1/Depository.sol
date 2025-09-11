@@ -497,8 +497,9 @@ contract Depository is Implementation {
         }
 
         // Check for array lengths
-        if (chainIds.length == 0 || chainIds.length != stakingProxies.length ||
-            chainIds.length != bridgePayloads.length || chainIds.length != values.length) {
+        if (chainIds.length != stakingProxies.length || chainIds.length != bridgePayloads.length ||
+            chainIds.length != values.length)
+        {
             revert WrongArrayLength();
         }
 
