@@ -90,7 +90,7 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
 
     // Processed batch hashes
     mapping(bytes32 => bool) public processedHashes;
-    // Queued hashes of (target, amount, batchHash)
+    // Queued hashes of (batchHash, target, amount, operation): true if request is queued
     mapping(bytes32 => bool) public queuedHashes;
 
     /// @dev DefaultStakerL2 constructor.

@@ -87,6 +87,21 @@ In order to complete the queued request, the agent must call the `redeem()` func
 function redeem(bytes32 batchHash, address target, uint256 amount, bytes32 operation) external;
 ```
 
+It is recommended to get the hash of the redeem operation with the following function:
+```solidity
+/// @dev Gets failed request queued hash.
+/// @param batchHash Batch hash.
+/// @param target Staking target address.
+/// @param amount Staking amount.
+/// @param operation Funds operation: stake / unstake.
+function getQueuedHash(bytes32 batchHash, address target, uint256 amount, bytes32 operation) public view returns (bytes32);
+```
+
+and check that the redeem is still queued with the following function using the queued hash value:
+```solidity
+function queuedHashes(bytes32) external view returns (bool);
+```
+
 ### Claim Reward Tokens
 
 Each staked service has a controlling [ActivityModule](../contracts/l2/ActivityModule.sol) contract, which serves as an entry point
