@@ -1625,5 +1625,43 @@ describe("Liquid Staking", function () {
             // Restore a previous state of blockchain
             snapshot.restore();
         });
+
+        it("Deposit without staking", async function () {
+            // Max timeout 1600 sec for coverage
+            this.timeout(1600000);
+
+            // Take a snapshot of the current state of the blockchain
+            const snapshot = await helpers.takeSnapshot();
+
+            console.log("L1");
+
+            // Get OLAS amount to stake
+            const olasAmount = minStakingDeposit.mul(8).div(3);
+            console.log("User deposits OLAS amount:", olasAmount.toString());
+
+            // Approve OLAS for depository
+            await olas.approve(depository.address, initSupply);
+
+            // Stake OLAS on L1 first deposit
+            console.log("User deposits OLAS for stOLAS");
+            await depository.deposit(olasAmount, [], [], [], []);
+            let stBalance = await st.balanceOf(deployer.address);
+            console.log("User stOLAS balance now:", stBalance.toString());
+
+            let stakedBalance = await st.stakedBalance();
+            let vaultBalance = await st.vaultBalance();
+            let reserveBalance = await st.reserveBalance();
+
+            console.log("stakedBalance after 1st deposit:", stakedBalance.toString());
+            console.log("vaultBalance after 1st deposit:", vaultBalance.toString());
+            console.log("reserveBalance after 1st deposit:", reserveBalance.toString());
+
+            // Check that the only amount is in reserve
+            const totalAssets = await st.totalAssets();
+            expect(totalAssets).to.equal(reserveBalance);
+
+            // Restore a previous state of blockchain
+            snapshot.restore();
+        });
     });
 });
