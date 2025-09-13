@@ -41,19 +41,24 @@
 ./scripts/deployment/deploy_l1_14_lz_oracle.sh $1
 
 # Change managers in stOLAS and Depository
-./scripts/deployment/script_l1_01_change_managers.sh $1
+./scripts/deployment/script_l1_01_initialize_stolas.sh $1
 
 # Change LzOracle address in Depository
 ./scripts/deployment/script_l1_02_change_lz_oracle.sh $1
 
-# Set StakingProcessorL2 in DepositProcessorL1
+
+## !!!!! DEPLOY L2 first before continuing here !!!!!
+# Set StakingProcessorL2 in DepositProcessorL1: globals, network
 ./scripts/deployment/script_l1_03_set_l2_staking_processor.sh $1 $2
 
-# Set DepositProcessorL1-s and corresponding chainIds
+# Set DepositProcessorL1-s and corresponding chainIds: globals, network, chainId
 ./scripts/deployment/script_l1_04_set_deposit_processor_chain_ids.sh $1 $2 $3
 
 # Initial veOLAS lock
 ./scripts/deployment/script_l1_05_ve_initial_lock.sh $1
 
-# Add staking model
+## !!!!! Create Staking Proxies first !!!!!
+./scripts/deployment/script_l1_06_add_staking_model.sh $1
+
+# Add staking model: globals, network, chainId
 ./scripts/deployment/script_l1_06_add_staking_model.sh $1 $2 $3
