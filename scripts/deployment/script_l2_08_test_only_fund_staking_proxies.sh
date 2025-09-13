@@ -25,8 +25,9 @@ chainId=$(jq -r '.chainId' $globals)
 networkURL=$(jq -r '.networkURL' $globals)
 
 olasAddress=$(jq -r ".olasAddress" $globals)
-stakingProxyAddress=$(jq -r ".stakingProxyAddresses.[1]" $globals)
-amount="10000000000000000000000"
+stakingProxyAddress=$(jq -r ".stakingProxyAddresses.[$2]" $globals)
+#stakingProxyAddresses=$(jq -r ".stakingProxyAddresses" $globals)
+amount="2000000000000000000000"
 
 # Check for Polygon keys only since on other networks those are not needed
 if [ $chainId == 137 ]; then
@@ -55,6 +56,7 @@ fi
 
 castSendHeader="cast send --rpc-url $networkURL$API_KEY $walletArgs"
 
+#for stakingProxyAddress in $stakingProxyAddresses; do
 echo "${green}Approve OLAS for StakingProxy${reset}"
 castArgs="$olasAddress approve(address,uint256) $stakingProxyAddress $amount"
 echo $castArgs
@@ -68,3 +70,4 @@ echo $castArgs
 castCmd="$castSendHeader $castArgs"
 result=$($castCmd)
 echo "$result" | grep "status"
+#done
