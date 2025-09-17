@@ -114,7 +114,7 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
 
         // Get the batch hash
         uint256 batchNonce = stakingBatchNonce;
-        bytes32 batchHash = keccak256(abi.encode(batchNonce, block.chainid, address(this)));
+        bytes32 batchHash = keccak256(abi.encode(batchNonce, address(this), block.timestamp, block.chainid));
 
         // Send the message to L2
         (uint256 sequence, uint256 leftovers) = _sendMessage(target, amount, bridgePayload, batchHash, operation);

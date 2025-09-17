@@ -55,7 +55,7 @@ fi
 castSendHeader="cast send --rpc-url $networkURL$API_KEY $walletArgs"
 
 echo "${green}Remove staking models${reset}"
-castArgs="$depositoryProxyAddress closeRetiredStakingModels(uint256[],address[]) [100] [0x90b043b4D4416cad893f62284bd545d1d55E5081]"
+castArgs="$depositoryProxyAddress closeRetiredStakingModels(uint256[],address[]) [100] [0xC375164E153b26D7DDEE557369970f1A929F47c2]"
 #castArgs="$depositoryProxyAddress closeRetiredStakingModels(uint256[],address[]) [8453] [0x71756B35E3ba7688C75A948EdCA5E040C7C2DDf4]"
 echo $castArgs
 castCmd="$castSendHeader $castArgs"

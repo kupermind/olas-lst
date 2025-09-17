@@ -434,54 +434,55 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         if (balance >= amount) {
             balance -= amount;
         } else {
-            // This must never happen
+            // This must never happen except for unlikely cases where L2 staking setup does not correspond L1 numbers
             if (mapStakedServiceIds[stakingProxy].length == 0) {
-                revert ZeroValue();
-            }
-
-            // Calculate how many unstakes are needed
-            uint256 minStakingDeposit = IStaking(stakingProxy).minStakingDeposit();
-            uint256 fullStakingDeposit = minStakingDeposit * (1 + NUM_AGENT_INSTANCES);
-            // Subtract unstaked balance
-            uint256 balanceDiff = amount - balance;
-
-            // Calculate number of stakes
-            numUnstakes = balanceDiff / fullStakingDeposit;
-            // Depending of how much is unstaked, adjust the unstaked balance
-            if (balanceDiff % fullStakingDeposit == 0) {
+                amount = balance;
                 balance = 0;
             } else {
-                numUnstakes++;
-                balance = numUnstakes * fullStakingDeposit - balanceDiff;
+                // Calculate how many unstakes are needed
+                uint256 minStakingDeposit = IStaking(stakingProxy).minStakingDeposit();
+                uint256 fullStakingDeposit = minStakingDeposit * (1 + NUM_AGENT_INSTANCES);
+                // Subtract unstaked balance
+                uint256 balanceDiff = amount - balance;
+
+                // Calculate number of stakes
+                numUnstakes = balanceDiff / fullStakingDeposit;
+                // Depending of how much is unstaked, adjust the unstaked balance
+                if (balanceDiff % fullStakingDeposit == 0) {
+                    balance = 0;
+                } else {
+                    numUnstakes++;
+                    balance = numUnstakes * fullStakingDeposit - balanceDiff;
+                }
+
+                // Get the last staked Service Id index
+                uint256 lastIdx = mapLastStakedServiceIdxs[stakingProxy];
+                // This must never happen
+                if (numUnstakes > lastIdx) {
+                    revert Overflow(numUnstakes, lastIdx);
+                }
+
+                // Traverse all required unstakes
+                for (uint256 i = 0; i < numUnstakes; ++i) {
+                    uint256 serviceId = mapStakedServiceIds[stakingProxy][lastIdx];
+                    // Unstake, terminate and unbond the service
+                    IStaking(stakingProxy).unstake(serviceId);
+                    IService(serviceManager).terminate(serviceId);
+                    IService(serviceManager).unbond(serviceId);
+
+                    // Get activityModule
+                    address activityModule = mapServiceIdActivityModules[serviceId];
+                    // Drain funds, if anything is left on a multisig
+                    IActivityModule(activityModule).drain();
+
+                    lastIdx--;
+
+                    emit Unstaked(stakingProxy, serviceId, activityModule);
+                }
+
+                // Update last staked service Id
+                mapLastStakedServiceIdxs[stakingProxy] = lastIdx;
             }
-
-            // Get the last staked Service Id index
-            uint256 lastIdx = mapLastStakedServiceIdxs[stakingProxy];
-            // This must never happen
-            if (numUnstakes > lastIdx) {
-                revert Overflow(numUnstakes, lastIdx);
-            }
-
-            // Traverse all required unstakes
-            for (uint256 i = 0; i < numUnstakes; ++i) {
-                uint256 serviceId = mapStakedServiceIds[stakingProxy][lastIdx];
-                // Unstake, terminate and unbond the service
-                IStaking(stakingProxy).unstake(serviceId);
-                IService(serviceManager).terminate(serviceId);
-                IService(serviceManager).unbond(serviceId);
-
-                // Get activityModule
-                address activityModule = mapServiceIdActivityModules[serviceId];
-                // Drain funds, if anything is left on a multisig
-                IActivityModule(activityModule).drain();
-
-                lastIdx--;
-
-                emit Unstaked(stakingProxy, serviceId, activityModule);
-            }
-
-            // Update last staked service Id
-            mapLastStakedServiceIdxs[stakingProxy] = lastIdx;
         }
 
         emit StakingBalanceUpdated(operation, stakingProxy, numUnstakes, balance);
@@ -489,11 +490,14 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         // Update staking balance
         mapStakingProxyBalances[stakingProxy] = balance;
 
-        // Approve OLAS for collector to initiate L1 transfer for corresponding operation later by agents / operators
-        IToken(olas).approve(collector, amount);
+        // Amount can be zero only if L2 and L1 balances are incorrectly setup (see condition above)
+        if (amount > 0) {
+            // Approve OLAS for collector to initiate L1 transfer for corresponding operation later by agents / operators
+            IToken(olas).approve(collector, amount);
 
-        // Request top-up by Collector for a specific unstake operation
-        ICollector(collector).topUpBalance(amount, operation);
+            // Request top-up by Collector for a specific unstake operation
+            ICollector(collector).topUpBalance(amount, operation);
+        }
 
         _locked = 1;
     }
