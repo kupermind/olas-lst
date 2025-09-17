@@ -50,10 +50,17 @@ interface IToken {
 
 /// @title DefaultStakingProcessorL2 - Smart contract for processing tokens and data received on L2, and tokens sent back to L1.
 abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
+    enum RequestStatus {
+        EXTERNAL_CALL_FAILED,
+        INSUFFICIENT_OLAS_BALANCE,
+        UNSUPPORTED_OPERATION_TYPE,
+        PAUSED
+    }
+
     event OwnerUpdated(address indexed owner);
     event FundsReceived(address indexed sender, uint256 value);
     event RequestExecuted(bytes32 indexed batchHash, address target, uint256 amount, bytes32 operation);
-    event RequestQueued(bytes32 indexed batchHash, address indexed target, uint256 amount, bytes32 operation, uint256 status);
+    event RequestQueued(bytes32 indexed batchHash, address indexed target, uint256 amount, bytes32 operation, RequestStatus status);
     event MessageReceived(address indexed sender, uint256 chainId, bytes data);
     event Drain(address indexed owner, uint256 amount);
     event Migrated(address indexed sender, address indexed newL2TargetDispenser, uint256 amount);
@@ -161,11 +168,7 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
         bool success;
 
         // Status to be emitted for failing scenarios, since reverts cannot be engaged in this function call
-        // 0: default one, external call has failed
-        // 1: insufficient OLAS balance
-        // 2: unsupported operation type
-        // 3: contract is paused
-        uint256 status;
+        RequestStatus status;
         if (paused == 1) {
             if (operation == STAKE) {
                 // Get current OLAS balance
@@ -180,20 +183,20 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
                     bytes memory stakeData = abi.encodeCall(IStakingManager.stake, (target, amount, operation));
                     (success, ) = stakingManager.call(stakeData);
                 } else {
-                    // Status 1: insufficient OLAS balance
-                    status = 1;
+                    // Insufficient OLAS balance
+                    status = RequestStatus.INSUFFICIENT_OLAS_BALANCE;
                 }
             } else if (operation == UNSTAKE || operation == UNSTAKE_RETIRED) {
                 // This is a low level call since it must never revert
                 bytes memory unstakeData = abi.encodeCall(IStakingManager.unstake, (target, amount, operation));
                 (success, ) = stakingManager.call(unstakeData);
             } else {
-                // Status 2: unsupported operation type
-                status = 2;
+                // Unsupported operation type
+                status = RequestStatus.UNSUPPORTED_OPERATION_TYPE;
             }
         } else {
-            // Status 3: contract is paused
-            status = 3;
+            // Contract is paused
+            status = RequestStatus.PAUSED;
         }
 
         // Check for operation success and queue, if required

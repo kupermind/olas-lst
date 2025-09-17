@@ -25,7 +25,6 @@ chainId=$(jq -r '.chainId' $globals)
 networkURL=$(jq -r '.networkURL' $globals)
 
 depositoryProxyAddress=$(jq -r ".depositoryProxyAddress" $globals)
-stakingTokenAddresses=$(jq -r ".stakingTokenAddresses" $globals)
 
 # Getting L1 API key
 if [ $chainId == 1 ]; then
@@ -55,7 +54,7 @@ fi
 castSendHeader="cast send --rpc-url $networkURL$API_KEY $walletArgs"
 
 echo "${green}Add staking models${reset}"
-castArgs="$depositoryProxyAddress createAndActivateStakingModels(uint256[],address[],uint256[],uint256[]) [100,100,100,100] [0x89e73778187b4Dda3A109E0EB10b41B969D81774,0xd7d95E6563B23966a8773BA57094453B456ba6F2,0x95a68333a2E8dE633dB02B826742869fe2F44c31,0xC375164E153b26D7DDEE557369970f1A929F47c2] [20000000000000000000000,4000000000000000000000,2000000000000000000000,400000000000000000000] [20,50,100,500]"
+castArgs="$depositoryProxyAddress createAndActivateStakingModels(uint256[],address[],uint256[],uint256[]) [100,100,100] [0xd7d95E6563B23966a8773BA57094453B456ba6F2,0x95a68333a2E8dE633dB02B826742869fe2F44c31,0xC375164E153b26D7DDEE557369970f1A929F47c2] [8000000000000000000000,4000000000000000000000,800000000000000000000] [50,100,500]"
 #castArgs="$depositoryProxyAddress createAndActivateStakingModels(uint256[],address[],uint256[],uint256[]) [8453] [0x71756B35E3ba7688C75A948EdCA5E040C7C2DDf4] [20000000000000000000000] [20]"
 echo $castArgs
 castCmd="$castSendHeader $castArgs"
