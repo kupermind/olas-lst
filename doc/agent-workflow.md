@@ -66,15 +66,23 @@ Currently, there are two contracts that require L2-L1 bridged funds forwarding f
 
 It is advised to check `olas.balanceOf(distributorProxyAddress)` and `olas.balanceOf(unstakeRelayerProxyAddress)` before executing function calls.
 
-### Redeem Stake Operations
+### Redeem Operations
 
-There could be scenarios when **STAKE** / **UNSTAKE** operations are not complete in an automatic way on L2 when triggered on L1.
+There could be scenarios when **STAKE** / **UNSTAKE** / **UNSTAKE_RETIRED** operations are not complete in an automatic way on L2 when triggered on L1.
 For example, OLAS funds arrive across bridge later than the message with the instruction about where funds need to be relayed.
 In this case, the `RequestQueued()` event in each [DefaultStakingProcessorL2](../contracts/l2/bridging/DefaultStakingProcessorL2.sol)
 is emitted with the following variables:
 
 ```solidity
-event RequestQueued(bytes32 indexed batchHash, address indexed target, uint256 amount, bytes32 operation, uint256 status);
+enum RequestStatus {
+    NON_EXISTENT,
+    EXTERNAL_CALL_FAILED,
+    INSUFFICIENT_OLAS_BALANCE,
+    UNSUPPORTED_OPERATION_TYPE,
+    CONTRACT_PAUSED
+}
+
+event RequestQueued(bytes32 indexed batchHash, address indexed target, uint256 amount, bytes32 operation, RequestStatus status);
 ```
 
 In order to complete the queued request, the agent must call the `redeem()` function using values from the `RequestQueued()` event:
@@ -99,8 +107,18 @@ function getQueuedHash(bytes32 batchHash, address target, uint256 amount, bytes3
 
 and check that the redeem is still queued with the following function using the queued hash value:
 ```solidity
-function queuedHashes(bytes32) external view returns (bool);
+function queuedHashes(bytes32) external view returns (RequestStatus);
 ```
+
+Note that **STAKE** operations will be redeemed either to finalize the stake, if queued due to insufficient OLAS balance
+(`INSUFFICIENT_OLAS_BALANCE`), or to be transferred back to L1 in all other cases.
+
+Queued **UNSTAKE** and **UNSTAKE_RETIRED** operations must be always redeemed, as changes were already recorded on L1.
+If for some reason redeem keeps on failing, agents need to continue trying to redeem once in a while, as the failed request
+will be identified and the fix will be in place.
+
+Note that `UNSUPPORTED_OPERATION_TYPE` queued status will never be delivered within the current contract scope,
+so agents are free to ignore those requests. However, proper separation of events is required.
 
 ### Claim Reward Tokens
 

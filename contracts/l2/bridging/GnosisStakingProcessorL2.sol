@@ -31,21 +31,23 @@ error ZeroValueOnly();
 contract GnosisStakingProcessorL2 is DefaultStakingProcessorL2 {
     /// @dev GnosisTargetDispenserL2 constructor.
     /// @param _olas OLAS token address.
-    /// @param _proxyFactory Service staking proxy factory address.
+    /// @param _stakingManager StakingManager address.
+    /// @param _collector Collector address.
     /// @param _l2TokenRelayer L2 token relayer bridging contract address.
     /// @param _l2MessageRelayer L2 message relayer bridging contract address (AMBHomeProxy).
     /// @param _l1DepositProcessor L1 deposit processor address.
     /// @param _l1SourceChainId L1 source chain Id.
     constructor(
         address _olas,
-        address _proxyFactory,
+        address _stakingManager,
+        address _collector,
         address _l2TokenRelayer,
         address _l2MessageRelayer,
         address _l1DepositProcessor,
         uint256 _l1SourceChainId
     )
-        DefaultStakingProcessorL2(_olas, _proxyFactory, _l2TokenRelayer, _l2MessageRelayer, _l1DepositProcessor,
-            _l1SourceChainId)
+        DefaultStakingProcessorL2(_olas, _stakingManager, _collector, _l2TokenRelayer, _l2MessageRelayer,
+            _l1DepositProcessor, _l1SourceChainId)
     {}
 
     /// @dev Processes a message received from the AMB Contract Proxy (Home) contract.
