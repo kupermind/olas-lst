@@ -719,8 +719,6 @@ contract Depository is Implementation {
             revert WrongArrayLength();
         }
 
-        uint256 unstakeAmount;
-
         // Allocate arrays of max possible size
         amounts = new uint256[](chainIds.length);
 

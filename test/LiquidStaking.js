@@ -278,7 +278,7 @@ describe("Liquid Staking", function () {
 
         const GnosisStakingProcessorL2 = await ethers.getContractFactory("GnosisStakingProcessorL2");
         gnosisStakingProcessorL2 = await GnosisStakingProcessorL2.deploy(olas.address, stakingManager.address,
-            bridgeRelayer.address, bridgeRelayer.address, gnosisDepositProcessorL1.address, chainId);
+            collector.address, bridgeRelayer.address, bridgeRelayer.address, gnosisDepositProcessorL1.address, chainId);
         await gnosisStakingProcessorL2.deployed();
 
         // changeStakingProcessorL2 for collector

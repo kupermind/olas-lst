@@ -9,6 +9,9 @@ import {IStaking} from "../interfaces/IStaking.sol";
 import {IToken, INFToken} from "../interfaces/IToken.sol";
 
 interface ICollector {
+    /// @dev Tops up address(this) with a specified amount according to a selected operation.
+    /// @param amount OLAS amount.
+    /// @param operation Operation type.
     function topUpBalance(uint256 amount, bytes32 operation) external;
 }
 

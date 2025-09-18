@@ -98,4 +98,12 @@ interface IBridgeErrors {
     /// @param batchHash Batch hash.
     /// @param operation Funds operation type.
     error OperationNotFound(bytes32 batchHash, bytes32 operation);
+
+    /// @dev Redeem request failed.
+    /// @param batchHash Batch hash.
+    /// @param target Staking target address.
+    /// @param amount Staking amount.
+    /// @param operation Funds operation: stake / unstake.
+    /// @param status Request status.
+    error RequestFailed(bytes32 batchHash, address target, uint256 amount, bytes32 operation, uint256 status);
 }

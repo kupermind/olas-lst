@@ -3,6 +3,14 @@ pragma solidity ^0.8.30;
 
 import {IBridgeErrors} from "../../interfaces/IBridgeErrors.sol";
 
+// Collector interface
+interface ICollector {
+    /// @dev Tops up address(this) with a specified amount according to a selected operation.
+    /// @param amount OLAS amount.
+    /// @param operation Operation type.
+    function topUpBalance(uint256 amount, bytes32 operation) external;
+}
+
 // StakingManager interface
 interface IStakingManager {
     /// @dev Stakes OLAS into specified staking proxy contract if deposit + balance is enough for staking.
@@ -51,10 +59,11 @@ interface IToken {
 /// @title DefaultStakingProcessorL2 - Smart contract for processing tokens and data received on L2, and tokens sent back to L1.
 abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
     enum RequestStatus {
+        NON_EXISTENT,
         EXTERNAL_CALL_FAILED,
         INSUFFICIENT_OLAS_BALANCE,
         UNSUPPORTED_OPERATION_TYPE,
-        PAUSED
+        CONTRACT_PAUSED
     }
 
     event OwnerUpdated(address indexed owner);
@@ -62,8 +71,7 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
     event RequestExecuted(bytes32 indexed batchHash, address target, uint256 amount, bytes32 operation);
     event RequestQueued(bytes32 indexed batchHash, address indexed target, uint256 amount, bytes32 operation, RequestStatus status);
     event MessageReceived(address indexed sender, uint256 chainId, bytes data);
-    event Drain(address indexed owner, uint256 amount);
-    event Migrated(address indexed sender, address indexed newL2TargetDispenser, uint256 amount);
+    event Drain(address indexed owner, uint256 nativeAmount, uint256 olasAmount);
     event StakingProcessorPaused();
     event StakingProcessorUnpaused();
 
@@ -80,6 +88,8 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
     address public immutable olas;
     // Staking manager address
     address public immutable stakingManager;
+    // Collector address
+    address public immutable collector;
     // L2 Relayer address that receives the message across the bridge from the source L1 network
     address public immutable l2MessageRelayer;
     // L2 Token relayer address that sends tokens to the L1 source network
@@ -98,25 +108,28 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
     // Processed batch hashes
     mapping(bytes32 => bool) public processedHashes;
     // Queued hashes of (batchHash, target, amount, operation): true if request is queued
-    mapping(bytes32 => bool) public queuedHashes;
+    mapping(bytes32 => RequestStatus) public queuedHashes;
 
     /// @dev DefaultStakerL2 constructor.
     /// @param _olas OLAS token address on L2.
     /// @param _stakingManager StakingManager address.
+    /// @param _collector Collector address.
     /// @param _l2TokenRelayer L2 token relayer bridging contract address.
     /// @param _l2MessageRelayer L2 message relayer bridging contract address.
     /// @param _l1SourceChainId L1 source chain Id.
     constructor(
         address _olas,
         address _stakingManager,
+        address _collector,
         address _l2TokenRelayer,
         address _l2MessageRelayer,
         address _l1DepositProcessor,
         uint256 _l1SourceChainId
     ) {
         // Check for zero addresses
-        if (_olas == address(0) || _stakingManager == address(0) || _l2TokenRelayer == address(0) ||
-            _l2MessageRelayer == address(0) || _l1DepositProcessor == address(0)) {
+        if (_olas == address(0) || _stakingManager == address(0) || _collector == address(0) ||
+            _l2TokenRelayer == address(0) || _l2MessageRelayer == address(0) || _l1DepositProcessor == address(0))
+        {
             revert ZeroAddress();
         }
 
@@ -133,6 +146,7 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
         // Immutable parameters assignment
         olas = _olas;
         stakingManager = _stakingManager;
+        collector = _collector;
         l2TokenRelayer = _l2TokenRelayer;
         l2MessageRelayer = _l2MessageRelayer;
         l1DepositProcessor = _l1DepositProcessor;
@@ -169,8 +183,8 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
 
         // Status to be emitted for failing scenarios, since reverts cannot be engaged in this function call
         RequestStatus status;
-        if (paused == 1) {
-            if (operation == STAKE) {
+        if (operation == STAKE) {
+            if (paused == 1) {
                 // Get current OLAS balance
                 uint256 olasBalance = IToken(olas).balanceOf(address(this));
     
@@ -186,27 +200,28 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
                     // Insufficient OLAS balance
                     status = RequestStatus.INSUFFICIENT_OLAS_BALANCE;
                 }
-            } else if (operation == UNSTAKE || operation == UNSTAKE_RETIRED) {
-                // This is a low level call since it must never revert
-                bytes memory unstakeData = abi.encodeCall(IStakingManager.unstake, (target, amount, operation));
-                (success, ) = stakingManager.call(unstakeData);
             } else {
-                // Unsupported operation type
-                status = RequestStatus.UNSUPPORTED_OPERATION_TYPE;
+                // Contract is paused
+                status = RequestStatus.CONTRACT_PAUSED;
             }
+        } else if (operation == UNSTAKE || operation == UNSTAKE_RETIRED) {
+            // Note that if UNSTAKE* is requested, it must be finalized in any case since changes are recorded on L1
+            // This is a low level call since it must never revert
+            bytes memory unstakeData = abi.encodeCall(IStakingManager.unstake, (target, amount, operation));
+            (success, ) = stakingManager.call(unstakeData);
         } else {
-            // Contract is paused
-            status = RequestStatus.PAUSED;
+            // Unsupported operation type
+            status = RequestStatus.UNSUPPORTED_OPERATION_TYPE;
         }
 
         // Check for operation success and queue, if required
         if (success) {
             emit RequestExecuted(batchHash, target, amount, operation);
         } else {
-            // Hash of batchHash + target + amount + operation + current target dispenser address (migration-proof)
+            // Hash of batchHash + target + amount + operation + current target dispenser address
             bytes32 queueHash = getQueuedHash(batchHash, target, amount, operation);
             // Queue the hash for further redeem
-            queuedHashes[queueHash] = true;
+            queuedHashes[queueHash] = status;
 
             emit RequestQueued(batchHash, target, amount, operation, status);
         }
@@ -273,34 +288,49 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
             revert Paused();
         }
 
-        // Hash of batchHash + target + amount + operation + chainId + current target dispenser address (migration-proof)
+        // Hash of batchHash + target + amount + operation + chainId + current target dispenser address
         bytes32 queueHash = getQueuedHash(batchHash, target, amount, operation);
-        bool queued = queuedHashes[queueHash];
+        RequestStatus requestStatus = queuedHashes[queueHash];
         // Check if the target and amount are queued
-        if (!queued) {
+        if (requestStatus == RequestStatus.NON_EXISTENT) {
             revert RequestNotQueued(target, amount, batchHash, operation);
         }
 
+        // Check for operation type
+        // STAKE operation always involves amounts, thus either stake() needs to be finalized, or funds are returned to L1
+        // Note that if contract is paused when STAKE operation is requested, funds are safely returned to L1, since
+        // contract might be paused for good
+        // However, if UNSTAKE* is requested, it must be finalized in any case since changes are recorded on L1
         if (operation == STAKE) {
             // Get the current contract OLAS balance
             uint256 olasBalance = IToken(olas).balanceOf(address(this));
             if (olasBalance >= amount) {
                 // Approve OLAS for stakingManager
                 IToken(olas).approve(stakingManager, amount);
-                IStakingManager(stakingManager).stake(target, amount, operation);
             } else {
                 // OLAS balance is not enough for redeem
                 revert InsufficientBalance(olasBalance, amount);
             }
+
+            // If request was queued due to insufficient balance - continue with the stake
+            if (requestStatus == RequestStatus.INSUFFICIENT_OLAS_BALANCE) {
+                IStakingManager(stakingManager).stake(target, amount, operation);
+            } else {
+                // Approve OLAS for collector to initiate L1 transfer for corresponding operation by agents
+                IToken(olas).approve(collector, amount);
+
+                // Request top-up by Collector for a specific unstake operation
+                ICollector(collector).topUpBalance(amount, operation);
+            }
         } else if (operation == UNSTAKE || operation == UNSTAKE_RETIRED) {
+            // UNSTAKE* must be finalized
             IStakingManager(stakingManager).unstake(target, amount, operation);
         } else {
-            // Must never happen
-            revert OperationNotFound(batchHash, operation);
+            revert RequestFailed(batchHash, target, amount, operation, uint256(requestStatus));
         }
 
         // Remove processed queued nonce
-        queuedHashes[queueHash] = false;
+        queuedHashes[queueHash] = RequestStatus.NON_EXISTENT;
 
         emit RequestExecuted(batchHash, target, amount, operation);
 
@@ -349,8 +379,9 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
 
     /// @dev Drains contract native funds.
     /// @notice For cross-bridge leftovers and incorrectly sent funds.
-    /// @return amount Drained amount to the owner address.
-    function drain() external returns (uint256 amount) {
+    /// @return nativeAmount Drained native amount.
+    /// @return olasAmount Drained OLAS amount.
+    function drain() external returns (uint256 nativeAmount, uint256 olasAmount) {
         // Reentrancy guard
         if (_locked > 1) {
             revert ReentrancyGuard();
@@ -362,72 +393,27 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
             revert OwnerOnly(msg.sender, owner);
         }
 
-        // Drain the slashed funds
-        amount = address(this).balance;
-        if (amount == 0) {
-            revert ZeroValue();
-        }
+        // Drain leftover funds
+        nativeAmount = address(this).balance;
 
-        // Send funds to the owner
-        (bool success, ) = msg.sender.call{value: amount}("");
-        if (!success) {
-            revert TransferFailed(address(0), address(this), msg.sender, amount);
-        }
-
-        emit Drain(msg.sender, amount);
-
-        _locked = 1;
-    }
-
-    /// @dev Migrates funds to a new specified L2 target dispenser contract address.
-    /// @notice The contract must be paused to prevent other interactions.
-    ///         The owner is be zeroed, the contract becomes paused and in the reentrancy state for good.
-    ///         No further write interaction with the contract is going to be possible.
-    ///         If the withheld amount is nonzero, it is regulated by the DAO directly on the L1 side.
-    ///         If there are outstanding queued requests, they are processed by the DAO directly on the L2 side.
-    function migrate(address newL2TargetDispenser) external {
-        // Reentrancy guard
-        if (_locked > 1) {
-            revert ReentrancyGuard();
-        }
-        _locked = 2;
-
-        // Check for the owner address
-        if (msg.sender != owner) {
-            revert OwnerOnly(msg.sender, owner);
-        }
-
-        // Check that the contract is paused
-        if (paused == 1) {
-            revert Unpaused();
-        }
-
-        // Check that the migration address is a contract
-        if (newL2TargetDispenser.code.length == 0) {
-            revert WrongAccount(newL2TargetDispenser);
-        }
-
-        // Check that the new address is not the current one
-        if (newL2TargetDispenser == address(this)) {
-            revert WrongAccount(address(this));
-        }
-
-        // Get OLAS token amount
-        uint256 amount = IToken(olas).balanceOf(address(this));
-        // Transfer amount to the new L2 target dispenser
-        if (amount > 0) {
-            bool success = IToken(olas).transfer(newL2TargetDispenser, amount);
+        if (nativeAmount > 0) {
+            // Send funds to owner
+            (bool success, ) = msg.sender.call{value: nativeAmount}("");
             if (!success) {
-                revert TransferFailed(olas, address(this), newL2TargetDispenser, amount);
+                revert TransferFailed(address(0), address(this), msg.sender, nativeAmount);
             }
         }
 
-        // Zero the owner
-        owner = address(0);
+        // Get OLAS token amount
+        olasAmount = IToken(olas).balanceOf(address(this));
+        // Send funds to owner
+        if (olasAmount > 0) {
+            IToken(olas).transfer(msg.sender, olasAmount);
+        }
 
-        emit Migrated(msg.sender, newL2TargetDispenser, amount);
+        emit Drain(msg.sender, nativeAmount, olasAmount);
 
-        // _locked is now set to 2 for good
+        _locked = 1;
     }
 
     /// @dev Relays OLAS to L1.
@@ -447,7 +433,7 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
         uint256 amount,
         bytes32 operation
     ) public view returns (bytes32) {
-        // Hash of batchHash + target + amount + operation + current target dispenser address (migration-proof)
+        // Hash of batchHash + target + amount + operation + current target dispenser address
         return keccak256(abi.encode(batchHash, target, amount, operation, block.chainid, address(this)));
     }
 
@@ -459,11 +445,6 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
 
     /// @dev Receives native network token.
     receive() external payable {
-        // Disable receiving native funds after the contract has been migrated
-        if (owner == address(0)) {
-            revert TransferFailed(address(0), msg.sender, address(this), msg.value);
-        }
-
         emit FundsReceived(msg.sender, msg.value);
     }
 }

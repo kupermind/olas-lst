@@ -55,7 +55,7 @@ fi
 castSendHeader="cast send --rpc-url $networkURL$API_KEY $walletArgs"
 
 echo "${green}Add staking models${reset}"
-castArgs="$depositoryProxyAddress setStakingModelStatuses(uint256[],address[],uint8[]) [100] [0xC375164E153b26D7DDEE557369970f1A929F47c2] [0]"
+castArgs="$depositoryProxyAddress setStakingModelStatuses(uint256[],address[],uint8[]) [100] [0xC375164E153b26D7DDEE557369970f1A929F47c2] [1]"
 #castArgs="$depositoryProxyAddress setStakingModelStatuses(uint256[],address[],uint8[]) [8453] [0x71756B35E3ba7688C75A948EdCA5E040C7C2DDf4] [0]"
 echo $castArgs
 castCmd="$castSendHeader $castArgs"

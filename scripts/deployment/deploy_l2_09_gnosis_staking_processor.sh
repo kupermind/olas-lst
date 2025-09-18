@@ -33,6 +33,7 @@ networkURL=$(jq -r '.networkURL' $globals)
 
 olasAddress=$(jq -r '.olasAddress' $globals)
 stakingManagerProxyAddress=$(jq -r '.stakingManagerProxyAddress' $globals)
+collectorProxyAddress=$(jq -r '.collectorProxyAddress' $globals)
 gnosisOmniBridgeAddress=$(jq -r '.gnosisOmniBridgeAddress' $globals)
 gnosisAMBHomeAddress=$(jq -r '.gnosisAMBHomeAddress' $globals)
 gnosisDepositProcessorL1Address=$(jq -r '.gnosisDepositProcessorL1Address' $globals)
@@ -56,7 +57,7 @@ fi
 
 contractName="GnosisStakingProcessorL2"
 contractPath="contracts/l2/bridging/$contractName.sol:$contractName"
-constructorArgs="$olasAddress $stakingManagerProxyAddress $gnosisOmniBridgeAddress $gnosisAMBHomeAddress $gnosisDepositProcessorL1Address $l1ChainId"
+constructorArgs="$olasAddress $stakingManagerProxyAddress $collectorProxyAddress $gnosisOmniBridgeAddress $gnosisAMBHomeAddress $gnosisDepositProcessorL1Address $l1ChainId"
 contractArgs="$contractPath --constructor-args $constructorArgs"
 
 # Get deployer based on the ledger flag
@@ -94,7 +95,7 @@ echo "$(jq '. += {"gnosisStakingProcessorL2Address":"'$gnosisStakingProcessorL2A
 
 # Verify contract
 if [ "$contractVerification" == "true" ]; then
-  contractParams="$gnosisStakingProcessorL2Address $contractPath --constructor-args $(cast abi-encode "constructor(address,address,address,address,address,uint256)" $constructorArgs)"
+  contractParams="$gnosisStakingProcessorL2Address $contractPath --constructor-args $(cast abi-encode "constructor(address,address,address,address,address,address,uint256)" $constructorArgs)"
   echo "Verification contract params: $contractParams"
 
   echo "${green}Verifying contract on Etherscan...${reset}"
