@@ -218,23 +218,11 @@ contract stOLAS is ERC4626 {
         revert NotImplemented();
     }
 
-    /// @dev Updates total assets.
-    function updateTotalAssets() public returns (uint256) {
-        (uint256 curStakedBalance, uint256 curVaultBalance, uint256 curReserveBalance, uint256 curTotalReserves) =
-            calculateCurrentBalances();
-
-        totalReserves = curTotalReserves;
-
-        emit TotalReservesUpdated(curStakedBalance, curVaultBalance, curReserveBalance, curTotalReserves);
-
-        return curTotalReserves;
-    }
-
-    /// @dev Calculates reserve and stake balances, and top-ups stOLAS or address(this).
+    /// @dev Calculates reserve and stake balances, and top-ups stOLAS or Depository.
     /// @param reserveAmount Additional reserve OLAS amount.
     /// @param stakeAmount Additional stake OLAS amount.
     /// @param topUp Top up amount to be sent or received.
-    /// @param direction To stOLAS, if true, and to address(this) otherwise
+    /// @param direction To stOLAS, if true, and to Depository otherwise.
     function syncStakeBalances(uint256 reserveAmount, uint256 stakeAmount, uint256 topUp, bool direction) external {
         if (msg.sender != depository) {
             revert DepositoryOnly(msg.sender, depository);
@@ -270,8 +258,7 @@ contract stOLAS is ERC4626 {
             // Top-up can be zero in case when it is not transferred to stOLAS as it is fully utilized in Depository
             // Thus, no action is required and this block is skipped
 
-            // Approve and transfer OLAS to Depository
-            asset.approve(msg.sender, topUp);
+            // Transfer OLAS to Depository
             asset.transfer(msg.sender, topUp);
         }
 
@@ -330,19 +317,6 @@ contract stOLAS is ERC4626 {
         emit TotalReservesUpdated(curStakedBalance, vaultBalance, curReserveBalance, curTotalReserves);
     }
 
-    /// @dev Previews deposit assets to shares amount.
-    /// @notice This function can only be used for a strict amount of provided assets value.
-    ///       It might not correlate with the Depository's `deposit()` function since the provided amount
-    ///       could be changed due to other input parameters. For accurate correspondence with the Depository's
-    ///       `deposit()` function use its static call directly.
-    /// @param assets Deposited assets amount.
-    function previewDeposit(uint256 assets) public view override returns (uint256) {
-        (, , , uint256 curTotalReserves) = calculateCurrentBalances();
-
-        uint256 shares = totalSupply;
-        return shares == 0 ? assets : assets.mulDivDown(shares, curTotalReserves);
-    }
-
     /// @dev Calculates current balances.
     /// @return curStakedBalance Current staked balance.
     /// @return curVaultBalance Current vault balance.
@@ -362,6 +336,19 @@ contract stOLAS is ERC4626 {
         curTotalReserves = curStakedBalance + curVaultBalance + curReserveBalance;
     }
 
+    /// @dev Previews deposit assets to shares amount.
+    /// @notice This function can only be used for a strict amount of provided assets value.
+    ///       It might not correlate with the Depository's `deposit()` function since the provided amount
+    ///       could be changed due to other input parameters. For accurate correspondence with the Depository's
+    ///       `deposit()` function use its static call directly.
+    /// @param assets Deposited assets amount.
+    function previewDeposit(uint256 assets) public view override returns (uint256) {
+        (, , , uint256 curTotalReserves) = calculateCurrentBalances();
+
+        uint256 shares = totalSupply;
+        return shares == 0 ? assets : assets.mulDivDown(shares, curTotalReserves);
+    }
+
     /// @dev Previews redeem shares to assets amount.
     /// @param shares Redeemed shares amount.
     function previewRedeem(uint256 shares) public view override returns (uint256) {
@@ -374,10 +361,5 @@ contract stOLAS is ERC4626 {
     /// @dev Gets total assets amount.
     function totalAssets() public view override returns (uint256) {
         return totalReserves;
-    }
-
-    /// @dev Gets total stake assets amount: currently staked and reserved for staking.
-    function totalStakeAssets() external view virtual returns (uint256) {
-        return stakedBalance + reserveBalance;
     }
 }

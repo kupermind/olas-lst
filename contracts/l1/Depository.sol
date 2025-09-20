@@ -20,11 +20,11 @@ interface IST {
     /// @return shares stOLAS amount.
     function deposit(uint256 assets, address receiver) external returns (uint256 shares);
 
-    /// @dev Calculates reserve and stake balances, and top-ups stOLAS or address(this).
+    /// @dev Calculates reserve and stake balances, and top-ups stOLAS or Depository.
     /// @param reserveAmount Additional reserve OLAS amount.
     /// @param stakeAmount Additional stake OLAS amount.
     /// @param topUp Top up amount to be sent or received.
-    /// @param direction To stOLAS, if true, and to address(this) otherwise
+    /// @param direction To stOLAS, if true, and to Depository otherwise.
     function syncStakeBalances(uint256 reserveAmount, uint256 stakeAmount, uint256 topUp, bool direction) external;
 
     /// @dev stOLAS reserve balance.
@@ -159,8 +159,6 @@ contract Depository is Implementation {
     mapping(address => uint256) public mapAccountDeposits;
     // Mapping for account => withdraw amounts
     mapping(address => uint256) public mapAccountWithdraws;
-    // Set of staking model Ids
-    uint256[] public setStakingModelIds;
 
     /// @dev Depository constructor.
     /// @param _olas OLAS address.
@@ -216,9 +214,6 @@ contract Depository is Implementation {
         stakingModel.remainder = uint96(supply);
         stakingModel.stakeLimitPerSlot = uint96(stakeLimitPerSlot);
         stakingModel.status = StakingModelStatus.Active;
-
-        // Add into global staking model set
-        setStakingModelIds.push(stakingModelId);
 
         emit StakingModelActivated(chainId, stakingProxy, stakeLimitPerSlot, numSlots);
     }
@@ -816,16 +811,6 @@ contract Depository is Implementation {
 
         paused = false;
         emit UnpausedDepository();
-    }
-
-    /// @dev Gets number of all staking models that have been activated.
-    function getNumStakingModels() external view returns (uint256) {
-        return setStakingModelIds.length;
-    }
-
-    /// @dev Gets set of staking model Ids.
-    function getSetStakingModelIds() external view returns (uint256[] memory) {
-        return setStakingModelIds;
     }
 
     /// @dev Gets staking model Id by provided chain Id and staking proxy address.

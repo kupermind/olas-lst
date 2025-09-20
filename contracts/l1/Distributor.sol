@@ -52,8 +52,6 @@ contract Distributor is Implementation {
 
     // Lock factor in 10_000 value
     uint256 public lockFactor;
-    // Total distributed OLAS amount
-    uint256 public totalDistributedAmount;
 
     // Reentrancy lock
     bool transient _locked;
@@ -123,9 +121,6 @@ contract Distributor is Implementation {
         uint256 olasAmount = IToken(olas).balanceOf(address(this));
 
         if (olasAmount > 0) {
-            // Increase total account deposit amount
-            totalDistributedAmount += olasAmount;
-
             // Lock OLAS for veOLAS
             olasAmount = _increaseLock(olasAmount);
 
