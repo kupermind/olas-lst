@@ -36,9 +36,6 @@ contract UnstakeRelayer is Implementation {
     // stOLAS contract address
     address public immutable st;
 
-    // Total relayed unstaked OLAS amount
-    uint256 public totalRelayedAmount;
-
     // Reentrancy lock
     bool transient _locked;
 
@@ -69,9 +66,6 @@ contract UnstakeRelayer is Implementation {
         uint256 olasAmount = IToken(olas).balanceOf(address(this));
 
         if (olasAmount > 0) {
-            // Increase total relayed amount
-            totalRelayedAmount += olasAmount;
-
             // Approve OLAS for stOLAS
             IToken(olas).approve(st, olasAmount);
 

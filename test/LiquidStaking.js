@@ -410,10 +410,6 @@ describe("Liquid Staking", function () {
             console.log("Calling distribute obtained L2 to L1 OLAS to veOLAS and stOLAS by agent or manually");
             await distributor.distribute();
 
-            // Update st total assets
-            console.log("Calling OLAS total assets on stOLAS update by agent or manually");
-            await st.updateTotalAssets();
-
             stTotalAssets = await st.totalAssets();
             console.log("OLAS total assets on stOLAS now:", stTotalAssets.toString());
 
@@ -580,10 +576,6 @@ describe("Liquid Staking", function () {
             console.log("Calling distribute obtained L2 to L1 OLAS to veOLAS and stOLAS by agent or manually");
             await distributor.distribute();
 
-            // Update st total assets
-            console.log("Calling OLAS total assets on stOLAS update by agent or manually");
-            await st.updateTotalAssets();
-
             stTotalAssets = await st.totalAssets();
             console.log("OLAS total assets on stOLAS now:", stTotalAssets.toString());
 
@@ -743,10 +735,6 @@ describe("Liquid Staking", function () {
             console.log("Calling distribute obtained L2 to L1 OLAS to veOLAS and stOLAS by agent or manually");
             await distributor.distribute();
 
-            // Update st total assets
-            console.log("Calling OLAS total assets on stOLAS update by agent or manually");
-            await st.updateTotalAssets();
-
             stTotalAssets = await st.totalAssets();
             console.log("OLAS total assets on stOLAS now:", stTotalAssets.toString());
 
@@ -868,10 +856,6 @@ describe("Liquid Staking", function () {
             // Distribute OLAS to veOLAS and stOLAS
             console.log("Calling distribute obtained L2 to L1 OLAS to veOLAS and stOLAS by agent or manually");
             await distributor.distribute();
-
-            // Update st total assets
-            console.log("Calling OLAS total assets on stOLAS update by agent or manually");
-            await st.updateTotalAssets();
 
             stTotalAssets = await st.totalAssets();
             console.log("OLAS total assets on stOLAS now:", stTotalAssets.toString());
@@ -1020,10 +1004,6 @@ describe("Liquid Staking", function () {
             // Distribute OLAS to veOLAS and stOLAS
             console.log("Calling distribute obtained L2 to L1 OLAS to veOLAS and stOLAS by agent or manually");
             await distributor.distribute();
-
-            // Update st total assets
-            console.log("Calling OLAS total assets on stOLAS update by agent or manually");
-            await st.updateTotalAssets();
 
             let stakedBalanceAfter = await st.stakedBalance();
             let vaultBalanceAfter = await st.vaultBalance();
@@ -1252,10 +1232,6 @@ describe("Liquid Staking", function () {
                 // Distribute OLAS to veOLAS and stOLAS
                 console.log("Calling distribute obtained L2 to L1 OLAS to veOLAS and stOLAS by agent or manually");
                 await distributor.distribute();
-
-                // Update st total assets
-                console.log("Calling OLAS total assets on stOLAS update by agent or manually");
-                await st.updateTotalAssets();
 
                 console.log("stakedBalance after distribute:", await st.stakedBalance());
                 console.log("vaultBalance after distribute:", await st.vaultBalance());
