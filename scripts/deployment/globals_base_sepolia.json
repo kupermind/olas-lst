@@ -31,10 +31,10 @@
   "apyLimit": "3000000000000000000",
   "stakingVerifierAddress": "0xA9D794548486D15BfbCe2b8b5F5518b739fa8A4b",
   "stakingFactoryAddress": "0x661E609d03bb63819f2F47b9202E15e1826f5B5f",
-  "distributorProxyAddress": "0x9D54Ce975f9B2aeF50a999f98C247a8a7b1cC24b",
-  "treasuryProxyAddress": "0xD5533F43fd709a11351fC1a62bF0278F70a96F02",
-  "unstakeRelayerProxyAddress": "0x789B8c39EFEc3bCaB1DB232eC4a86E5ae2797d27",
-  "baseDepositProcessorL1Address": "0x721555b1b67f984BfC0bB845349F30A74E14507F",
+  "distributorProxyAddress": "0x7dCb187ECD8D21EE2bb61a14AA1d6E0b8e5F6553",
+  "unstakeRelayerProxyAddress": "0xD580DDa6a97F9d69FC80900d7fef3b1aFFAF4cB5",
+  "treasuryProxyAddress": "0x849087431F73B9ee47D3488A71Aa0f47C228d1e7",
+  "baseDepositProcessorL1Address": "0x20a94C8dbDD9EF5924Bc78C0B5b18c96765D2aB8",
   "collectorAddress": "0x069BDcCB3Adf203bbA81DE28d6467198699e6dfc",
   "collectorProxyAddress": "0x910Ca843Cad6C050Faf3f84387879b2928D40370",
   "activityModuleAddress": "0x80c3aEB23FaC4071CDd7055F36b817e19dF60CDA",
@@ -47,7 +47,7 @@
   "stakingManagerProxyAddress": "0x0CF8ad7AD779157a253964036af0e95f625EA27c",
   "moduleActivityCheckerAddress": "0x7E335396a9804097Fd7c04F8b3adc314Ca9398A0",
   "stakingTokenLockedAddress": "0x3070692B3A338ac2B583419c33CFeE641FC10c26",
-  "baseStakingProcessorL2Address": "0xd17D637C09332b57DFd272925F5b45Fa7FD44a40",
+  "baseStakingProcessorL2Address": "0x7455f97804eB6d2bfA6d377a3BBbd654cb2AAb82",
   "stakingHelperAddress": "0x56B83C1E457ae25F64936cCDCb6eD7d2DE828672",
   "stakingProxyAddress": ""
 }

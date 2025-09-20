@@ -58,7 +58,5 @@
 ./scripts/deployment/script_l1_05_ve_initial_lock.sh $1
 
 ## !!!!! Create Staking Proxies first !!!!!
-./scripts/deployment/script_l1_06_add_staking_model.sh $1
-
 # Add staking model: globals, network, chainId
-./scripts/deployment/script_l1_06_add_staking_model.sh $1 $2 $3
+./scripts/deployment/script_l1_06_add_staking_models.sh $1 $2 $3
