@@ -14,7 +14,8 @@ import {ServiceRegistryL2} from "../../lib/autonolas-registries/contracts/Servic
 import {ServiceRegistryTokenUtility} from "../../lib/autonolas-registries/contracts/ServiceRegistryTokenUtility.sol";
 import {ServiceManagerToken} from "../../lib/autonolas-registries/contracts/ServiceManagerToken.sol";
 import {GnosisSafeMultisig} from "../../lib/autonolas-registries/contracts/multisigs/GnosisSafeMultisig.sol";
-import {GnosisSafeSameAddressMultisig} from "../../lib/autonolas-registries/contracts/multisigs/GnosisSafeSameAddressMultisig.sol";
+import {GnosisSafeSameAddressMultisig} from
+    "../../lib/autonolas-registries/contracts/multisigs/GnosisSafeSameAddressMultisig.sol";
 import {StakingVerifier} from "../../lib/autonolas-registries/contracts/staking/StakingVerifier.sol";
 import {StakingFactory} from "../../lib/autonolas-registries/contracts/staking/StakingFactory.sol";
 import {ERC20Token} from "../../lib/autonolas-registries/contracts/test/ERC20Token.sol";

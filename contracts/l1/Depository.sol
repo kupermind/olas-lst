@@ -10,7 +10,9 @@ interface IDepositProcessor {
     /// @param amount Corresponding staking amount.
     /// @param bridgePayload Bridge payload necessary (if required) for a specific bridge relayer.
     /// @param operation Funds operation: stake / unstake.
-    function sendMessage(address target, uint256 amount, bytes memory bridgePayload, bytes32 operation) external payable;
+    function sendMessage(address target, uint256 amount, bytes memory bridgePayload, bytes32 operation)
+        external
+        payable;
 }
 
 interface IST {
@@ -76,7 +78,6 @@ error ReentrancyGuard();
 /// @dev Contract is paused.
 error Paused();
 
-
 // Product type enum
 enum ProductType {
     Alpha,
@@ -103,18 +104,24 @@ struct StakingModel {
     StakingModelStatus status;
 }
 
-
 /// @title Depository - Smart contract for the stOLAS Depository.
 contract Depository is Implementation {
     event TreasuryUpdated(address indexed treasury);
     event LzOracleUpdated(address indexed lzOracle);
     event ProductTypeUpdated(ProductType productType);
     event SetDepositProcessorChainIds(address[] depositProcessors, uint256[] chainIds);
-    event StakingModelActivated(uint256 indexed chainId, address indexed stakingProxy, uint256 stakeLimitPerSlots,
-        uint256 numSlots);
+    event StakingModelActivated(
+        uint256 indexed chainId, address indexed stakingProxy, uint256 stakeLimitPerSlots, uint256 numSlots
+    );
     event StakingModelStatusSet(uint256 indexed chainId, address indexed stakingProxy, StakingModelStatus status);
-    event Deposit(address indexed sender, uint256 stakeAmount, uint256 stAmount, uint256[] chainIds,
-        address[] stakingProxies, uint256[] amounts);
+    event Deposit(
+        address indexed sender,
+        uint256 stakeAmount,
+        uint256 stAmount,
+        uint256[] chainIds,
+        address[] stakingProxies,
+        uint256[] amounts
+    );
     event Unstake(address indexed sender, uint256[] chainIds, address[] stakingProxies, uint256[] amounts);
     event Retired(uint256[] chainIds, address[] stakingProxies);
     event PausedDepository();
@@ -272,13 +279,14 @@ contract Depository is Implementation {
             }
 
             // Perform operation on corresponding Staker on L2
-            IDepositProcessor(depositProcessor).sendMessage{value: values[i]}(stakingProxies[i], amounts[i],
-                bridgePayloads[i], operation);
+            IDepositProcessor(depositProcessor).sendMessage{value: values[i]}(
+                stakingProxies[i], amounts[i], bridgePayloads[i], operation
+            );
         }
     }
 
     /// @dev Depository initializer.
-    function initialize() external{
+    function initialize() external {
         // Check for already initialized
         if (owner != address(0)) {
             revert AlreadyInitialized();
@@ -329,7 +337,7 @@ contract Depository is Implementation {
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);
         }
-        
+
         productType = newProductType;
         emit ProductTypeUpdated(newProductType);
     }
@@ -381,8 +389,10 @@ contract Depository is Implementation {
         }
 
         // Check for array lengths
-        if (chainIds.length == 0 || chainIds.length != stakingProxies.length || chainIds.length != numSlots.length ||
-            chainIds.length != stakeLimitPerSlots.length) {
+        if (
+            chainIds.length == 0 || chainIds.length != stakingProxies.length || chainIds.length != numSlots.length
+                || chainIds.length != stakeLimitPerSlots.length
+        ) {
             revert WrongArrayLength();
         }
 
@@ -480,9 +490,10 @@ contract Depository is Implementation {
         }
 
         // Check for contract product type and limits
-        if ((productType == ProductType.Alpha && stakeAmount > ALPHA_DEPOSIT_LIMIT) ||
-            (productType == ProductType.Beta && stakeAmount > BETA_DEPOSIT_LIMIT))
-        {
+        if (
+            (productType == ProductType.Alpha && stakeAmount > ALPHA_DEPOSIT_LIMIT)
+                || (productType == ProductType.Beta && stakeAmount > BETA_DEPOSIT_LIMIT)
+        ) {
             revert ProductTypeDepositOverflow(uint8(productType), stakeAmount);
         }
 
@@ -492,9 +503,10 @@ contract Depository is Implementation {
         }
 
         // Check for array lengths
-        if (chainIds.length != stakingProxies.length || chainIds.length != bridgePayloads.length ||
-            chainIds.length != values.length)
-        {
+        if (
+            chainIds.length != stakingProxies.length || chainIds.length != bridgePayloads.length
+                || chainIds.length != values.length
+        ) {
             revert WrongArrayLength();
         }
 
@@ -634,8 +646,10 @@ contract Depository is Implementation {
         }
 
         // Check array lengths
-        if (chainIds.length == 0 || chainIds.length != stakingProxies.length ||
-            chainIds.length != bridgePayloads.length || chainIds.length != values.length) {
+        if (
+            chainIds.length == 0 || chainIds.length != stakingProxies.length || chainIds.length != bridgePayloads.length
+                || chainIds.length != values.length
+        ) {
             revert WrongArrayLength();
         }
 
@@ -709,8 +723,10 @@ contract Depository is Implementation {
         _locked = true;
 
         // Check array lengths
-        if (chainIds.length == 0 || chainIds.length != stakingProxies.length ||
-            chainIds.length != bridgePayloads.length || chainIds.length != values.length) {
+        if (
+            chainIds.length == 0 || chainIds.length != stakingProxies.length || chainIds.length != bridgePayloads.length
+                || chainIds.length != values.length
+        ) {
             revert WrongArrayLength();
         }
 

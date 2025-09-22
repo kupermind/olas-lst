@@ -57,7 +57,7 @@ contract MockVE {
     }
 
     /// @dev Gets the account balance at a specific block number.
-    function balanceOfAt(address, uint256) external view returns (uint256){
+    function balanceOfAt(address, uint256) external view returns (uint256) {
         return balance;
     }
 

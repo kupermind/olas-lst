@@ -26,7 +26,6 @@ interface IBridge {
 /// @dev Zero value only allowed
 error ZeroValueOnly();
 
-
 /// @title GnosisStakingProcessorL2 - Smart contract for processing tokens and data received on Gnosis L2, and tokens sent back to L1.
 contract GnosisStakingProcessorL2 is DefaultStakingProcessorL2 {
     /// @dev GnosisTargetDispenserL2 constructor.
@@ -46,8 +45,15 @@ contract GnosisStakingProcessorL2 is DefaultStakingProcessorL2 {
         address _l1DepositProcessor,
         uint256 _l1SourceChainId
     )
-        DefaultStakingProcessorL2(_olas, _stakingManager, _collector, _l2TokenRelayer, _l2MessageRelayer,
-            _l1DepositProcessor, _l1SourceChainId)
+        DefaultStakingProcessorL2(
+            _olas,
+            _stakingManager,
+            _collector,
+            _l2TokenRelayer,
+            _l2MessageRelayer,
+            _l1DepositProcessor,
+            _l1SourceChainId
+        )
     {}
 
     /// @dev Processes a message received from the AMB Contract Proxy (Home) contract.
@@ -61,7 +67,7 @@ contract GnosisStakingProcessorL2 is DefaultStakingProcessorL2 {
     }
 
     /// @inheritdoc DefaultStakingProcessorL2
-    function relayToL1(address to, uint256 olasAmount, bytes memory) external virtual override payable {
+    function relayToL1(address to, uint256 olasAmount, bytes memory) external payable virtual override {
         // msg.value must be zero
         if (msg.value > 0) {
             revert ZeroValueOnly();

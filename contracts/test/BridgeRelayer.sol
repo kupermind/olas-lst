@@ -61,6 +61,7 @@ contract BridgeRelayer {
         WrongNumTokens,
         WrongDeliveryHash
     }
+
     Mode public mode;
 
     constructor(address _token) {
@@ -157,7 +158,7 @@ contract BridgeRelayer {
         uint256,
         bytes calldata data
     ) external payable returns (uint256) {
-        (bool success, ) = to.call(data);
+        (bool success,) = to.call(data);
 
         if (success) {
             return 0;
@@ -185,7 +186,7 @@ contract BridgeRelayer {
     /// @return a unique identifier for this L2-to-L1 transaction.
     function sendTxToL1(address destination, bytes calldata data) external payable returns (uint256) {
         destination = arbitrumDepositProcessorL1;
-        (bool success, ) = destination.call(data);
+        (bool success,) = destination.call(data);
 
         if (success) {
             return 0;
@@ -202,7 +203,6 @@ contract BridgeRelayer {
             return address(uint160(address(this)) - offset);
         }
     }
-
 
     // !!!!!!!!!!!!!!!!!!!!! GNOSIS FUNCTIONS !!!!!!!!!!!!!!!!!!!!!
     // Contract: AMB Contract Proxy Foreign
@@ -244,7 +244,6 @@ contract BridgeRelayer {
         }
     }
 
-
     // !!!!!!!!!!!!!!!!!!!!! OPTIMISM FUNCTIONS !!!!!!!!!!!!!!!!!!!!!
     // Source: https://github.com/ethereum-optimism/optimism/blob/65ec61dde94ffa93342728d324fecf474d228e1f/packages/contracts-bedrock/contracts/L1/L1StandardBridge.sol#L188
     // Doc: https://docs.optimism.io/builders/app-developers/bridging/standard-bridge#architecture
@@ -259,14 +258,7 @@ contract BridgeRelayer {
     // @param extraData   Optional data to forward to L2. Data supplied here will not be used to
     //                     execute any code on L2 and is only emitted as extra data for the
     //                     convenience of off-chain tooling.
-    function depositERC20To(
-        address l1Token,
-        address,
-        address to,
-        uint256 amount,
-        uint32,
-        bytes calldata
-    ) external {
+    function depositERC20To(address l1Token, address, address to, uint256 amount, uint32, bytes calldata) external {
         IToken(l1Token).transferFrom(msg.sender, address(this), amount);
         IToken(l1Token).transfer(to, amount);
     }
@@ -281,13 +273,9 @@ contract BridgeRelayer {
     // @param target      Target contract or wallet address.
     // @param message     Message to trigger the target address with.
     // @param minGasLimit Minimum gas limit that the message can be executed with.
-    function sendMessage(
-        address target,
-        bytes calldata message,
-        uint32
-    ) external payable {
+    function sendMessage(address target, bytes calldata message, uint32) external payable {
         sender = msg.sender;
-        (bool success, ) = target.call(message);
+        (bool success,) = target.call(message);
 
         if (!success) {
             revert();
@@ -305,7 +293,6 @@ contract BridgeRelayer {
         return sender;
     }
 
-
     // !!!!!!!!!!!!!!!!!!!!! POLYGON FUNCTIONS !!!!!!!!!!!!!!!!!!!!!
     // Source: https://github.com/maticnetwork/pos-portal/blob/master/flat/RootChainManager.sol#L2173
     /// @notice Move tokens from root to child chain
@@ -319,13 +306,11 @@ contract BridgeRelayer {
         IToken(rootToken).transfer(user, amount);
     }
 
-
     // Source: https://github.com/0xPolygon/fx-portal/blob/731959279a77b0779f8a1eccdaea710e0babee19/contracts/FxRoot.sol#L29
     function sendMessageToChild(address receiver, bytes calldata data) external {
         // Source: https://github.com/0xPolygon/fx-portal/blob/731959279a77b0779f8a1eccdaea710e0babee19/contracts/tunnel/FxBaseChildTunnel.sol#L36
         IBridgeRelayer(receiver).processMessageFromRoot(0, msg.sender, data);
     }
-
 
     // !!!!!!!!!!!!!!!!!!!!! WORMHOLE FUNCTIONS !!!!!!!!!!!!!!!!!!!!!
     // @notice VaaKey identifies a wormhole message
@@ -379,19 +364,16 @@ contract BridgeRelayer {
         bytes32 hash;
     }
 
-    function transferTokensWithPayload(
-        address l1Token,
-        uint256 amount,
-        uint16,
-        bytes32 recipient,
-        uint32,
-        bytes memory
-    ) external payable returns (uint64 sequence) {
+    function transferTokensWithPayload(address l1Token, uint256 amount, uint16, bytes32 recipient, uint32, bytes memory)
+        external
+        payable
+        returns (uint64 sequence)
+    {
         IToken(l1Token).transferFrom(msg.sender, address(this), amount);
         IToken(l1Token).transfer(address(uint160(uint256(recipient))), amount);
         sequence = 0;
     }
-    
+
     // @notice Returns the price to request a relay to chain `targetChain`, using the default delivery provider
     //
     // @param targetChain in Wormhole Chain ID format
@@ -404,7 +386,10 @@ contract BridgeRelayer {
     //         promise by the delivery provider of the amount of refund per gas unused that will be returned to the refundAddress at the target chain.
     //         If a delivery provider decides to override, this will be visible as part of the emitted Delivery event on the target chain.
     function quoteEVMDeliveryPrice(uint16, uint256, uint256)
-        external pure returns (uint256 nativePriceQuote, uint256 targetChainRefundPerGasUnused) {
+        external
+        pure
+        returns (uint256 nativePriceQuote, uint256 targetChainRefundPerGasUnused)
+    {
         nativePriceQuote = 1;
         targetChainRefundPerGasUnused = 1;
     }
@@ -419,7 +404,7 @@ contract BridgeRelayer {
         }
         return 1;
     }
-    
+
     // @notice Publishes an instruction for the default delivery provider
     // to relay a payload and VAAs specified by `vaaKeys` to the address `targetAddress` on chain `targetChain`
     // with gas limit `gasLimit` and `msg.value` equal to `receiverValue`
@@ -460,8 +445,9 @@ contract BridgeRelayer {
             additionalVaas = new bytes[](2);
         }
 
-        IBridgeRelayer(targetAddress).receiveWormholeMessages(payload, additionalVaas,
-            bytes32(uint256(uint160(msg.sender))), targetChain, bytes32(nonce));
+        IBridgeRelayer(targetAddress).receiveWormholeMessages(
+            payload, additionalVaas, bytes32(uint256(uint160(msg.sender))), targetChain, bytes32(nonce)
+        );
 
         if (mode != Mode.WrongDeliveryHash) {
             nonce++;
@@ -528,8 +514,9 @@ contract BridgeRelayer {
             targetChain = 0;
         }
 
-        IBridgeRelayer(targetAddress).receiveWormholeMessages(payload, new bytes[](0),
-            bytes32(uint256(uint160(msg.sender))), targetChain, bytes32(nonce));
+        IBridgeRelayer(targetAddress).receiveWormholeMessages(
+            payload, new bytes[](0), bytes32(uint256(uint160(msg.sender))), targetChain, bytes32(nonce)
+        );
 
         if (mode != Mode.WrongDeliveryHash) {
             nonce++;

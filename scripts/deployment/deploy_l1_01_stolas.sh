@@ -21,7 +21,7 @@ reset=$(tput sgr0)
 globals="$(dirname "$0")/globals_$1.json"
 if [ ! -f $globals ]; then
   echo "${red}!!! $globals is not found${reset}"
-  exit 0
+  exit 1
 fi
 
 contractName="stOLAS"
@@ -39,13 +39,13 @@ if [ $chainId == 1 ]; then
   API_KEY=$ALCHEMY_API_KEY_MAINNET
   if [ "$API_KEY" == "" ]; then
       echo "set ALCHEMY_API_KEY_MAINNET env variable"
-      exit 0
+      exit 1
   fi
 elif [ $chainId == 11155111 ]; then
     API_KEY=$ALCHEMY_API_KEY_SEPOLIA
     if [ "$API_KEY" == "" ]; then
         echo "set ALCHEMY_API_KEY_SEPOLIA env variable"
-        exit 0
+        exit 1
     fi
 fi
 
@@ -79,7 +79,7 @@ outputLength=${#stOLASAddress}
 # Check for the deployed address
 if [ $outputLength != 42 ]; then
   echo "${red}!!! The contract was not deployed...${reset}"
-  exit 0
+  exit 1
 fi
 
 

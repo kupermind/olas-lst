@@ -23,7 +23,10 @@ interface IMultiSend {
 }
 
 interface ISafe {
-    enum Operation {Call, DelegateCall}
+    enum Operation {
+        Call,
+        DelegateCall
+    }
 
     function nonce() external returns (uint256);
 
@@ -46,9 +49,18 @@ interface ISafe {
     /// @param gasToken Token address (or 0 if ETH) that is used for the payment.
     /// @param refundReceiver Address of receiver of gas payment (or 0 if tx.origin).
     /// @param signatures Packed signature data ({bytes32 r}{bytes32 s}{uint8 v})
-    function execTransaction(address to, uint256 value, bytes calldata data, Operation operation, uint256 safeTxGas,
-        uint256 baseGas, uint256 gasPrice, address gasToken, address payable refundReceiver, bytes memory signatures)
-        external payable returns (bool success);
+    function execTransaction(
+        address to,
+        uint256 value,
+        bytes calldata data,
+        Operation operation,
+        uint256 safeTxGas,
+        uint256 baseGas,
+        uint256 gasPrice,
+        address gasToken,
+        address payable refundReceiver,
+        bytes memory signatures
+    ) external payable returns (bool success);
 
     /// @dev Returns hash to be signed by owners.
     /// @param to Destination address.
@@ -62,17 +74,27 @@ interface ISafe {
     /// @param refundReceiver Address of receiver of gas payment (or 0 if tx.origin).
     /// @param _nonce Transaction nonce.
     /// @return Transaction hash.
-    function getTransactionHash(address to, uint256 value, bytes calldata data, Operation operation, uint256 safeTxGas,
-        uint256 baseGas, uint256 gasPrice, address gasToken, address refundReceiver, uint256 _nonce)
-        external view returns (bytes32);
+    function getTransactionHash(
+        address to,
+        uint256 value,
+        bytes calldata data,
+        Operation operation,
+        uint256 safeTxGas,
+        uint256 baseGas,
+        uint256 gasPrice,
+        address gasToken,
+        address refundReceiver,
+        uint256 _nonce
+    ) external view returns (bytes32);
 
     /// @dev Allows a Module to execute a Safe transaction without any further confirmations.
     /// @param to Destination address of module transaction.
     /// @param value Ether value of module transaction.
     /// @param data Data payload of module transaction.
     /// @param operation Operation type of module transaction.
-    function execTransactionFromModule(address to, uint256 value, bytes memory data,
-        Operation operation) external returns (bool success);
+    function execTransactionFromModule(address to, uint256 value, bytes memory data, Operation operation)
+        external
+        returns (bool success);
 }
 
 interface IStakingManager {
@@ -179,14 +201,16 @@ contract ActivityModule {
             // Encode collector top-up function call
             data = abi.encodeCall(ICollector.topUpBalance, (balance, REWARD));
             // Concatenate multi send payload with the packed data of (operation, multisig address, value(0), payload length, payload)
-            msPayload = bytes.concat(msPayload, abi.encodePacked(ISafe.Operation.Call, collector, uint256(0),
-                data.length, data));
+            msPayload = bytes.concat(
+                msPayload, abi.encodePacked(ISafe.Operation.Call, collector, uint256(0), data.length, data)
+            );
 
             // Multisend call to execute all the payloads
             msPayload = abi.encodeCall(IMultiSend.multiSend, (msPayload));
 
             // Execute module call
-            bool success = ISafe(multisig).execTransactionFromModule(multiSend, 0, msPayload, ISafe.Operation.DelegateCall);
+            bool success =
+                ISafe(multisig).execTransactionFromModule(multiSend, 0, msPayload, ISafe.Operation.DelegateCall);
 
             // Check for success
             if (!success) {
@@ -250,15 +274,17 @@ contract ActivityModule {
             revert AlreadyInitialized();
         }
 
-        bytes32 txHash = ISafe(multisig).getTransactionHash(multisig, 0, data, ISafe.Operation.Call, 0, 0, 0,
-            address(0), address(0), nonce);
+        bytes32 txHash = ISafe(multisig).getTransactionHash(
+            multisig, 0, data, ISafe.Operation.Call, 0, 0, 0, address(0), address(0), nonce
+        );
 
         // Approve hash
         ISafe(multisig).approveHash(txHash);
 
         // Execute multisig transaction
-        ISafe(multisig).execTransaction(multisig, 0, data, ISafe.Operation.Call, 0, 0, 0, address(0),
-            payable(address(0)), signature);
+        ISafe(multisig).execTransaction(
+            multisig, 0, data, ISafe.Operation.Call, 0, 0, 0, address(0), payable(address(0)), signature
+        );
 
         _locked = 1;
     }
