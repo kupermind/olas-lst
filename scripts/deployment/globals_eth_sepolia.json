@@ -9,7 +9,7 @@
   "veOLASAddress": "0xbdcB6B1Aa07b1a2e21aBB8849E2727568C04bcD8",
   "baseOLASAddress": "0x48033A738FeAE58ea5558673db9f21c0cD3F1896",
   "timelockAddress": "0x31D3202d8744B16A120117A053459DDFAE93c855",
-  "olasGovernorAddress": "0x8e84b5055492901988b831817e4ace5275a3b401",
+  "olasGovernorAddress": "0x8E84B5055492901988B831817e4Ace5275A3b401",
   "gnosisOmniBridgeAddress": "0x63e47c5e3303dddcaf3b404b1ccf9eb633652e9e",
   "gnosisAMBForeignAddress": "0xf2546D6648BD2af6a008A7e7C1542BB240329E11",
   "baseL1StandardBridgeProxyAddress": "0xfd0Bf71F60660E2f608ed56e1659C450eB113120",

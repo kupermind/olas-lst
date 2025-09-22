@@ -35,7 +35,7 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
     uint256 public constant MESSAGE_GAS_LIMIT = 2_000_000;
     // OLAS token address
     address public immutable olas;
-    // L1 tokenomics depository address
+    // L1 depository address
     address public immutable l1Depository;
     // L1 token relayer bridging contract address
     address public immutable l1TokenRelayer;
@@ -45,15 +45,15 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
     address public l2StakingProcessor;
     // Contract owner until the time when the l2StakingProcessor is set
     address public owner;
-    // Nonce for each staking batch
-    uint256 public stakingBatchNonce;
+    // Nonce for each message batch
+    uint256 public messageBatchNonce;
 
     // Processed batch hashes
     mapping(bytes32 => bool) public processedHashes;
 
     /// @dev DefaultDepositProcessorL1 constructor.
     /// @param _olas OLAS token address on L1.
-    /// @param _l1Depository L1 tokenomics depository address.
+    /// @param _l1Depository L1 depository address.
     /// @param _l1TokenRelayer L1 token relayer bridging contract address.
     /// @param _l1MessageRelayer L1 message relayer bridging contract address.
     constructor(address _olas, address _l1Depository, address _l1TokenRelayer, address _l1MessageRelayer) {
@@ -107,7 +107,7 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
         }
 
         // Get the batch hash
-        uint256 batchNonce = stakingBatchNonce;
+        uint256 batchNonce = messageBatchNonce;
         bytes32 batchHash = keccak256(abi.encode(batchNonce, address(this), block.timestamp, block.chainid));
 
         // Send the message to L2
@@ -123,7 +123,7 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
         }
 
         // Increase the staking batch nonce
-        stakingBatchNonce = batchNonce + 1;
+        messageBatchNonce = batchNonce + 1;
 
         emit MessagePosted(sequence, target, amount, batchHash);
     }

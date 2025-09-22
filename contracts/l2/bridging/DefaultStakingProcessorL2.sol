@@ -103,7 +103,7 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
     // Owner address (Timelock or bridge mediator)
     address public owner;
     // Pause switcher
-    uint8 public paused;
+    uint256 public paused;
     // Reentrancy lock
     uint256 internal _locked;
 
