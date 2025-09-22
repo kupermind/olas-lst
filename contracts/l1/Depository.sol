@@ -124,8 +124,8 @@ contract Depository is Implementation {
     );
     event Unstake(address indexed sender, uint256[] chainIds, address[] stakingProxies, uint256[] amounts);
     event Retired(uint256[] chainIds, address[] stakingProxies);
-    event PausedDepository();
-    event UnpausedDepository();
+    event DepositoryPaused();
+    event DepositoryUnpaused();
 
     // Depository version
     string public constant VERSION = "0.1.0";
@@ -150,10 +150,10 @@ contract Depository is Implementation {
     // Layer Zero oracle
     address public lzOracle;
 
-    // Contract pause status
-    bool public paused;
     // Product type value
     ProductType public productType;
+    // Pause switcher
+    uint256 public paused;
 
     // Reentrancy lock
     bool transient _locked;
@@ -292,8 +292,9 @@ contract Depository is Implementation {
             revert AlreadyInitialized();
         }
 
-        productType = ProductType.Alpha;
         owner = msg.sender;
+        productType = ProductType.Alpha;
+        paused = 1;
     }
 
     /// @dev Changes Treasury contract address.
@@ -485,7 +486,7 @@ contract Depository is Implementation {
         _locked = true;
 
         // Check if contract is paused
-        if (paused) {
+        if (paused == 2) {
             revert Paused();
         }
 
@@ -814,8 +815,8 @@ contract Depository is Implementation {
             revert OwnerOnly(msg.sender, owner);
         }
 
-        paused = true;
-        emit PausedDepository();
+        paused = 2;
+        emit DepositoryPaused();
     }
 
     /// @dev Unpauses contract.
@@ -825,8 +826,8 @@ contract Depository is Implementation {
             revert OwnerOnly(msg.sender, owner);
         }
 
-        paused = false;
-        emit UnpausedDepository();
+        paused = 1;
+        emit DepositoryUnpaused();
     }
 
     /// @dev Gets staking model Id by provided chain Id and staking proxy address.
