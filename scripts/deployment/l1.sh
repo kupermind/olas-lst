@@ -1,3 +1,7 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
 # Deploy stOLAS
 ./scripts/deployment/deploy_l1_01_stolas.sh $1
 
@@ -31,6 +35,9 @@
 # Deploy TreasuryProxy
 ./scripts/deployment/deploy_l1_11_treasury_proxy.sh $1
 
+# Change managers in stOLAS and Depository
+./scripts/deployment/script_l1_01_initialize_stolas.sh $1
+
 # Deploy GnosisDepositProcessorL1
 ./scripts/deployment/deploy_l1_12_gnosis_deposit_processor.sh $1
 
@@ -39,9 +46,6 @@
 
 # Deploy LzOracle
 ./scripts/deployment/deploy_l1_14_lz_oracle.sh $1
-
-# Change managers in stOLAS and Depository
-./scripts/deployment/script_l1_01_initialize_stolas.sh $1
 
 # Change LzOracle address in Depository
 ./scripts/deployment/script_l1_02_change_lz_oracle.sh $1

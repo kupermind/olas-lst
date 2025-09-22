@@ -64,17 +64,19 @@ error UnauthorizedAccount(address account);
 /// @dev Caught reentrancy violation.
 error ReentrancyGuard();
 
-
 /// @title StakingManager - Smart contract for OLAS staking management
 contract StakingManager is Implementation, ERC721TokenReceiver {
     event StakingProcessorL2Updated(address indexed l2StakingProcessor);
-    event StakingBalanceUpdated(bytes32 indexed operation, address indexed stakingProxy, uint256 numStakes,
-        uint256 balance);
+    event StakingBalanceUpdated(
+        bytes32 indexed operation, address indexed stakingProxy, uint256 numStakes, uint256 balance
+    );
     event Staked(address indexed stakingProxy, uint256 indexed serviceId, address activityModule);
     event Unstaked(address indexed stakingProxy, uint256 indexed serviceId, address activityModule);
     event CreatedAndDeployed(uint256 indexed serviceId, address indexed multisig, address indexed activityModule);
     event ReDeployed(uint256 indexed serviceId, address indexed multisig, address indexed activityModule);
-    event Claimed(address indexed stakingProxy, uint256 indexed serviceId, address indexed activityModule, uint256 reward);
+    event Claimed(
+        address indexed stakingProxy, uint256 indexed serviceId, address indexed activityModule, uint256 reward
+    );
     event NativeTokenReceived(uint256 amount);
 
     // Staking Manager version
@@ -153,10 +155,11 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         bytes32 _configHash
     ) {
         // Check for zero addresses
-        if (_olas == address(0) || _serviceManager == address(0) || _stakingFactory == address(0) ||
-            _safeModuleInitializer ==address(0) || _safeL2 == address(0) || _beacon ==address(0) ||
-            _collector == address(0))
-        {
+        if (
+            _olas == address(0) || _serviceManager == address(0) || _stakingFactory == address(0)
+                || _safeModuleInitializer == address(0) || _safeL2 == address(0) || _beacon == address(0)
+                || _collector == address(0)
+        ) {
             revert ZeroAddress();
         }
 
@@ -183,11 +186,7 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
     /// @param _safeMultisig Safe multisig contract address.
     /// @param _safeSameAddressMultisig Safe same address multisig contract address.
     /// @param _fallbackHandler Fallback handler for service multisigs.
-    function initialize(
-        address _safeMultisig,
-        address _safeSameAddressMultisig,
-        address _fallbackHandler
-    ) external {
+    function initialize(address _safeMultisig, address _safeSameAddressMultisig, address _fallbackHandler) external {
         if (owner != address(0)) {
             revert AlreadyInitialized();
         }
@@ -225,10 +224,10 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
     /// @param minStakingDeposit Min staking deposit value.
     /// @return serviceId Minted service Id.
     /// @return multisig Service multisig.
-    function _createAndDeploy(
-        address token,
-        uint256 minStakingDeposit
-    ) internal returns (uint256 serviceId, address multisig, address activityModule) {
+    function _createAndDeploy(address token, uint256 minStakingDeposit)
+        internal
+        returns (uint256 serviceId, address multisig, address activityModule)
+    {
         // Set agent params
         IService.AgentParams[] memory agentParams = new IService.AgentParams[](NUM_AGENT_INSTANCES);
         agentParams[0] = IService.AgentParams(uint32(NUM_AGENT_INSTANCES), uint96(minStakingDeposit));
@@ -247,8 +246,8 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         instances[0] = activityModule;
 
         // Create a service owned by this contract
-        serviceId = IService(serviceManager).create(address(this), token, configHash, agentIds,
-            agentParams, uint32(THRESHOLD));
+        serviceId =
+            IService(serviceManager).create(address(this), token, configHash, agentIds, agentParams, uint32(THRESHOLD));
 
         // Record activity module
         mapServiceIdActivityModules[serviceId] = instances[0];
@@ -264,8 +263,9 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         uint256 randomNonce = uint256(keccak256(abi.encodePacked(block.timestamp, msg.sender, localNonce)));
         // Safe module payload
         bytes memory safeModulePayload = abi.encodeWithSignature("setupToL2(address)", safeL2);
-        bytes memory data = abi.encodePacked(safeModuleInitializer, fallbackHandler, address(0), address(0), uint256(0),
-            randomNonce, safeModulePayload);
+        bytes memory data = abi.encodePacked(
+            safeModuleInitializer, fallbackHandler, address(0), address(0), uint256(0), randomNonce, safeModulePayload
+        );
 
         // Deploy the service
         multisig = IService(serviceManager).deploy(serviceId, safeMultisig, data);
@@ -290,7 +290,7 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
 
         emit Staked(stakingProxy, serviceId, activityModule);
     }
-    
+
     /// @dev Creates and deploys a service, and stakes it with a specified staking contract.
     /// @notice The service cannot be registered again if it is currently staked.
     /// @param stakingProxy Corresponding staking instance address.
@@ -315,7 +315,7 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
     /// @param serviceId Service Id.
     function _deployAndStake(address stakingProxy, uint256 serviceId) internal {
         // Get the service multisig
-        (, address multisig, , , , , ) = IService(serviceRegistry).mapServices(serviceId);
+        (, address multisig,,,,,) = IService(serviceRegistry).mapServices(serviceId);
 
         // Activate registration (1 wei as a deposit wrapper)
         IService(serviceManager).activateRegistration{value: 1}(serviceId);
@@ -358,7 +358,7 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
 
         // Get OLAS from l2StakingProcessor
         IToken(olas).transferFrom(l2StakingProcessor, address(this), amount);
-        
+
         // Get current unstaked balance
         uint256 balance = mapStakingProxyBalances[stakingProxy];
         uint256 minStakingDeposit = IStaking(stakingProxy).minStakingDeposit();

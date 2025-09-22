@@ -23,28 +23,47 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v4
 
-      # Install modules
-      - name: Install modules
-        run: yarn install
+      # Install Python
+      - name: Install Python
+        uses: actions/setup-python@v4
+      
+      - name: Install and configure Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 2.1.4
+          virtualenvs-create: true
+          installer-parallel: true
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
 
+      # Install modules
+      - name: Install modules
+        run: make install
+
+      - name: Run formatting
+        run: make fmt
+
       # Run linters
       - name: Run ESLint
         run: ./node_modules/.bin/eslint . --ext .js,.jsx,.ts,.tsx
       - name: Run solhint
-        run: ./node_modules/.bin/solhint 'contracts/**/*.sol'
+        run: make lint
 
       # Compile the code and run tests
       - name: Compile the code
-        run: forge build
+        run: make build
       - name: Run Forge tests
-        run: forge test
+        run: make tests
       - name: Run Hardhat tests
-        run: yarn test:hardhat
+        run: make tests-hardhat
+
+      # - name: Check For changes
+      #   id: changes
+      #   run: |
+      #     git diff --exit-code
 
       # Run hardhat coverage and upload codecov report
       #- name: Solidity coverage summary

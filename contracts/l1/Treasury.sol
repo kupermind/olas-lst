@@ -13,8 +13,13 @@ interface IDepository {
     /// @param bridgePayloads Bridge payloads corresponding to each chain Id.
     /// @param values Value amounts for each bridge interaction, if applicable.
     /// @return amounts Corresponding OLAS amounts for each staking proxy.
-    function unstake(uint256 unstakeAmount, uint256[] memory chainIds, address[] memory stakingProxies,
-        bytes[] memory bridgePayloads, uint256[] memory values) external payable returns (uint256[] memory amounts);
+    function unstake(
+        uint256 unstakeAmount,
+        uint256[] memory chainIds,
+        address[] memory stakingProxies,
+        bytes[] memory bridgePayloads,
+        uint256[] memory values
+    ) external payable returns (uint256[] memory amounts);
 }
 
 interface IST {
@@ -25,7 +30,7 @@ interface IST {
     /// @return assets OLAS amount.
     function redeem(uint256 shares, address receiver, address owner) external returns (uint256 assets);
 
-    function stakedBalance() external returns(uint256);
+    function stakedBalance() external returns (uint256);
 }
 
 /// @dev Only `depository` has a privilege, but the `sender` was provided.
@@ -47,12 +52,12 @@ error Overflow(uint256 provided, uint256 max);
 /// @dev Caught reentrancy violation.
 error ReentrancyGuard();
 
-
 /// @title Treasury - Smart contract for treasury
 contract Treasury is Implementation, ERC6909 {
     event WithdrawDelayUpdates(uint256 withdrawDelay);
-    event WithdrawRequestInitiated(address indexed requester, uint256 indexed requestId, uint256 stAmount,
-        uint256 olasAmount, uint256 withdrawTime);
+    event WithdrawRequestInitiated(
+        address indexed requester, uint256 indexed requestId, uint256 stAmount, uint256 olasAmount, uint256 withdrawTime
+    );
     event WithdrawRequestExecuted(uint256 requestId, uint256 amount);
     event WithdrawAmountRequestedUpdated(uint256 withdrawAmountRequested);
 
@@ -87,7 +92,7 @@ contract Treasury is Implementation, ERC6909 {
     }
 
     /// @dev Treasury initializer.
-    function initialize(uint256 _withdrawDelay) external{
+    function initialize(uint256 _withdrawDelay) external {
         // Check for already initialized
         if (owner != address(0)) {
             revert AlreadyInitialized();

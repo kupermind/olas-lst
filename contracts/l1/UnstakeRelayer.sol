@@ -23,7 +23,6 @@ error UnauthorizedAccount(address account);
 /// @dev Caught reentrancy violation.
 error ReentrancyGuard();
 
-
 /// @title UnstakeRelayer - Smart contract for relaying funds obtained via bridging when unstaked from retired models.
 contract UnstakeRelayer is Implementation {
     event UnstakeRelayed(address indexed account, address indexed st, uint256 olasAmount);
@@ -45,7 +44,7 @@ contract UnstakeRelayer is Implementation {
     }
 
     /// @dev UnstakeRelayer initializer.
-    function initialize() external{
+    function initialize() external {
         // Check for already initialized
         if (owner != address(0)) {
             revert AlreadyInitialized();

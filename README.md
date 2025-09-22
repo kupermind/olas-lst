@@ -109,23 +109,23 @@ git clone --recursive https://github.com/kupermind/olas-lst.git
 cd olas-lst
 
 # Install dependencies
-yarn install
+make install
 ```
 
 ### Compilation and Testing
 
 ```bash
 # Compile contracts
-forge build
+make build
 
 # Run all tests
-forge test -vvv
+make tests
 
 # Run specific test file
 forge test --match-path "test/LiquidStaking.t.sol" -vv
 
 # Run Hardhat tests
-yarn test:hardhat
+make tests-hardhat
 ```
 
 ### Key Test Scenarios
@@ -227,6 +227,11 @@ Proposal Id: [`59025344683074789922169705239782887646995636661382504070382540682
 Proposal State: [Executed](https://etherscan.io/address/0x8e84b5055492901988b831817e4ace5275a3b401#readContract#F21)
 
 ## Documentation
+
+```
+make docs
+```
+The documentation is generated using the `doc` directory and includes:
 
 - [Technical Architecture](doc/architecture.md)
 - [Architecture Diagrams](doc/architecture-diagrams.md)

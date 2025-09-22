@@ -16,6 +16,9 @@
 # Deploy StakingManager Proxy
 ./scripts/deployment/deploy_l2_06_staking_manager_proxy.sh $1
 
+# Fund StakingManagerProxy
+./scripts/deployment/script_l2_01_fund_staking_manager.sh $1
+
 # Deploy ModuleActivityChecker
 ./scripts/deployment/deploy_l2_07_module_activity_checker.sh $1
 
@@ -29,10 +32,7 @@
 #./scripts/deployment/deploy_l2_10_base_staking_processor.sh $1
 
 # Change staking processors in CollectorProxy and StakingManagerProxy
-./scripts/deployment/script_l2_01_change_staking_processors.sh $1
-
-# Fund StakingManagerProxy
-./scripts/deployment/script_l2_02_fund_staking_manager.sh $1
+./scripts/deployment/script_l2_02_change_staking_processors.sh $1
 
 # Set operation receivers in Collector
 ./scripts/deployment/script_l2_03_set_operation_receivers_collector.sh $1

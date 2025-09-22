@@ -10,8 +10,12 @@ interface IGovernor {
     /// @param calldatas The ordered list of data to be passed to each individual function call during proposal execution.
     /// @param description A human readable description of the proposal and the changes it will enact.
     /// @return The Id of the newly created proposal.
-    function propose(address[] memory targets, uint256[] memory values, bytes[] memory calldatas,
-        string memory description) external returns (uint256);
+    function propose(
+        address[] memory targets,
+        uint256[] memory values,
+        bytes[] memory calldatas,
+        string memory description
+    ) external returns (uint256);
 
     /// @dev Casts a vote
     function castVote(uint256 proposalId, uint8 support) external returns (uint256);
@@ -106,7 +110,7 @@ contract Lock is Implementation {
     }
 
     /// @dev Lock initializer.
-    function initialize() external{
+    function initialize() external {
         // Check for already initialized
         if (owner != address(0)) {
             revert AlreadyInitialized();
@@ -114,10 +118,10 @@ contract Lock is Implementation {
 
         owner = msg.sender;
     }
-    
+
     /// @dev Changes OLAS governor address.
     /// @param newOlasGovernor New OLAS governor address.
-    function changeGovernor(address newOlasGovernor) external{
+    function changeGovernor(address newOlasGovernor) external {
         // Check for ownership
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);
@@ -127,7 +131,7 @@ contract Lock is Implementation {
         if (newOlasGovernor == address(0)) {
             revert ZeroAddress();
         }
-        
+
         olasGovernor = newOlasGovernor;
         emit OlasGovernorUpdated(newOlasGovernor);
     }
@@ -174,7 +178,7 @@ contract Lock is Implementation {
         // Increase unlock time to a maximum, if possible
         bytes memory increaseUnlockTimeData = abi.encodeCall(IVEOLAS.increaseUnlockTime, (MAX_LOCK_TIME));
         // Note: both success and failure are acceptable
-        (unlockTimeIncreased, ) = ve.call(increaseUnlockTimeData);
+        (unlockTimeIncreased,) = ve.call(increaseUnlockTimeData);
     }
 
     /// @dev Create a new proposal to change the protocol / contract parameters.
@@ -188,7 +192,7 @@ contract Lock is Implementation {
         uint256[] memory values,
         bytes[] memory calldatas,
         string memory description
-    ) external returns (uint256){
+    ) external returns (uint256) {
         // Check for ownership
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);

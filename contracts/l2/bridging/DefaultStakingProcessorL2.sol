@@ -69,9 +69,11 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
     event OwnerUpdated(address indexed owner);
     event FundsReceived(address indexed sender, uint256 value);
     event RequestExecuted(bytes32 indexed batchHash, address target, uint256 amount, bytes32 operation);
-    event RequestQueued(bytes32 indexed batchHash, address indexed target, uint256 amount, bytes32 operation, RequestStatus status);
+    event RequestQueued(
+        bytes32 indexed batchHash, address indexed target, uint256 amount, bytes32 operation, RequestStatus status
+    );
     event MessageReceived(address indexed sender, uint256 chainId, bytes data);
-    event Drain(address indexed owner, uint256 nativeAmount, uint256 olasAmount);
+    event Drain(address indexed owner, uint256 amount);
     event StakingProcessorPaused();
     event StakingProcessorUnpaused();
 
@@ -127,9 +129,10 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
         uint256 _l1SourceChainId
     ) {
         // Check for zero addresses
-        if (_olas == address(0) || _stakingManager == address(0) || _collector == address(0) ||
-            _l2TokenRelayer == address(0) || _l2MessageRelayer == address(0) || _l1DepositProcessor == address(0))
-        {
+        if (
+            _olas == address(0) || _stakingManager == address(0) || _collector == address(0)
+                || _l2TokenRelayer == address(0) || _l2MessageRelayer == address(0) || _l1DepositProcessor == address(0)
+        ) {
             revert ZeroAddress();
         }
 
@@ -187,15 +190,15 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
             if (paused == 1) {
                 // Get current OLAS balance
                 uint256 olasBalance = IToken(olas).balanceOf(address(this));
-    
+
                 // Check the OLAS balance and the contract being unpaused
                 if (olasBalance >= amount) {
                     // Approve OLAS for stakingManager
                     IToken(olas).approve(stakingManager, amount);
-    
+
                     // This is a low level call since it must never revert
                     bytes memory stakeData = abi.encodeCall(IStakingManager.stake, (target, amount, operation));
-                    (success, ) = stakingManager.call(stakeData);
+                    (success,) = stakingManager.call(stakeData);
                 } else {
                     // Insufficient OLAS balance
                     status = RequestStatus.INSUFFICIENT_OLAS_BALANCE;
@@ -208,7 +211,7 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
             // Note that if UNSTAKE* is requested, it must be finalized in any case since changes are recorded on L1
             // This is a low level call since it must never revert
             bytes memory unstakeData = abi.encodeCall(IStakingManager.unstake, (target, amount, operation));
-            (success, ) = stakingManager.call(unstakeData);
+            (success,) = stakingManager.call(unstakeData);
         } else {
             // Unsupported operation type
             status = RequestStatus.UNSUPPORTED_OPERATION_TYPE;
@@ -233,11 +236,7 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
     /// @param messageRelayer L2 bridge message relayer address.
     /// @param sourceProcessor L1 deposit processor address.
     /// @param data Bytes message data sent from L1.
-    function _receiveMessage(
-        address messageRelayer,
-        address sourceProcessor,
-        bytes memory data
-    ) internal virtual {
+    function _receiveMessage(address messageRelayer, address sourceProcessor, bytes memory data) internal virtual {
         // Check L2 message relayer address
         if (messageRelayer != l2MessageRelayer) {
             revert TargetRelayerOnly(messageRelayer, l2MessageRelayer);
@@ -337,24 +336,6 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
         _locked = 1;
     }
 
-    /// @dev Processes the data manually provided by the DAO in order to restore the data that was not delivered from L1.
-    /// @notice All the staking target addresses encoded in the data must follow the undelivered ones, and thus be unique.
-    ///         The data payload here must correspond to the exact data failed to be delivered (targets, incentives, batch).
-    ///         Here are possible bridge failure scenarios and the way to act via the DAO vote:
-    ///         - Both token and message delivery fails: re-send OLAS to the contract (separate vote), call this function;
-    ///         - Token transfer succeeds, message fails: call this function;
-    ///         - Token transfer fails, message succeeds: re-send OLAS to the contract (separate vote).
-    /// @param data Bytes message data that was not delivered from L1.
-    function processDataMaintenance(bytes memory data) external {
-        // Check for the contract ownership
-        if (msg.sender != owner) {
-            revert OwnerOnly(msg.sender, owner);
-        }
-
-        // Process the data
-        _processData(data);
-    }
-
     /// @dev Pause the contract.
     function pause() external {
         // Check for the contract ownership
@@ -380,8 +361,7 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
     /// @dev Drains contract native funds.
     /// @notice For cross-bridge leftovers and incorrectly sent funds.
     /// @return nativeAmount Drained native amount.
-    /// @return olasAmount Drained OLAS amount.
-    function drain() external returns (uint256 nativeAmount, uint256 olasAmount) {
+    function drain() external returns (uint256 nativeAmount) {
         // Reentrancy guard
         if (_locked > 1) {
             revert ReentrancyGuard();
@@ -396,22 +376,18 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
         // Drain leftover funds
         nativeAmount = address(this).balance;
 
-        if (nativeAmount > 0) {
-            // Send funds to owner
-            (bool success, ) = msg.sender.call{value: nativeAmount}("");
-            if (!success) {
-                revert TransferFailed(address(0), address(this), msg.sender, nativeAmount);
-            }
+        // Check for zero value
+        if (nativeAmount == 0) {
+            revert ZeroValue();
         }
 
-        // Get OLAS token amount
-        olasAmount = IToken(olas).balanceOf(address(this));
         // Send funds to owner
-        if (olasAmount > 0) {
-            IToken(olas).transfer(msg.sender, olasAmount);
+        (bool success,) = msg.sender.call{value: nativeAmount}("");
+        if (!success) {
+            revert TransferFailed(address(0), address(this), msg.sender, nativeAmount);
         }
 
-        emit Drain(msg.sender, nativeAmount, olasAmount);
+        emit Drain(msg.sender, nativeAmount);
 
         _locked = 1;
     }
@@ -420,19 +396,18 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
     /// @param to Address to send tokens to.
     /// @param olasAmount OLAS amount.
     /// @param bridgePayload Bridge payload.
-    function relayToL1(address to, uint256 olasAmount, bytes memory bridgePayload) external virtual payable;
+    function relayToL1(address to, uint256 olasAmount, bytes memory bridgePayload) external payable virtual;
 
     /// @dev Gets failed request queued hash.
     /// @param batchHash Batch hash.
     /// @param target Staking target address.
     /// @param amount Staking amount.
     /// @param operation Funds operation: stake / unstake.
-    function getQueuedHash(
-        bytes32 batchHash,
-        address target,
-        uint256 amount,
-        bytes32 operation
-    ) public view returns (bytes32) {
+    function getQueuedHash(bytes32 batchHash, address target, uint256 amount, bytes32 operation)
+        public
+        view
+        returns (bytes32)
+    {
         // Hash of batchHash + target + amount + operation + current target dispenser address
         return keccak256(abi.encode(batchHash, target, amount, operation, block.chainid, address(this)));
     }

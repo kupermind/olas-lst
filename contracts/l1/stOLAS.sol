@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import {ERC20, ERC4626, FixedPointMathLib} from  "../../lib/solmate/src/tokens/ERC4626.sol";
+import {ERC20, ERC4626, FixedPointMathLib} from "../../lib/solmate/src/tokens/ERC4626.sol";
 
 /// @dev Provided zero address.
 error ZeroAddress();
@@ -40,14 +40,16 @@ error UnstakeRelayerOnly(address sender, address unstakeRelayer);
 /// @dev The function is not implemented.
 error NotImplemented();
 
-
 /// @title stOLAS - Smart contract for the stOLAS token.
 contract stOLAS is ERC4626 {
     using FixedPointMathLib for uint256;
 
-    event Initialized(address indexed treasury, address indexed depository, address indexed dstributor,
-        address unstakeRelayer);
-    event TotalReservesUpdated(uint256 stakedBalance, uint256 vaultBalance, uint256 reserveBalance, uint256 totalReserves);
+    event Initialized(
+        address indexed treasury, address indexed depository, address indexed dstributor, address unstakeRelayer
+    );
+    event TotalReservesUpdated(
+        uint256 stakedBalance, uint256 vaultBalance, uint256 reserveBalance, uint256 totalReserves
+    );
 
     // Staked balance: funds allocated for staking contracts on different chains
     uint256 public stakedBalance;
@@ -69,9 +71,7 @@ contract stOLAS is ERC4626 {
 
     /// @dev stOLAS constructor.
     /// @param _olas OLAS token address.
-    constructor(ERC20 _olas)
-        ERC4626(_olas, "Staked OLAS", "stOLAS")
-    {}
+    constructor(ERC20 _olas) ERC4626(_olas, "Staked OLAS", "stOLAS") {}
 
     /// @dev Initializes stOLAS with various managing contract addresses.
     /// @notice The initialization is checked offchain before integration with other contracts.
@@ -79,21 +79,19 @@ contract stOLAS is ERC4626 {
     /// @param _depository Depository address.
     /// @param _distributor Distributor address.
     /// @param _unstakeRelayer UnstakeRelayer address.
-    function initialize(
-        address _treasury,
-        address _depository,
-        address _distributor,
-        address _unstakeRelayer
-    ) external {
+    function initialize(address _treasury, address _depository, address _distributor, address _unstakeRelayer)
+        external
+    {
         // Check for already being initialized
         if (treasury != address(0)) {
             revert AlreadyInitialized();
         }
 
         // Check for zero addresses
-        if (_treasury == address(0) || _depository == address(0) || _distributor == address(0) ||
-            _unstakeRelayer == address(0))
-        {
+        if (
+            _treasury == address(0) || _depository == address(0) || _distributor == address(0)
+                || _unstakeRelayer == address(0)
+        ) {
             revert ZeroAddress();
         }
 
@@ -120,7 +118,7 @@ contract stOLAS is ERC4626 {
             revert ZeroValue();
         }
 
-        (, , , uint256 curTotalReserves) = calculateCurrentBalances();
+        (,,, uint256 curTotalReserves) = calculateCurrentBalances();
 
         // Calculate shares
         shares = totalSupply;
@@ -181,7 +179,7 @@ contract stOLAS is ERC4626 {
             // If vault and reserve does not have enough balance, use it all and take rest from staked
             transferAmount = vaultAndReserveBalance;
             uint256 remainingAmount = assets - vaultAndReserveBalance;
-            
+
             // Check for overflow, must never happen
             if (remainingAmount > curStakedBalance) {
                 revert Overflow(remainingAmount, curStakedBalance);
@@ -322,7 +320,9 @@ contract stOLAS is ERC4626 {
     /// @return curVaultBalance Current vault balance.
     /// @return curReserveBalance Current reserve balance.
     /// @return curTotalReserves Current total reserves.
-    function calculateCurrentBalances() public view
+    function calculateCurrentBalances()
+        public
+        view
         returns (uint256 curStakedBalance, uint256 curVaultBalance, uint256 curReserveBalance, uint256 curTotalReserves)
     {
         // Current staked balance
@@ -343,7 +343,7 @@ contract stOLAS is ERC4626 {
     ///       `deposit()` function use its static call directly.
     /// @param assets Deposited assets amount.
     function previewDeposit(uint256 assets) public view override returns (uint256) {
-        (, , , uint256 curTotalReserves) = calculateCurrentBalances();
+        (,,, uint256 curTotalReserves) = calculateCurrentBalances();
 
         uint256 shares = totalSupply;
         return shares == 0 ? assets : assets.mulDivDown(shares, curTotalReserves);
@@ -352,7 +352,7 @@ contract stOLAS is ERC4626 {
     /// @dev Previews redeem shares to assets amount.
     /// @param shares Redeemed shares amount.
     function previewRedeem(uint256 shares) public view override returns (uint256) {
-        (, , , uint256 curTotalReserves) = calculateCurrentBalances();
+        (,,, uint256 curTotalReserves) = calculateCurrentBalances();
 
         uint256 assets = totalSupply;
         return assets == 0 ? shares : shares.mulDivDown(curTotalReserves, assets);
