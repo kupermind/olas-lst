@@ -103,22 +103,6 @@ describe("Liquid Staking", function () {
             operatorWhitelist.address);
         await serviceManager.deployed();
 
-        const ERC20Token = await ethers.getContractFactory("ERC20Token");
-        olas = await ERC20Token.deploy();
-        await olas.deployed();
-        serviceParams.stakingToken = olas.address;
-
-        // Mint tokens to the deployer
-        await olas.mint(deployer.address, initSupply);
-
-        const VE = await ethers.getContractFactory("MockVE");
-        ve = await VE.deploy(olas.address);
-        await ve.deployed();
-
-        const SToken = await ethers.getContractFactory("stOLAS");
-        st = await SToken.deploy(olas.address);
-        await st.deployed();
-
         const GnosisSafe = await ethers.getContractFactory("GnosisSafe");
         gnosisSafe = await GnosisSafe.deploy();
         await gnosisSafe.deployed();
@@ -139,15 +123,15 @@ describe("Liquid Staking", function () {
         fallbackHandler = await FallbackHandler.deploy();
         await fallbackHandler.deployed();
 
+        const MultiSend = await ethers.getContractFactory("MultiSendCallOnly");
+        multiSend = await MultiSend.deploy();
+        await multiSend.deployed();
+
         const GnosisSafeProxy = await ethers.getContractFactory("GnosisSafeProxy");
         const gnosisSafeProxy = await GnosisSafeProxy.deploy(gnosisSafe.address);
         await gnosisSafeProxy.deployed();
         const bytecode = await ethers.provider.getCode(gnosisSafeProxy.address);
         bytecodeHash = ethers.utils.keccak256(bytecode);
-
-        const MultiSend = await ethers.getContractFactory("MultiSendCallOnly");
-        multiSend = await MultiSend.deploy();
-        await multiSend.deployed();
 
         const GnosisSafeMultisig = await ethers.getContractFactory("GnosisSafeMultisig");
         gnosisSafeMultisig = await GnosisSafeMultisig.deploy(gnosisSafe.address, gnosisSafeProxyFactory.address);
@@ -156,6 +140,22 @@ describe("Liquid Staking", function () {
         const GnosisSafeSameAddressMultisig = await ethers.getContractFactory("GnosisSafeSameAddressMultisig");
         gnosisSafeSameAddressMultisig = await GnosisSafeSameAddressMultisig.deploy(bytecodeHash);
         await gnosisSafeSameAddressMultisig.deployed();
+
+        const ERC20Token = await ethers.getContractFactory("ERC20Token");
+        olas = await ERC20Token.deploy();
+        await olas.deployed();
+        serviceParams.stakingToken = olas.address;
+
+        // Mint tokens to the deployer
+        await olas.mint(deployer.address, initSupply);
+
+        const VE = await ethers.getContractFactory("MockVE");
+        ve = await VE.deploy(olas.address);
+        await ve.deployed();
+
+        const SToken = await ethers.getContractFactory("stOLAS");
+        st = await SToken.deploy(olas.address);
+        await st.deployed();
 
         const Lock = await ethers.getContractFactory("Lock");
         lock = await Lock.deploy(olas.address, ve.address);
@@ -217,7 +217,6 @@ describe("Liquid Staking", function () {
         treasury = await ethers.getContractAt("Treasury", treasuryProxy.address);
 
         // Change managers for stOLAS
-        // Only Treasury contract can mint OLAS
         await st.initialize(treasury.address, depository.address, distributor.address, unstakeRelayer.address);
 
         // Change treasury address in depository

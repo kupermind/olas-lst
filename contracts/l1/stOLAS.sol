@@ -118,11 +118,9 @@ contract stOLAS is ERC4626 {
             revert ZeroValue();
         }
 
-        (,,, uint256 curTotalReserves) = calculateCurrentBalances();
-
         // Calculate shares
         shares = totalSupply;
-        shares = shares == 0 ? assets : assets.mulDivDown(shares, curTotalReserves);
+        shares = shares == 0 ? assets : assets.mulDivDown(shares, totalReserves);
 
         // Check for rounding error since we round down in mulDivDown
         if (shares == 0) {
