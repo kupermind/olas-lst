@@ -1121,8 +1121,6 @@ describe("Liquid Staking", function () {
             // Take a snapshot of the current state of the blockchain
             const snapshot = await helpers.takeSnapshot();
 
-            console.log("L1");
-
             // Get initial OLAS amount to stake
             let olasAmount = (minStakingDeposit.mul(5)).div(4);
 
@@ -1134,6 +1132,8 @@ describe("Liquid Staking", function () {
             let values = new Array(numStakes).fill(0);
             for (let i = 0; i < numIters; i++) {
                 console.log("\n\n STAKE-UNSTAKE ITERATION:", i);
+
+                console.log("L1");
 
                 // Increase every iteration by a factor of 4 - first one is to cover 2 staked services: 2 * 2 * minStakingDeposit
                 olasAmount = olasAmount.add(1);

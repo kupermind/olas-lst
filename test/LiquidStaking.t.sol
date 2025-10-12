@@ -36,7 +36,7 @@ import {Collector} from "../contracts/l2/Collector.sol";
 import {ActivityModule} from "../contracts/l2/ActivityModule.sol";
 import {StakingManager} from "../contracts/l2/StakingManager.sol";
 import {ModuleActivityChecker} from "../contracts/l2/ModuleActivityChecker.sol";
-import {StakingTokenLocked} from "../contracts/l2/StakingTokenLocked.sol";
+import {StakingTokenLocked, ServiceInfo} from "../contracts/l2/StakingTokenLocked.sol";
 import {GnosisStakingProcessorL2} from "../contracts/l2/bridging/GnosisStakingProcessorL2.sol";
 
 import {Proxy} from "../contracts/Proxy.sol";
@@ -449,7 +449,7 @@ contract LiquidStakingTest is Test {
         bytes[] memory bridgePayloads = _fillArray(BRIDGE_PAYLOAD, numStakes);
         uint256[] memory values = _fillArray(0, numStakes);
 
-        // Mirror the Hardhat test's intensive stake-unstake cadence by running more iterations
+        // Iterate over deposits
         for (uint256 i = 0; i < 40; i++) {
             console.log("Stake-Unstake iteration:", i);
 
@@ -458,6 +458,7 @@ contract LiquidStakingTest is Test {
             uint256 amountToStake = olasAmount * numStakes;
 
             // Approve and preview
+            vm.prank(deployer);
             olas.approve(address(depository), amountToStake);
             uint256 previewAmount = st.previewDeposit(amountToStake);
 
@@ -466,6 +467,7 @@ contract LiquidStakingTest is Test {
             uint256 stBalanceBefore = st.balanceOf(deployer);
 
             // Deposit
+            vm.prank(deployer);
             depository.deposit(amountToStake, chainIds, stakingInstances, bridgePayloads, values);
 
             // Validate totalAssets increased by exact deposited OLAS
@@ -486,6 +488,34 @@ contract LiquidStakingTest is Test {
             uint256 stBalance = st.balanceOf(deployer);
             console.log("User stOLAS balance now:", stBalance);
             console.log("OLAS total assets on stOLAS:", stTotalAssetsAfter);
+
+            uint256 veBalance = ve.getVotes(address(lock));
+            console.log("Protocol current veOLAS balance:", veBalance);
+
+            console.log("L2");
+
+            console.log("OLAS rewards available on L2 staking contract:", stakingTokenInstance.availableRewards());
+
+            // Increase the time for the livenessPeriod
+            console.log("Wait for liveness period to pass");
+            skip(LIVENESS_PERIOD);
+
+            // Call the checkpoint
+            console.log("Calling checkpoint by agent or manually");
+            vm.prank(agent);
+            stakingTokenInstance.checkpoint();
+
+            uint256[] memory stakedServiceIds = stakingManager.getStakedServiceIds(address(stakingTokenInstance));
+            console.log("Number of staked services in StakingManager:", stakedServiceIds.length);
+            uint256 numStakedServices = stakingTokenInstance.getNumServiceIds();
+            assertEq(numStakedServices, stakedServiceIds.length);
+
+            // Check sync of staked balances on both chains
+            uint256 stakedBalanceL1 = st.stakedBalance();
+            uint256 stakedBalanceL2 = FULL_STAKE_DEPOSIT * stakedServiceIds.length;
+            uint256 stakeBalanceRemainder = stakingManager.mapStakingProxyBalances(address(stakingTokenInstance));
+            stakedBalanceL2 = stakedBalanceL2 + stakeBalanceRemainder;
+            assertEq(stakedBalanceL1, stakedBalanceL2);
         }
 
         console.log("Test completed successfully");
