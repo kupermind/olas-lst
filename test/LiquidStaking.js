@@ -49,7 +49,7 @@ describe("Liquid Staking", function () {
     const agentId = 1;
     const livenessPeriod = oneDay; // 24 hours
     const initSupply = "5" + "0".repeat(26);
-    const livenessRatio = "11111111111111"; // 1 transaction per 25 hours
+    const livenessRatio = "1"; // minimal possible value
     const maxNumServices = 100;
     const minStakingDeposit = regDeposit;
     const fullStakeDeposit = regDeposit.mul(2);
@@ -327,7 +327,7 @@ describe("Liquid Staking", function () {
         await depository.createAndActivateStakingModels([gnosisChainId], [stakingTokenAddress], [fullStakeDeposit],
             [maxNumServices]);
 
-        // Set
+        // Set operation receivers
         await collector.setOperationReceivers([rewardOperation, unstakeOperation, unstakeRetiredOperation],
             [distributor.address, treasury.address, unstakeRelayer.address]);
     });

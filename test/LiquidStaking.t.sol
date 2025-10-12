@@ -8,10 +8,12 @@ import {IService} from "../contracts/interfaces/IService.sol";
 import {GnosisSafe} from "@gnosis.pm/safe-contracts/contracts/GnosisSafe.sol";
 import {GnosisSafeL2} from "@gnosis.pm/safe-contracts/contracts/GnosisSafeL2.sol";
 import {GnosisSafeProxyFactory} from "@gnosis.pm/safe-contracts/contracts/proxies/GnosisSafeProxyFactory.sol";
+import {GnosisSafeProxy} from "@gnosis.pm/safe-contracts/contracts/proxies/GnosisSafeProxy.sol";
 import {DefaultCallbackHandler} from "@gnosis.pm/safe-contracts/contracts/handler/DefaultCallbackHandler.sol";
 import {MultiSendCallOnly} from "@gnosis.pm/safe-contracts/contracts/libraries/MultiSendCallOnly.sol";
-import {SafeToL2Setup} from "../test/SafeToL2Setup.sol";
+import {SafeToL2Setup} from "../contracts/test/SafeToL2Setup.sol";
 
+import {ERC20} from "@solmate/src/tokens/ERC20.sol";
 import {ERC20Token} from "@registries/contracts/test/ERC20Token.sol";
 import {ServiceRegistryL2} from "@registries/contracts/ServiceRegistryL2.sol";
 import {ServiceRegistryTokenUtility} from "@registries/contracts/ServiceRegistryTokenUtility.sol";
@@ -42,8 +44,6 @@ import {Beacon} from "../contracts/Beacon.sol";
 import {MockVE} from "../contracts/test/MockVE.sol";
 import {BridgeRelayer} from "../contracts/test/BridgeRelayer.sol";
 import {SafeToL2Setup} from "../contracts/test/SafeToL2Setup.sol";
-import {GnosisSafeSameAddressMultisig} from "../lib/autonolas-registries/audits/internal4/analysis/contracts/GnosisSafeSameAddressMultisig-flatten.sol";
-import {Treasury} from "../lib/layerzero-v2/packages/layerzero-v2/evm/messagelib/contracts/Treasury.sol";
 
 contract LiquidStakingTest is Test {
     Utils internal utils;
@@ -67,21 +67,18 @@ contract LiquidStakingTest is Test {
     StakingFactory internal stakingFactory;
 
     stOLAS internal st;
-    Lock internal lockImplementation;
-    Distributor internal distributorImplementation;
-    UnstakeRelayer internal unstakeRelayerImplementation;
-    Depository internal depositoryImplementation;
-    Treasury internal treasuryImplementation;
-    Collector internal collectorImplementation;
-    StakingManager internal stakingManagerImplementation;
-
-    Proxy internal lock;
-    Proxy internal distributor;
-    Proxy internal unstakeRelayer;
-    Proxy internal depository;
-    Proxy internal treasury;
-    Proxy internal collector;
-    Proxy internal stakingManager;
+    Lock internal lock;
+    Distributor internal distributor;
+    UnstakeRelayer internal unstakeRelayer;
+    Depository internal depository;
+    Treasury internal treasury;
+    GnosisDepositProcessorL1 internal gnosisDepositProcessorL1;
+    Collector internal collector;
+    ActivityModule internal activityModule;
+    StakingManager internal stakingManager;
+    GnosisStakingProcessorL2 internal gnosisStakingProcessorL2;
+    ModuleActivityChecker internal moduleActivityChecker;
+    StakingTokenLocked internal stakingTokenInstance;
 
     Beacon internal beacon;
     MockVE internal ve;
@@ -90,6 +87,7 @@ contract LiquidStakingTest is Test {
     // Test addresses
     address internal deployer;
     address internal agent;
+    address payable[] internal users;
 
     // Constants
     uint256 public constant ONE_DAY = 86400;
@@ -98,10 +96,12 @@ contract LiquidStakingTest is Test {
     uint256 public constant AGENT_ID = 1;
     uint256 public constant LIVENESS_PERIOD = ONE_DAY;
     uint256 public constant INIT_SUPPLY = 5e26;
-    uint256 public constant LIVENESS_RATIO = 11111111111111;
+    uint256 public constant LIVENESS_RATIO = 1;
     uint256 public constant MAX_NUM_SERVICES = 100;
+    uint256 public constant REWARDS_PER_SECOND = 0.0005 ether;
     uint256 public constant MIN_STAKING_DEPOSIT = REG_DEPOSIT;
     uint256 public constant FULL_STAKE_DEPOSIT = REG_DEPOSIT * 2;
+    uint256 public constant STAKING_SUPPLY = FULL_STAKE_DEPOSIT * MAX_NUM_SERVICES;
     uint256 public constant TIME_FOR_EMISSIONS = 30 * ONE_DAY;
     uint256 public constant APY_LIMIT = 3 ether;
     uint256 public constant LOCK_FACTOR = 100;
@@ -109,6 +109,7 @@ contract LiquidStakingTest is Test {
     uint256 public constant PROTOCOL_FACTOR = 0;
     uint256 public constant CHAIN_ID = 31337;
     uint256 public constant GNOSIS_CHAIN_ID = 100;
+    bytes32 public DEFAULT_HASH = 0x9999999999999999999999999999999999999999999999999999999999999999;
 
     // Bridge operations
     bytes32 public constant REWARD_OPERATION = 0x0b9821ae606ebc7c79bf3390bdd3dc93e1b4a7cda27aad60646e7b88ff55b001;
@@ -119,60 +120,14 @@ contract LiquidStakingTest is Test {
     // Bridge payload
     bytes public constant BRIDGE_PAYLOAD = "";
 
-    address payable[] internal users;
-    address[] internal agentInstances;
-    uint256[] internal serviceIds;
-    uint256[] internal emptyArray;
-    address internal deployer;
-    address internal operator;
-    uint256 internal numServices = 3;
-    uint256 internal initialMint = 50_000_000 ether;
-    uint256 internal largeApproval = 1_000_000_000 ether;
-    uint256 internal oneYear = 365 * 24 * 3600;
-    uint32 internal threshold = 1;
-    uint96 internal regBond = 10 ether;
-    uint256 internal regDeposit = 10 ether;
-    uint256 internal numDays = 10;
-
-    bytes32 internal unitHash = 0x9999999999999999999999999999999999999999999999999999999999999999;
-    bytes internal payload;
-    uint32[] internal agentIds;
-
-    // Maximum number of staking services
-    uint256 internal maxNumServices = 10;
-    // Rewards per second
-    uint256 internal rewardsPerSecond = 549768518519;
-    // Minimum service staking deposit value required for staking
-    uint256 internal minStakingDeposit = regDeposit;
-    // APY limit
-    uint256 internal apyLimit = 2 ether;
-    // Min number of staking periods before the service can be unstaked
-    uint256 internal minNumStakingPeriods = 3;
-    // Max number of accumulated inactivity periods after which the service is evicted
-    uint256 internal maxNumInactivityPeriods = 3;
-    // Liveness period
-    uint256 internal livenessPeriod = 1 days;
-    // Time for emissions
-    uint256 internal timeForEmissions = 1 weeks;
-    // Liveness ratio in the format of 1e18
-    uint256 internal livenessRatio = 0.0001 ether; // One nonce in 3 hours
-    // Number of agent instances in the service
-    uint256 internal numAgentInstances = 1;
 
     function setUp() public virtual {
-        agentIds = new uint32[](1);
-        agentIds[0] = 1;
-
         utils = new Utils();
         users = utils.createUsers(20);
         deployer = users[0];
         vm.label(deployer, "Deployer");
-        operator = users[1];
-        // Allocate several addresses for agent instances
-        agentInstances = new address[](2 * numServices);
-        for (uint256 i = 0; i < 2 * numServices; ++i) {
-            agentInstances[i] = users[i + 2];
-        }
+        agent = users[1];
+        vm.label(deployer, "Agent");
 
         // Deploying registries contracts
         serviceRegistry = new ServiceRegistryL2("Service Registry", "SERVICE", "https://localhost/service/");
@@ -186,7 +141,7 @@ contract LiquidStakingTest is Test {
         gnosisSafe = new GnosisSafe();
         gnosisSafeL2 = new GnosisSafeL2();
         gnosisSafeProxyFactory = new GnosisSafeProxyFactory();
-        SafeToL2Setup = new SafeToL2Setup();
+        safeModuleInitializer = new SafeToL2Setup();
         fallbackHandler = new DefaultCallbackHandler();
         multiSend = new MultiSendCallOnly();
         gnosisSafeProxy = new GnosisSafeProxy(address(gnosisSafe));
@@ -199,47 +154,51 @@ contract LiquidStakingTest is Test {
 
         // Deploying OLAS mock and minting to deployer, operator and a current contract
         olas = new ERC20Token();
-        olas.mint(deployer, initialMint);
-        olas.mint(operator, initialMint);
-        olas.mint(address(this), initialMint);
+        olas.mint(deployer, INIT_SUPPLY);
+        olas.mint(address(this), INIT_SUPPLY);
 
         ve = new MockVE(address(olas));
-        st = new stOLAS(address(olas));
+        st = new stOLAS(ERC20(address(olas)));
 
-        lockImplementation = new Lock(address(olas), address(ve));
+        Lock lockImplementation = new Lock(address(olas), address(ve));
         bytes memory initPayload = abi.encodeWithSelector(lockImplementation.initialize.selector);
-        lock = new Proxy(address(lock), initPayload);
+        Proxy lockProxy = new Proxy(address(lockImplementation), initPayload);
+        lock = Lock(address(lockProxy));
 
         // Transfer initial lock
         olas.transfer(address(lock), 1 ether);
         // Set governor and create first lock
         // Governor address is irrelevant for testing
-        Lock(lock).setGovernorAndCreateFirstLock(address(this));
+        lock.setGovernorAndCreateFirstLock(address(this));
 
-        distributorImplementation = new Distributor(address(olas), address(st), address(lock));
+        Distributor distributorImplementation = new Distributor(address(olas), address(st), address(lock));
         initPayload = abi.encodeWithSelector(distributorImplementation.initialize.selector, LOCK_FACTOR);
-        distributor = new Proxy(address(distributorImplementation), initPayload);
+        Proxy distributorProxy = new Proxy(address(distributorImplementation), initPayload);
+        distributor = Distributor(address(distributorProxy));
 
-        unstakeRelayerImplementation = new UnstakeRelayer(address(olas), address(st));
+        UnstakeRelayer unstakeRelayerImplementation = new UnstakeRelayer(address(olas), address(st));
         initPayload = abi.encodeWithSelector(unstakeRelayerImplementation.initialize.selector);
-        unstakeRelayer = new Proxy(address(unstakeRelayerImplementation), initPayload);
+        Proxy unstakeRelayerProxy = new Proxy(address(unstakeRelayerImplementation), initPayload);
+        unstakeRelayer = UnstakeRelayer(address(unstakeRelayerProxy));
 
-        depositoryImplementation = new Depository(address(olas), address(st));
+        Depository depositoryImplementation = new Depository(address(olas), address(st));
         initPayload = abi.encodeWithSelector(depositoryImplementation.initialize.selector);
-        depository = new Proxy(address(depositoryImplementation), initPayload);
+        Proxy depositoryProxy = new Proxy(address(depositoryImplementation), initPayload);
+        depository = Depository(address(depositoryProxy));
 
         // Change product type to Final
-        Depository(depository).changeProductType(ProductType.Final);
+        depository.changeProductType(ProductType.Final);
 
-        treasuryImplementation = new Treasury(address(olas), address(st), address(depository));
+        Treasury treasuryImplementation = new Treasury(address(olas), address(st), address(depository));
         initPayload = abi.encodeWithSelector(treasuryImplementation.initialize.selector, 0);
-        treasury = new Proxy(address(treasuryImplementation), initPayload);
+        Proxy treasuryProxy = new Proxy(address(treasuryImplementation), initPayload);
+        treasury = Treasury(address(treasuryProxy));
 
         // Change managers for stOLAS
         st.initialize(address(treasury), address(depository), address(distributor), address(unstakeRelayer));
 
         // Change treasury address in depository
-        Depository(depository).changeTreasury(address(treasury));
+        depository.changeTreasury(address(treasury));
 
         // Deploy service staking verifier
         stakingVerifier = new StakingVerifier(address(olas), address(serviceRegistry),
@@ -248,147 +207,97 @@ contract LiquidStakingTest is Test {
         // Deploy service staking factory
         stakingFactory = new StakingFactory(address(stakingVerifier));
 
-        // Deploy service staking activity checker
-        stakingActivityChecker = new StakingActivityChecker(livenessRatio);
+        Collector collectorImplementation = new Collector(address(olas));
+        initPayload = abi.encodeWithSelector(collectorImplementation.initialize.selector);
+        Proxy collectorProxy = new Proxy(address(collectorImplementation), initPayload);
+        collector = Collector(address(collectorProxy));
 
-        // Deploy service staking native token and arbitrary ERC20 token
-        StakingBase.StakingParams memory stakingParams = StakingBase.StakingParams(
-            bytes32(uint256(uint160(address(msg.sender)))), maxNumServices, rewardsPerSecond, minStakingDeposit,
-            minNumStakingPeriods, maxNumInactivityPeriods, livenessPeriod, timeForEmissions, numAgentInstances,
-            emptyArray, 0, bytes32(0), multisigProxyHash, address(serviceRegistry), address(stakingActivityChecker));
-        stakingNativeTokenImplementation = new StakingNativeToken();
-        stakingTokenImplementation = new StakingToken();
+        activityModule = new ActivityModule(address(olas), address(collector), address(multiSend));
+        beacon = new Beacon(address(activityModule));
+
+        StakingManager stakingManagerImplementation = new StakingManager(address(olas), address(serviceManagerToken),
+            address(stakingFactory), address(safeModuleInitializer), address(gnosisSafeL2), address(beacon),
+            address(collector), AGENT_ID, DEFAULT_HASH);
+        initPayload = abi.encodeWithSelector(stakingManagerImplementation.initialize.selector, address(gnosisSafeMultisig),
+            address(gnosisSafeSameAddressMultisig), address(fallbackHandler));
+        Proxy stakingManagerProxy = new Proxy(address(stakingManagerImplementation), initPayload);
+        stakingManager = StakingManager(payable(address(stakingManagerProxy)));
+
+        // Fund staking manager with native to support staking creation
+        vm.deal(address(stakingManager), 1 ether);
+
+        bridgeRelayer = new BridgeRelayer(address(olas));
+        gnosisDepositProcessorL1 = new GnosisDepositProcessorL1(address(olas), address(depository), address(bridgeRelayer),
+            address(bridgeRelayer));
+        gnosisStakingProcessorL2 = new GnosisStakingProcessorL2(address(olas), address(stakingManager), address(collector),
+            address(bridgeRelayer), address(bridgeRelayer), address(gnosisDepositProcessorL1), CHAIN_ID);
+
+        // changeStakingProcessorL2 for collector
+        collector.changeStakingProcessorL2(address(gnosisStakingProcessorL2));
+
+        // changeStakingProcessorL2 for stakingManager
+        stakingManager.changeStakingProcessorL2(address(gnosisStakingProcessorL2));
+
+        // Set the gnosisStakingProcessorL2 address in gnosisDepositProcessorL1
+        gnosisDepositProcessorL1.setL2StakingProcessor(address(gnosisStakingProcessorL2));
+
+        // Whitelist deposit processors
+        address[] memory depositProcessors = new address[](1);
+        depositProcessors[0] = address(gnosisDepositProcessorL1);
+        uint256[] memory chainIds = new uint256[](1);
+        chainIds[0] = GNOSIS_CHAIN_ID;
+        depository.setDepositProcessorChainIds(depositProcessors, chainIds);
+
+        // Deploy service staking activity checker
+        moduleActivityChecker = new ModuleActivityChecker(LIVENESS_RATIO);
+
+        // Deploy service staking token locked implementation
+        StakingTokenLocked stakingTokenImplementation = new StakingTokenLocked();
+
+        // Whitelist implementation
+        address[] memory stakingTokenImplementations = new address[](1);
+        stakingTokenImplementations[0] = address(stakingTokenImplementation);
+        bool[] memory boolArr = new bool[](1);
+        boolArr[0] = true;
+        stakingVerifier.setImplementationsStatuses(stakingTokenImplementations, boolArr, true);
+
+        StakingTokenLocked.StakingParams memory stakingParams = StakingTokenLocked.StakingParams(
+            MAX_NUM_SERVICES, REWARDS_PER_SECOND, MIN_STAKING_DEPOSIT, LIVENESS_PERIOD, TIME_FOR_EMISSIONS,
+            address(serviceRegistry), address(serviceRegistryTokenUtility), address(olas), address(stakingManager),
+            address(moduleActivityChecker));
 
         // Initialization payload and deployment of stakingNativeToken
-        bytes memory initPayload = abi.encodeWithSelector(stakingNativeTokenImplementation.initialize.selector,
-            stakingParams, address(serviceRegistry), multisigProxyHash);
-        stakingNativeToken = StakingNativeToken(stakingFactory.createStakingInstance(
-            address(stakingNativeTokenImplementation), initPayload));
-
-        // Set the stakingVerifier
-        stakingFactory.changeVerifier(address(stakingVerifier));
-        // Initialization payload and deployment of stakingToken
-        initPayload = abi.encodeWithSelector(stakingTokenImplementation.initialize.selector,
-            stakingParams, address(serviceRegistryTokenUtility), address(token));
-        stakingToken = StakingToken(stakingFactory.createStakingInstance(
-            address(stakingTokenImplementation), initPayload));
+        initPayload = abi.encodeWithSelector(stakingTokenImplementation.initialize.selector, stakingParams);
+        address stakingTokenAddress = stakingFactory.createStakingInstance(address(stakingTokenImplementation), initPayload);
+        stakingTokenInstance = StakingTokenLocked(stakingTokenAddress);
 
         // Whitelist multisig implementations
         serviceRegistry.changeMultisigPermission(address(gnosisSafeMultisig), true);
+        serviceRegistry.changeMultisigPermission(address(gnosisSafeSameAddressMultisig), true);
 
-        IService.AgentParams[] memory agentParams = new IService.AgentParams[](1);
-        agentParams[0].slots = 1;
-        agentParams[0].bond = regBond;
+        // Fund the staking contract
+        olas.approve(stakingTokenAddress, STAKING_SUPPLY);
+        stakingTokenInstance.deposit(STAKING_SUPPLY);
 
-        // Create services, activate them, register agent instances and deploy
-        for (uint256 i = 0; i < numServices; ++i) {
-            // Create a service
-            serviceManagerToken.create(deployer, serviceManagerToken.ETH_TOKEN_ADDRESS(), unitHash, agentIds,
-                agentParams, threshold);
+        // Add model to L1
+        address[] memory stakingTokenAddresses = new address[](1);
+        stakingTokenAddresses[0] = address(stakingTokenAddress);
+        uint256[] memory fullStakeDeposits = new uint256[](1);
+        fullStakeDeposits[0] = FULL_STAKE_DEPOSIT;
+        uint256[] memory maxNumServices = new uint256[](1);
+        maxNumServices[0] = MAX_NUM_SERVICES;
+        depository.createAndActivateStakingModels(chainIds, stakingTokenAddresses, fullStakeDeposits, maxNumServices);
 
-            uint256 serviceId = i + 1;
-            // Activate registration
-            vm.prank(deployer);
-            serviceManagerToken.activateRegistration{value: regDeposit}(serviceId);
-
-            // Register agent instances
-            address[] memory agentInstancesService = new address[](1);
-            agentInstancesService[0] = agentInstances[i];
-            vm.prank(operator);
-            serviceManagerToken.registerAgents{value: regBond}(serviceId, agentInstancesService, agentIds);
-
-            // Deploy the service
-            vm.prank(deployer);
-            serviceManagerToken.deploy(serviceId, address(gnosisSafeMultisig), payload);
-        }
-
-        // Create services with ERC20 token, activate them, register agent instances and deploy
-        vm.prank(deployer);
-        token.approve(address(serviceRegistryTokenUtility), initialMint);
-        vm.prank(operator);
-        token.approve(address(serviceRegistryTokenUtility), initialMint);
-        for (uint256 i = 0; i < numServices; ++i) {
-            // Create a service
-            serviceManagerToken.create(deployer, address(token), unitHash, agentIds, agentParams, threshold);
-
-            uint256 serviceId = i + numServices + 1;
-            // Activate registration
-            vm.prank(deployer);
-            serviceManagerToken.activateRegistration{value: 1}(serviceId);
-
-            // Register agent instances
-            address[] memory agentInstancesService = new address[](1);
-            agentInstancesService[0] = agentInstances[i + numServices];
-            vm.prank(operator);
-            serviceManagerToken.registerAgents{value: 1}(serviceId, agentInstancesService, agentIds);
-
-            // Deploy the service
-            vm.prank(deployer);
-            serviceManagerToken.deploy(serviceId, address(gnosisSafeMultisig), payload);
-        }
-    }
-
-    function _initializeContracts() internal {
-        console.log("Initializing Lock...");
-        // Initialize Lock
-        lock.initialize();
-        console.log("Lock initialized");
-
-        console.log("Initializing Distributor...");
-        // Initialize Distributor
-        distributor.initialize(LOCK_FACTOR);
-        console.log("Distributor initialized");
-
-        console.log("Initializing UnstakeRelayer...");
-        // Initialize UnstakeRelayer
-        unstakeRelayer.initialize();
-        console.log("UnstakeRelayer initialized");
-
-        console.log("Initializing Depository...");
-        // Initialize Depository
-        depository.initialize();
-        console.log("Depository initialized");
-
-        console.log("Initializing Treasury...");
-        // Initialize Treasury
-        treasury.initialize(0);
-        console.log("Treasury initialized");
-
-        console.log("Initializing Collector...");
-        // Initialize Collector
-        collector.initialize();
-        console.log("Collector initialized");
-
-        console.log("Initializing StakingManager...");
-        // Initialize StakingManager
-        stakingManager.initialize(address(0), address(0), address(0));
-        console.log("StakingManager initialized");
-
-        console.log("Setting up stOLAS managers...");
-        // Setup stOLAS managers
-        st.initialize(address(treasury), address(depository), address(distributor), address(unstakeRelayer));
-        console.log("stOLAS managers set");
-
-        console.log("Setting up depository treasury...");
-        // Setup depository treasury
-        depository.changeTreasury(address(treasury));
-        console.log("Depository treasury set");
-
-        console.log("Funding Lock with initial OLAS...");
-        // Fund Lock with initial OLAS
-        olas.transfer(address(lock), 1 ether);
-        console.log("Lock funded with 1 ether");
-
-        console.log("Setting governor and creating first lock...");
-        lock.setGovernorAndCreateFirstLock(deployer);
-        console.log("Governor set and first lock created");
-
-        console.log("Funding StakingManager...");
-        // Fund StakingManager
-        payable(address(stakingManager)).transfer(1 ether);
-        console.log("StakingManager funded with 1 ether");
-
-        console.log("=== Contract initialization completed ===");
+        // Set operation receivers
+        bytes32[] memory operations = new bytes32[](3);
+        operations[0] = REWARD_OPERATION;
+        operations[1] = UNSTAKE_OPERATION;
+        operations[2] = UNSTAKE_RETIRED_OPERATION;
+        address[] memory receivers = new address[](3);
+        receivers[0] = address(distributor);
+        receivers[1] = address(treasury);
+        receivers[2] = address(unstakeRelayer);
+        Collector(collector).setOperationReceivers(operations, receivers);
     }
 
     function testE2ELiquidStakingSimple() public {
