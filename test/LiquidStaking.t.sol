@@ -445,7 +445,7 @@ contract LiquidStakingTest is Test {
         uint256 numStakes = 18;
 
         uint256[] memory chainIds = _fillArray(GNOSIS_CHAIN_ID, numStakes);
-        address[] memory stakingInstances = _fillArray(address(0), numStakes);
+        address[] memory stakingInstances = _fillArray(address(stakingTokenInstance), numStakes);
         bytes[] memory bridgePayloads = _fillArray(BRIDGE_PAYLOAD, numStakes);
         uint256[] memory values = _fillArray(0, numStakes);
 
