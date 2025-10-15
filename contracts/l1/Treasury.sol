@@ -142,14 +142,11 @@ contract Treasury is Implementation, ERC6909 {
             revert ZeroValue();
         }
 
-        // Get stOLAS
-        IToken(st).transferFrom(msg.sender, address(this), stAmount);
-
         // Get current staked balance
         uint256 stakedBalanceBefore = IST(st).stakedBalance();
 
         // Redeem OLAS and burn stOLAS tokens
-        olasAmount = IST(st).redeem(stAmount, address(this), address(this));
+        olasAmount = IST(st).redeem(stAmount, address(this), msg.sender);
 
         // Get updated staked balance
         uint256 stakedBalanceAfter = IST(st).stakedBalance();
@@ -197,9 +194,6 @@ contract Treasury is Implementation, ERC6909 {
         uint256 totalAmount;
         // Traverse all withdraw requests
         for (uint256 i = 0; i < requestIds.length; ++i) {
-            // Get amount for a specified withdraw request Id
-            transferFrom(msg.sender, address(this), requestIds[i], amounts[i]);
-
             // Decode a pair of key defining variables from one key: withdrawTime | requestId
             // requestId occupies first 64 bits, withdrawTime occupies next bits as they both fit well in uint256
             uint256 requestId = requestIds[i] & type(uint64).max;
@@ -218,7 +212,7 @@ contract Treasury is Implementation, ERC6909 {
             }
 
             // Burn withdraw tokens
-            _burn(address(this), requestIds[i], amounts[i]);
+            _burn(msg.sender, requestIds[i], amounts[i]);
 
             totalAmount += amounts[i];
 
