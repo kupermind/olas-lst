@@ -33,9 +33,7 @@ error ReentrancyGuard();
 /// @title Distributor - Smart contract for distributing funds obtained via bridging or direct deposits.
 contract Distributor is Implementation {
     event LockFactorUpdated(uint256 lockFactor);
-    event Locked(
-        address indexed account, uint256 olasAmount, uint256 lockAmount, uint256 vaultBalance, bool unlockTimeIncreased
-    );
+    event Locked(address indexed account, uint256 olasAmount, uint256 lockAmount, uint256 vaultBalance);
     event Distributed(address indexed account, address indexed st, uint256 olasAmount);
 
     // Depository version
@@ -68,15 +66,25 @@ contract Distributor is Implementation {
     function _increaseLock(uint256 olasAmount) internal returns (uint256 remainder) {
         // Get treasury veOLAS lock amount
         uint256 lockAmount = (olasAmount * lockFactor) / MAX_LOCK_FACTOR;
-        remainder = olasAmount - lockAmount;
 
         // Approve OLAS for Lock
-        IToken(olas).transfer(lock, lockAmount);
+        IToken(olas).approve(lock, lockAmount);
 
+        // Form increase lock payload
+        bytes memory lockPayload = abi.encodeCall(ILock.increaseLock, (lockAmount));
         // Increase lock
-        bool unlockTimeIncreased = ILock(lock).increaseLock(lockAmount);
+        (bool success,) = lock.call(lockPayload);
 
-        emit Locked(msg.sender, olasAmount, lockAmount, remainder, unlockTimeIncreased);
+        // Check for successful increase lock call
+        if (success) {
+            // lock amount is locked
+            remainder = olasAmount - lockAmount;
+
+            emit Locked(msg.sender, olasAmount, lockAmount, remainder);
+        } else {
+            // lock amount is not locked, letting all olas amount be transferred to stOLAS
+            remainder = olasAmount;
+        }
     }
 
     /// @dev Distributor initializer.
