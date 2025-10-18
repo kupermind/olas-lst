@@ -73,6 +73,11 @@ struct AccountChainIdMsgType {
     uint16 msgType;
 }
 
+/// @dev Only `owner` has a privilege, but the `sender` was provided.
+/// @param sender Sender address.
+/// @param owner Required sender address as an owner.
+error OwnerOnly(address sender, address owner);
+
 /// @title LzOracle - Smart contract for LayerZero oracle.
 contract LzOracle is OAppRead, OAppOptionsType3 {
     event LzCreateAndActivateStakingModelProcessed(
@@ -108,21 +113,30 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
 
     /// @dev LzOracle constructor.
     /// @param _endpoint LZ endpoint address.
+    /// @param _depository Depository address.
     /// @param _stakingImplementationBytecodeHash Staking implementation contract bytecode hash.
     /// @param _chainIds supported EVM chain Ids.
     /// @param _stakingHelpers Corresponding staking helper addresses.
     /// @param _lzChainIds Corresponding LZ format chain Ids.
     constructor(
         address _endpoint,
+        address _depository,
         bytes32 _stakingImplementationBytecodeHash,
         uint256[] memory _chainIds,
         address[] memory _stakingHelpers,
         uint256[] memory _lzChainIds
     ) OAppRead(_endpoint, msg.sender) Ownable(msg.sender) {
+        // Check for zero address
+        if (_depository == address(0)) {
+            revert ZeroAddress();
+        }
+
+        // Check for zero value
         if (_stakingImplementationBytecodeHash == 0) {
             revert ZeroValue();
         }
 
+        depository = _depository;
         stakingImplementationBytecodeHash = _stakingImplementationBytecodeHash;
 
         // Set chain Ids and corresponding staking helpers
@@ -247,6 +261,7 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
     function lzCreateAndActivateStakingModel(uint256 chainId, address stakingProxy, bytes calldata options)
         external
         payable
+        onlyOwner
     {
         // Push a pair of key defining variables into one key: chainId | stakingProxy
         // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
@@ -279,7 +294,7 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
             payload,
             combineOptions(READ_CHANNEL, READ_TYPE_CREATE, options),
             MessagingFee(msg.value, 0),
-            payable(tx.origin)
+            payable(msg.sender)
         );
 
         mapUidStakingProxyChainIds[receipt.guid] =
@@ -292,7 +307,8 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
     /// @param chainId EVM chain Id.
     /// @param stakingProxy Staking proxy address.
     /// @param options LZ message options.
-    function lzCloseStakingModel(uint256 chainId, address stakingProxy, bytes calldata options) external payable {
+    function lzCloseStakingModel(uint256 chainId, address stakingProxy, bytes calldata options) external payable onlyOwner {
+        // TODO Check chainId for uint32.max
         // Push a pair of key defining variables into one key: chainId | stakingProxy
         // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
         uint256 stakingModelId = uint256(uint160(stakingProxy));
@@ -317,11 +333,11 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
             READ_CHANNEL,
             payload,
             combineOptions(READ_CHANNEL, READ_TYPE_CLOSE, options),
-            MessagingFee(msg.value, 0),
-            payable(tx.origin)
+            MessagingFee({ nativeFee: msg.value, lzTokenFee: 0 }),
+            payable(msg.sender)
         );
 
-        mapUidStakingProxyChainIds[receipt.guid] = AccountChainIdMsgType(stakingProxy, uint32(chainId), READ_TYPE_CLOSE);
+        mapUidStakingProxyChainIds[receipt.guid] = AccountChainIdMsgType({ account: stakingProxy, chainId: uint32(chainId), msgType: READ_TYPE_CLOSE });
 
         emit LzCloseStakingModelInitiated(receipt.guid, chainId, stakingProxy);
     }
@@ -351,7 +367,7 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
                 revert ZeroAddress();
             }
 
-            mapStakingHelperLzChainIds[chainIds[i]] = AccountChainIdMsgType(stakingHelpers[i], uint32(lzChainIds[i]), 0);
+            mapStakingHelperLzChainIds[chainIds[i]] = AccountChainIdMsgType({ account: stakingHelpers[i], chainId: uint32(lzChainIds[i]), msgType: 0 });
         }
     }
 }

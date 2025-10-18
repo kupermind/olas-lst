@@ -114,16 +114,11 @@ contract Collector is Implementation {
     }
 
     /// @dev Changes protocol factor value.
-    /// @param newProtocolFactor New lock factor value.
+    /// @param newProtocolFactor New protocol factor value.
     function changeProtocolFactor(uint256 newProtocolFactor) external {
         // Check for ownership
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);
-        }
-
-        // Check for zero value
-        if (protocolFactor == 0) {
-            revert ZeroValue();
         }
 
         protocolFactor = newProtocolFactor;
@@ -219,16 +214,20 @@ contract Collector is Implementation {
             revert ZeroValue();
         }
 
-        // Rewards are subject to a protocol fee
+        // Rewards are subject to a protocol fee, if applicable
         if (operation == REWARD) {
-            uint256 protocolAmount = (olasBalance * protocolFactor) / MAX_PROTOCOL_FACTOR;
-            olasBalance -= protocolAmount;
+            uint256 curProtocolFactor = protocolFactor;
 
-            // Update protocol balance
-            uint256 curProtocolBalance = protocolBalance + protocolAmount;
-            protocolBalance = curProtocolBalance;
+            if (curProtocolFactor > 0) {
+                uint256 protocolAmount = (olasBalance * protocolFactor) / MAX_PROTOCOL_FACTOR;
+                olasBalance -= protocolAmount;
 
-            emit ProtocolBalanceUpdated(curProtocolBalance);
+                // Update protocol balance
+                uint256 curProtocolBalance = protocolBalance + protocolAmount;
+                protocolBalance = curProtocolBalance;
+
+                emit ProtocolBalanceUpdated(curProtocolBalance);
+            }
         }
 
         // Zero operation balance

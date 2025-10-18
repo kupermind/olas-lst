@@ -185,7 +185,8 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
         bool success;
 
         // Status to be emitted for failing scenarios, since reverts cannot be engaged in this function call
-        RequestStatus status;
+        // By default, status is set to external call failed, and changed to another failed one, if not succeeded
+        RequestStatus status = RequestStatus.EXTERNAL_CALL_FAILED;
         if (operation == STAKE) {
             if (paused == 1) {
                 // Get current OLAS balance
