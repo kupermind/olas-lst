@@ -91,7 +91,8 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
     /// @param amount Corresponding staking amount.
     /// @param bridgePayload Bridge payload necessary (if required) for a specific bridge relayer.
     /// @param operation Funds operation: stake / unstake.
-    function sendMessage(address target, uint256 amount, bytes memory bridgePayload, bytes32 operation)
+    /// @param sender Sender account.
+    function sendMessage(address target, uint256 amount, bytes memory bridgePayload, bytes32 operation, address sender)
         external
         payable
         virtual
@@ -117,9 +118,9 @@ abstract contract DefaultDepositProcessorL1 is IBridgeErrors {
         if (leftovers > 0) {
             // If the call fails, ignore to avoid the attack that would prevent this function from executing
             // solhint-disable-next-line avoid-low-level-calls
-            (bool success,) = tx.origin.call{value: leftovers}("");
+            (bool success,) = sender.call{value: leftovers}("");
 
-            emit LeftoversRefunded(tx.origin, leftovers, success);
+            emit LeftoversRefunded(sender, leftovers, success);
         }
 
         // Increase the staking batch nonce
