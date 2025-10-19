@@ -337,6 +337,15 @@ if [ $result != $olasAddressL2 ]; then
   echo "${red}!!! Fetched address: $result${reset}"
   echo "${red}!!! Expected address: $olasAddressL2${reset}"
 fi
+# StakingManager
+castArgs="$collectorProxyAddress stakingManager()(address)"
+castCmd="$castCallHeader $castArgs"
+result=$($castCmd)
+if [ $result != $stakingManagerProxyAddress ]; then
+  echo "${red}!!! StakingManager address is incorrect!${reset}"
+  echo "${red}!!! Fetched address: $result${reset}"
+  echo "${red}!!! Expected address: $stakingManagerProxyAddress${reset}"
+fi
 # l2StakingProcessor
 castArgs="$collectorProxyAddress l2StakingProcessor()(address)"
 castCmd="$castCallHeader $castArgs"

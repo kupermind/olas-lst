@@ -54,8 +54,8 @@ fi
 castSendHeader="cast send --rpc-url $networkURL$API_KEY $walletArgs"
 
 echo "${green}Add staking models${reset}"
-castArgs="$depositoryProxyAddress createAndActivateStakingModels(uint256[],address[],uint256[],uint256[]) [100,100,100,100] [0x940fb482A821B666CCCE93723d1C6c9359785150,0xcf98Cd2B423c045dc2A1259A4f02291910b64E74,0x05b6e1341877F728fa460fc1A78FB3f699FE62EB,0x16DAeAE9582B80F1c07E1b26cADCf33cE4e7D1d7] [20000000000000000000000,8000000000000000000000,4000000000000000000000,800000000000000000000] [20,50,100,500]"
-#castArgs="$depositoryProxyAddress createAndActivateStakingModels(uint256[],address[],uint256[],uint256[]) [8453] [0x71756B35E3ba7688C75A948EdCA5E040C7C2DDf4] [20000000000000000000000] [20]"
+castArgs="$depositoryProxyAddress createAndActivateStakingModels(uint256[],address[],uint256[],uint256[]) [100,100,100,100] [0x9277fa41D459274462D235B3e0A547add2Ac4Be3,0xeC45dfE874d98a4654a068579C6ca7924543Ec1c,0x53aB2f67a5575f6360D39104cF129e1ACd9A97e4,0x2f11Dc30726923EB37373424fDcd14340FC273Ca] [20000000000000000000000,8000000000000000000000,4000000000000000000000,800000000000000000000] [20,50,100,500]"
+#castArgs="$depositoryProxyAddress createAndActivateStakingModels(uint256[],address[],uint256[],uint256[]) [8453] [] [20000000000000000000000] [20]"
 echo $castArgs
 castCmd="$castSendHeader $castArgs"
 result=$($castCmd)

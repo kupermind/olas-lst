@@ -1,3 +1,7 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
 # Deploy Collector
 ./scripts/deployment/deploy_l2_01_collector.sh $1
 
@@ -26,6 +30,7 @@
 ./scripts/deployment/deploy_l2_08_staking_token_locked.sh $1
 
 # Deploy GnosisStakingProcessorL2
+# !!!!! Need to have GnosisDepositProcessorL1 address in the config
 ./scripts/deployment/deploy_l2_09_gnosis_staking_processor.sh $1
 
 # Deploy BaseStakingProcessorL2
@@ -40,6 +45,12 @@
 ##### !!!!! For mainnet - this is subject to the DAO vote !!!!!
 # Whitelist staking implementation
 ./scripts/deployment/script_l2_04_whitelist_staking_implementation.sh $1
+
+# Create staking contracts
+./scripts/deployment/script_l2_05*.sh $1
+
+# Fund staking contracts: globals, staking proxy number
+./scripts/deployment/script_l2_08_test_only_fund_staking_proxies.sh $1 $2
 
 ##### !!!!! After DAO vote !!!!!
 # Change protocol factor in Collector
