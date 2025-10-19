@@ -67,16 +67,16 @@ interface IDepository {
     function LzCloseStakingModel(uint256 chainId, address stakingProxy) external;
 }
 
+/// @dev Only `owner` has a privilege, but the `sender` was provided.
+/// @param sender Sender address.
+/// @param owner Required sender address as an owner.
+error OwnerOnly(address sender, address owner);
+
 struct AccountChainIdMsgType {
     address account;
     uint32 chainId;
     uint16 msgType;
 }
-
-/// @dev Only `owner` has a privilege, but the `sender` was provided.
-/// @param sender Sender address.
-/// @param owner Required sender address as an owner.
-error OwnerOnly(address sender, address owner);
 
 /// @title LzOracle - Smart contract for LayerZero oracle.
 contract LzOracle is OAppRead, OAppOptionsType3 {
@@ -161,6 +161,11 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
         // Get chainId and stakingProxy address corresponding to guid
         AccountChainIdMsgType memory accountChainIdMsgType = mapUidStakingProxyChainIds[guid];
 
+        // Push a pair of key defining variables into one key: chainId | stakingProxy
+        // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
+        uint256 stakingModelId = uint256(uint160(accountChainIdMsgType.account));
+        stakingModelId |= accountChainIdMsgType.chainId << 160;
+
         // Check for message type
         if (accountChainIdMsgType.msgType == READ_TYPE_CREATE) {
             // Decode obtained data
@@ -172,10 +177,9 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
                 uint256 availableRewards
             ) = abi.decode(message, (bytes32, bool, uint256, uint256, uint256));
 
-            // Check for correctness of parameters
+            // Check for correctness of parameters for staking proxy
             if (!isEnabled || availableRewards == 0 || bytecodeHash != stakingImplementationBytecodeHash) {
-                // TODO
-                revert();
+                revert WrongStakingModel(stakingModelId);
             }
 
             // Considering 1 agent per service: deposit + operator bond = 2 * minStakingDeposit
@@ -193,7 +197,7 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
 
             // Check for correctness of parameters
             if (availableRewards > 0) {
-                revert();
+                revert WrongStakingModel(stakingModelId);
             }
 
             IDepository(depository).LzCloseStakingModel(accountChainIdMsgType.chainId, accountChainIdMsgType.account);
@@ -201,7 +205,7 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
             emit LzCloseStakingModelProcessed(guid, accountChainIdMsgType.chainId, accountChainIdMsgType.account);
         } else {
             // This must never happen
-            revert();
+            revert WrongStakingModel(stakingModelId);
         }
     }
 
@@ -285,14 +289,15 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
         // Get lzRead payload
         bytes memory payload = _cmdGetStakingInfo(stakingProxy, accountChainId.account, accountChainId.chainId);
 
-        // TODO Figure out the correct quote check
-        MessagingFee memory fee = _quote(READ_CHANNEL, payload, options, false);
+        // Get message options fee
+        bytes memory messageOptions = combineOptions(READ_CHANNEL, READ_TYPE_CREATE, options);
+        MessagingFee memory fee = _quote(READ_CHANNEL, payload, messageOptions, false);
         require(msg.value >= fee.nativeFee);
 
         MessagingReceipt memory receipt = _lzSend(
             READ_CHANNEL,
             payload,
-            combineOptions(READ_CHANNEL, READ_TYPE_CREATE, options),
+            messageOptions,
             MessagingFee(msg.value, 0),
             payable(msg.sender)
         );
@@ -308,7 +313,6 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
     /// @param stakingProxy Staking proxy address.
     /// @param options LZ message options.
     function lzCloseStakingModel(uint256 chainId, address stakingProxy, bytes calldata options) external payable onlyOwner {
-        // TODO Check chainId for uint32.max
         // Push a pair of key defining variables into one key: chainId | stakingProxy
         // stakingProxy occupies first 160 bits, chainId occupies next bits as they both fit well in uint256
         uint256 stakingModelId = uint256(uint160(stakingProxy));
@@ -325,14 +329,15 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
         AccountChainIdMsgType memory accountChainId = mapStakingHelperLzChainIds[chainId];
         bytes memory payload = _cmdGetAvailableRewards(stakingProxy, accountChainId.chainId);
 
-        // TODO Figure out the correct quote check
-        MessagingFee memory fee = _quote(READ_CHANNEL, payload, options, false);
+        // Get message options fee
+        bytes memory messageOptions = combineOptions(READ_CHANNEL, READ_TYPE_CLOSE, options);
+        MessagingFee memory fee = _quote(READ_CHANNEL, payload, messageOptions, false);
         require(msg.value >= fee.nativeFee);
 
         MessagingReceipt memory receipt = _lzSend(
             READ_CHANNEL,
             payload,
-            combineOptions(READ_CHANNEL, READ_TYPE_CLOSE, options),
+            messageOptions,
             MessagingFee({ nativeFee: msg.value, lzTokenFee: 0 }),
             payable(msg.sender)
         );
