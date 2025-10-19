@@ -232,6 +232,9 @@ contract LiquidStakingTest is Test {
         gnosisStakingProcessorL2 = new GnosisStakingProcessorL2(address(olas), address(stakingManager), address(collector),
             address(bridgeRelayer), address(bridgeRelayer), address(gnosisDepositProcessorL1), CHAIN_ID);
 
+        // changeStakingManager for collector
+        collector.changeStakingManager(address(stakingManager));
+
         // changeStakingProcessorL2 for collector
         collector.changeStakingProcessorL2(address(gnosisStakingProcessorL2));
 

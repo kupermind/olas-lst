@@ -280,6 +280,9 @@ describe("Liquid Staking", function () {
             collector.address, bridgeRelayer.address, bridgeRelayer.address, gnosisDepositProcessorL1.address, chainId);
         await gnosisStakingProcessorL2.deployed();
 
+        // changeStakingManager for collector
+        await collector.changeStakingManager(stakingManager.address);
+
         // changeStakingProcessorL2 for collector
         await collector.changeStakingProcessorL2(gnosisStakingProcessorL2.address);
 

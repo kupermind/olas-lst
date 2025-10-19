@@ -42,6 +42,10 @@ error Overflow(uint256 provided, uint256 max);
 /// @dev Wrong length of arrays.
 error WrongArrayLength();
 
+/// @dev Wrong sender account address.
+/// @param sender Sender account.
+error WrongAccount(address sender);
+
 /// @dev Caught reentrancy violation.
 error ReentrancyGuard();
 
@@ -53,9 +57,11 @@ struct ReceiverBalance {
 
 /// @title Collector - Smart contract for collecting staking rewards
 contract Collector is Implementation {
+    event StakingManagerUpdated(address indexed stakingManager);
     event StakingProcessorUpdated(address indexed stakingProcessorL2);
     event OperationReceiversSet(bytes32[] operations, address[] receivers);
     event OperationReceiverBalancesUpdated(bytes32 indexed operation, address indexed receiver, uint256 balance);
+    event StakingProxyUnstakeReserveUpdated(address indexed sender, address indexed stakingProxy, uint256 amount);
     event ProtocolFactorUpdated(uint256 protocolFactor);
     event ProtocolBalanceUpdated(uint256 protocolBalance);
     event TokensRelayed(address indexed l1Distributor, uint256 amount);
@@ -74,6 +80,8 @@ contract Collector is Implementation {
     uint256 public protocolBalance;
     // Protocol factor in 10_000 value
     uint256 public protocolFactor;
+    // Staking manager address
+    address public stakingManager;
     // L2 staking processor address
     address public l2StakingProcessor;
 
@@ -82,6 +90,8 @@ contract Collector is Implementation {
 
     // Mapping of operation => OLAS balance and L1 address to send to
     mapping(bytes32 => ReceiverBalance) public mapOperationReceiverBalances;
+    // Mapping of staking proxy => unsuccessful stake amount
+    mapping(address => uint256) public mapStakingProxyUnstakeReserves;
 
     /// @param _olas OLAS address on L2.
     constructor(address _olas) {
@@ -95,6 +105,22 @@ contract Collector is Implementation {
         }
 
         owner = msg.sender;
+    }
+
+    /// @dev Changes staking manager address.
+    /// @param newStakingManager New staking processor L2 address.
+    function changeStakingManager(address newStakingManager) external {
+        // Check for ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
+        }
+
+        if (newStakingManager == address(0)) {
+            revert ZeroAddress();
+        }
+
+        stakingManager = newStakingManager;
+        emit StakingManagerUpdated(newStakingManager);
     }
 
     /// @dev Changes staking processor L2 address.
@@ -183,6 +209,76 @@ contract Collector is Implementation {
         receiverBalance.balance = balance;
 
         emit OperationReceiverBalancesUpdated(operation, receiver, balance);
+
+        _locked = 1;
+    }
+
+    /// @dev Tops up address(this) with a specified amount as staking proxy unstake reserve.
+    /// @param stakingProxy Staking proxy address.
+    /// @param amount OLAS amount.
+    function topUpUnstakeReserve(address stakingProxy, uint256 amount) external {
+        // Reentrancy guard
+        if (_locked == 2) {
+            revert ReentrancyGuard();
+        }
+        _locked = 2;
+
+        // Check for correct access
+        if (msg.sender != l2StakingProcessor) {
+            revert WrongAccount(msg.sender);
+        }
+
+        // Pull OLAS amount and increase corresponding balance
+        IToken(olas).transferFrom(msg.sender, address(this), amount);
+
+        mapStakingProxyUnstakeReserves[stakingProxy] += amount;
+
+        emit StakingProxyUnstakeReserveUpdated(msg.sender, stakingProxy, amount);
+
+        _locked = 1;
+    }
+
+    /// @dev Re-balances unstake reserve to direct it to requested operation.
+    /// @param stakingProxy Staking proxy address.
+    /// @param amount Amount value.
+    /// @param operation Operation type.
+    function rebalanceFromUnstakeReserve(address stakingProxy, uint256 amount, bytes32 operation) external {
+        // Reentrancy guard
+        if (_locked == 2) {
+            revert ReentrancyGuard();
+        }
+        _locked = 2;
+
+        // Check for correct access
+        if (msg.sender != stakingManager) {
+            revert WrongAccount(msg.sender);
+        }
+
+        uint256 proxyUnstakeBalance = mapStakingProxyUnstakeReserves[stakingProxy];
+        // Check for overflow
+        if (amount > proxyUnstakeBalance) {
+            revert Overflow(amount, proxyUnstakeBalance);
+        }
+
+        // Record proxy unstake balance change
+        proxyUnstakeBalance -= amount;
+        mapStakingProxyUnstakeReserves[stakingProxy] = proxyUnstakeBalance;
+
+        // Get ReceiverBalance struct according to the operation type
+        ReceiverBalance storage receiverBalance = mapOperationReceiverBalances[operation];
+        // Get receiver address
+        address receiver = receiverBalance.receiver;
+        // Check for zero address
+        if (receiverBalance.receiver == address(0)) {
+            revert ZeroAddress();
+        }
+
+        // Record L1 receiver balance change
+        uint256 updatedBalance = receiverBalance.balance + amount;
+        receiverBalance.balance = updatedBalance;
+
+        emit StakingProxyUnstakeReserveUpdated(msg.sender, stakingProxy, proxyUnstakeBalance);
+        emit OperationReceiverBalancesUpdated(operation, receiver, updatedBalance);
 
         _locked = 1;
     }
