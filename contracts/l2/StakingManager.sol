@@ -446,13 +446,15 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
             // This must never happen except for unlikely cases where L2 staking setup does not correspond L1 numbers,
             // or when stake failed and now symmetrical unstakes take place
             if (mapStakedServiceIds[stakingProxy].length == 0) {
-                amount = balance;
+                // Get amount - balance difference
                 uint256 amountDiff = amount - balance;
+                // Amount becomes balance
+                amount = balance;
+                // Balance drops to zero since it was not sufficient in first places
+                balance = 0;
 
                 // Request funds re-balance from unstake reserve
                 ICollector(collector).rebalanceFromUnstakeReserve(stakingProxy, amountDiff, operation);
-
-                balance = 0;
             } else {
                 // Calculate how many unstakes are needed
                 uint256 minStakingDeposit = IStaking(stakingProxy).minStakingDeposit();
