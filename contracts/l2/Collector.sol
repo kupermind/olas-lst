@@ -231,9 +231,11 @@ contract Collector is Implementation {
         // Pull OLAS amount and increase corresponding balance
         IToken(olas).transferFrom(msg.sender, address(this), amount);
 
-        mapStakingProxyUnstakeReserves[stakingProxy] += amount;
+        // Record balance change
+        uint256 stakingProxyBalance = mapStakingProxyUnstakeReserves[stakingProxy] + amount;
+        mapStakingProxyUnstakeReserves[stakingProxy] = stakingProxyBalance;
 
-        emit StakingProxyUnstakeReserveUpdated(msg.sender, stakingProxy, amount);
+        emit StakingProxyUnstakeReserveUpdated(msg.sender, stakingProxy, stakingProxyBalance);
 
         _locked = 1;
     }
