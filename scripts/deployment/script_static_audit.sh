@@ -355,6 +355,38 @@ if [ $result != 0 ]; then
   echo "${red}!!! Fetched: $result${reset}"
   echo "${red}!!! Expected: 0${reset}"
 fi
+# mapOperationReceiverBalances
+#[$REWARD,$UNSTAKE,$UNSTAKE_RETIRED] => [$distributorProxyAddress,$treasuryProxyAddress,$unstakeRelayerProxyAddress]"
+REWARD="0x0b9821ae606ebc7c79bf3390bdd3dc93e1b4a7cda27aad60646e7b88ff55b001"
+castArgs="$collectorProxyAddress mapOperationReceiverBalances(bytes32)(uint256,address) $REWARD"
+castCmd="$castCallHeader $castArgs"
+result=$($castCmd)
+resultAddress=$(echo "$result" | grep "0x")
+if [ $resultAddress != $distributorProxyAddress ]; then
+  echo "${red}!!! Distributor address is incorrect!${reset}"
+  echo "${red}!!! Fetched address: $result${reset}"
+  echo "${red}!!! Expected address: $distributorProxyAddress${reset}"
+fi
+UNSTAKE="0x8ca9a95e41b5eece253c93f5b31eed1253aed6b145d8a6e14d913fdf8e732293"
+castArgs="$collectorProxyAddress mapOperationReceiverBalances(bytes32)(uint256,address) $UNSTAKE"
+castCmd="$castCallHeader $castArgs"
+result=$($castCmd)
+resultAddress=$(echo "$result" | grep "0x")
+if [ $resultAddress != $treasuryProxyAddress ]; then
+  echo "${red}!!! Treasury address is incorrect!${reset}"
+  echo "${red}!!! Fetched address: $result${reset}"
+  echo "${red}!!! Expected address: $treasuryProxyAddress${reset}"
+fi
+UNSTAKE_RETIRED="0x9065ad15d9673159e4597c86084aff8052550cec93c5a6e44b3f1dba4c8731b3"
+castArgs="$collectorProxyAddress mapOperationReceiverBalances(bytes32)(uint256,address) $UNSTAKE_RETIRED"
+castCmd="$castCallHeader $castArgs"
+result=$($castCmd)
+resultAddress=$(echo "$result" | grep "0x")
+if [ $resultAddress != $unstakeRelayerProxyAddress ]; then
+  echo "${red}!!! UnstakeRelayer address is incorrect!${reset}"
+  echo "${red}!!! Fetched address: $result${reset}"
+  echo "${red}!!! Expected address: $unstakeRelayerProxyAddress${reset}"
+fi
 
 
 echo "${green}Checking StakingManager${reset}"

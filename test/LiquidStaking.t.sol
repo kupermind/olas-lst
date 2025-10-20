@@ -1,267 +1,93 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import "forge-std/Test.sol";
+import {Test, console} from "forge-std/Test.sol";
+import {Utils} from "./utils/Utils.sol";
 
-// Simple mock contracts to avoid naming conflicts
-contract MockERC20 {
-    mapping(address => uint256) public balanceOf;
-    mapping(address => mapping(address => uint256)) public allowance;
-    string public name = "Test Token";
-    string public symbol = "TEST";
-    uint8 public decimals = 18;
-    uint256 public totalSupply;
+import {IService} from "../contracts/interfaces/IService.sol";
+import {GnosisSafe} from "@gnosis.pm/safe-contracts/contracts/GnosisSafe.sol";
+import {GnosisSafeL2} from "@gnosis.pm/safe-contracts/contracts/GnosisSafeL2.sol";
+import {GnosisSafeProxyFactory} from "@gnosis.pm/safe-contracts/contracts/proxies/GnosisSafeProxyFactory.sol";
+import {GnosisSafeProxy} from "@gnosis.pm/safe-contracts/contracts/proxies/GnosisSafeProxy.sol";
+import {DefaultCallbackHandler} from "@gnosis.pm/safe-contracts/contracts/handler/DefaultCallbackHandler.sol";
+import {MultiSendCallOnly} from "@gnosis.pm/safe-contracts/contracts/libraries/MultiSendCallOnly.sol";
+import {SafeToL2Setup} from "../contracts/test/SafeToL2Setup.sol";
 
-    function mint(address to, uint256 amount) external {
-        balanceOf[to] += amount;
-        totalSupply += amount;
-    }
+import {ERC20} from "@solmate/src/tokens/ERC20.sol";
+import {ERC20Token} from "@registries/contracts/test/ERC20Token.sol";
+import {ServiceRegistryL2} from "@registries/contracts/ServiceRegistryL2.sol";
+import {ServiceRegistryTokenUtility} from "@registries/contracts/ServiceRegistryTokenUtility.sol";
+import {ServiceManagerToken} from "@registries/contracts/ServiceManagerToken.sol";
+import {OperatorWhitelist} from "@registries/contracts/utils/OperatorWhitelist.sol";
+import {GnosisSafeMultisig} from "@registries/contracts/multisigs/GnosisSafeMultisig.sol";
+import {GnosisSafeSameAddressMultisig} from "@registries/contracts/multisigs/GnosisSafeSameAddressMultisig.sol";
+import {StakingVerifier} from "@registries/contracts/staking/StakingVerifier.sol";
+import {StakingFactory} from "@registries/contracts/staking/StakingFactory.sol";
 
-    function transfer(address to, uint256 amount) external returns (bool) {
-        require(balanceOf[msg.sender] >= amount, "Insufficient balance");
-        balanceOf[msg.sender] -= amount;
-        balanceOf[to] += amount;
-        return true;
-    }
+import {stOLAS} from "../contracts/l1/stOLAS.sol";
+import {Lock} from "../contracts/l1/Lock.sol";
+import {Depository, ProductType, StakingModelStatus} from "../contracts/l1/Depository.sol";
+import {Treasury} from "../contracts/l1/Treasury.sol";
+import {Distributor} from "../contracts/l1/Distributor.sol";
+import {UnstakeRelayer} from "../contracts/l1/UnstakeRelayer.sol";
+import {GnosisDepositProcessorL1} from "../contracts/l1/bridging/GnosisDepositProcessorL1.sol";
 
-    function approve(address spender, uint256 amount) external returns (bool) {
-        allowance[msg.sender][spender] = amount;
-        return true;
-    }
+import {Collector} from "../contracts/l2/Collector.sol";
+import {ActivityModule} from "../contracts/l2/ActivityModule.sol";
+import {StakingManager} from "../contracts/l2/StakingManager.sol";
+import {ModuleActivityChecker} from "../contracts/l2/ModuleActivityChecker.sol";
+import {StakingTokenLocked, ServiceInfo} from "../contracts/l2/StakingTokenLocked.sol";
+import {GnosisStakingProcessorL2} from "../contracts/l2/bridging/GnosisStakingProcessorL2.sol";
 
-    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
-        require(balanceOf[from] >= amount, "Insufficient balance");
-        require(allowance[from][msg.sender] >= amount, "Insufficient allowance");
-        balanceOf[from] -= amount;
-        balanceOf[to] += amount;
-        allowance[from][msg.sender] -= amount;
-        return true;
-    }
-}
-
-contract MockStOLAS {
-    MockERC20 public olas;
-    mapping(address => uint256) public balanceOf;
-    uint256 public totalSupply;
-    uint256 public totalAssets;
-
-    constructor(address _olas) {
-        olas = MockERC20(_olas);
-    }
-
-    function previewDeposit(uint256 assets) public view returns (uint256) {
-        return assets; // 1:1 ratio for simplicity
-    }
-
-    function deposit(uint256 assets, address receiver) external returns (uint256) {
-        require(olas.transferFrom(msg.sender, address(this), assets), "Transfer failed");
-        uint256 shares = previewDeposit(assets);
-        _mint(receiver, shares);
-        totalAssets += assets;
-        return shares;
-    }
-
-    function _mint(address to, uint256 amount) internal {
-        balanceOf[to] += amount;
-        totalSupply += amount;
-    }
-
-    // Public function for external minting (for testing)
-    function mint(address to, uint256 amount) external {
-        _mint(to, amount);
-    }
-
-    // Function to update totalAssets (for testing)
-    function addToTotalAssets(uint256 amount) external {
-        totalAssets += amount;
-    }
-
-    function initialize(address treasury, address depository, address distributor, address unstakeRelayer) external {
-        // Mock implementation
-    }
-}
-
-contract MockLock {
-    MockERC20 public olas;
-    address public ve;
-    bool public initialized;
-    address public governor;
-
-    constructor(address _olas, address _ve) {
-        olas = MockERC20(_olas);
-        ve = _ve;
-    }
-
-    function initialize() external {
-        require(!initialized, "Already initialized");
-        initialized = true;
-    }
-
-    function setGovernorAndCreateFirstLock(address _governor) external {
-        governor = _governor;
-    }
-
-    // Add receive function to accept ETH
-    receive() external payable {}
-}
-
-contract MockDepository {
-    MockERC20 public olas;
-    MockStOLAS public st;
-    address public treasury;
-    bool public initialized;
-
-    constructor(address _olas, address _st) {
-        olas = MockERC20(_olas);
-        st = MockStOLAS(_st);
-    }
-
-    function initialize() external {
-        require(!initialized, "Already initialized");
-        initialized = true;
-    }
-
-    function deposit(
-        uint256 amount,
-        uint256[] calldata chainIds,
-        address[] calldata stakingTokenInstances,
-        bytes[] calldata bridgePayloads,
-        uint256[] calldata values
-    ) external {
-        require(olas.transferFrom(msg.sender, address(this), amount), "Transfer failed");
-        // Mock: directly mint stOLAS tokens to the user without calling st.deposit
-        // In real implementation, this would handle bridging and L2 operations
-        st.mint(msg.sender, amount);
-        st.addToTotalAssets(amount);
-    }
-
-    function changeTreasury(address _treasury) external {
-        treasury = _treasury;
-    }
-
-    function closeRetiredStakingModels(uint256[] calldata chainIds, address[] calldata stakingTokenInstances)
-        external
-    {
-        // Mock implementation that reverts for testing
-        revert("Not implemented");
-    }
-}
-
-contract MockTreasury {
-    MockERC20 public olas;
-    MockStOLAS public st;
-    MockDepository public depository;
-    bool public initialized;
-
-    constructor(address _olas, address _st, address _depository) {
-        olas = MockERC20(_olas);
-        st = MockStOLAS(_st);
-        depository = MockDepository(_depository);
-    }
-
-    function initialize(uint256) external {
-        require(!initialized, "Already initialized");
-        initialized = true;
-    }
-}
-
-contract MockDistributor {
-    MockERC20 public olas;
-    MockStOLAS public st;
-    MockLock public lock;
-    bool public initialized;
-
-    constructor(address _olas, address _st, address payable _lock) {
-        olas = MockERC20(_olas);
-        st = MockStOLAS(_st);
-        lock = MockLock(_lock);
-    }
-
-    function initialize(uint256 lockFactor) external {
-        require(!initialized, "Already initialized");
-        initialized = true;
-    }
-}
-
-contract MockUnstakeRelayer {
-    MockERC20 public olas;
-    MockStOLAS public st;
-    bool public initialized;
-
-    constructor(address _olas, address _st) {
-        olas = MockERC20(_olas);
-        st = MockStOLAS(_st);
-    }
-
-    function initialize() external {
-        require(!initialized, "Already initialized");
-        initialized = true;
-    }
-}
-
-contract MockCollector {
-    MockERC20 public olas;
-    bool public initialized;
-
-    constructor(address _olas) {
-        olas = MockERC20(_olas);
-    }
-
-    function initialize() external {
-        require(!initialized, "Already initialized");
-        initialized = true;
-    }
-}
-
-contract MockStakingManager {
-    MockERC20 public olas;
-    address public beacon;
-    MockCollector public collector;
-    uint256 public agentId;
-    bytes32 public configHash;
-    bool public initialized;
-
-    constructor(address _olas, address _beacon, address _collector, uint256 _agentId, bytes32 _configHash) {
-        olas = MockERC20(_olas);
-        beacon = _beacon;
-        collector = MockCollector(_collector);
-        agentId = _agentId;
-        configHash = _configHash;
-    }
-
-    function initialize(address, address, address) external {
-        require(!initialized, "Already initialized");
-        initialized = true;
-    }
-
-    // Add receive function to accept ETH
-    receive() external payable {}
-}
-
-contract MockBeacon {
-    address public implementation;
-
-    constructor(address _implementation) {
-        implementation = _implementation;
-    }
-}
+import {Proxy} from "../contracts/Proxy.sol";
+import {Beacon} from "../contracts/Beacon.sol";
+import {MockVE} from "../contracts/test/MockVE.sol";
+import {BridgeRelayer} from "../contracts/test/BridgeRelayer.sol";
+import {SafeToL2Setup} from "../contracts/test/SafeToL2Setup.sol";
 
 contract LiquidStakingTest is Test {
-    // Test contracts
-    MockERC20 public olas;
-    MockStOLAS public st;
-    MockLock public lock;
-    MockDistributor public distributor;
-    MockUnstakeRelayer public unstakeRelayer;
-    MockDepository public depository;
-    MockTreasury public treasury;
-    MockCollector public collector;
-    MockBeacon public beacon;
-    MockStakingManager public stakingManager;
+    Utils internal utils;
+    ERC20Token internal olas;
+    ServiceRegistryL2 internal serviceRegistry;
+    ServiceRegistryTokenUtility internal serviceRegistryTokenUtility;
+    OperatorWhitelist internal operatorWhitelist;
+    ServiceManagerToken internal serviceManagerToken;
+
+    GnosisSafe internal gnosisSafe;
+    GnosisSafeL2 internal gnosisSafeL2;
+    GnosisSafeProxy internal gnosisSafeProxy;
+    GnosisSafeProxyFactory internal gnosisSafeProxyFactory;
+    DefaultCallbackHandler internal fallbackHandler;
+    MultiSendCallOnly internal multiSend;
+    SafeToL2Setup internal safeModuleInitializer;
+
+    GnosisSafeMultisig internal gnosisSafeMultisig;
+    GnosisSafeSameAddressMultisig internal gnosisSafeSameAddressMultisig;
+    StakingVerifier internal stakingVerifier;
+    StakingFactory internal stakingFactory;
+
+    stOLAS internal st;
+    Lock internal lock;
+    Distributor internal distributor;
+    UnstakeRelayer internal unstakeRelayer;
+    Depository internal depository;
+    Treasury internal treasury;
+    GnosisDepositProcessorL1 internal gnosisDepositProcessorL1;
+    Collector internal collector;
+    ActivityModule internal activityModule;
+    StakingManager internal stakingManager;
+    GnosisStakingProcessorL2 internal gnosisStakingProcessorL2;
+    ModuleActivityChecker internal moduleActivityChecker;
+    StakingTokenLocked internal stakingTokenInstance;
+
+    Beacon internal beacon;
+    MockVE internal ve;
+    BridgeRelayer internal bridgeRelayer;
 
     // Test addresses
-    address public deployer;
-    address public agent;
+    address internal deployer;
+    address internal agent;
+    address payable[] internal users;
 
     // Constants
     uint256 public constant ONE_DAY = 86400;
@@ -270,10 +96,12 @@ contract LiquidStakingTest is Test {
     uint256 public constant AGENT_ID = 1;
     uint256 public constant LIVENESS_PERIOD = ONE_DAY;
     uint256 public constant INIT_SUPPLY = 5e26;
-    uint256 public constant LIVENESS_RATIO = 11111111111111;
+    uint256 public constant LIVENESS_RATIO = 1;
     uint256 public constant MAX_NUM_SERVICES = 100;
+    uint256 public constant REWARDS_PER_SECOND = 0.0005 ether;
     uint256 public constant MIN_STAKING_DEPOSIT = REG_DEPOSIT;
     uint256 public constant FULL_STAKE_DEPOSIT = REG_DEPOSIT * 2;
+    uint256 public constant STAKING_SUPPLY = FULL_STAKE_DEPOSIT * MAX_NUM_SERVICES;
     uint256 public constant TIME_FOR_EMISSIONS = 30 * ONE_DAY;
     uint256 public constant APY_LIMIT = 3 ether;
     uint256 public constant LOCK_FACTOR = 100;
@@ -281,6 +109,7 @@ contract LiquidStakingTest is Test {
     uint256 public constant PROTOCOL_FACTOR = 0;
     uint256 public constant CHAIN_ID = 31337;
     uint256 public constant GNOSIS_CHAIN_ID = 100;
+    bytes32 public DEFAULT_HASH = 0x9999999999999999999999999999999999999999999999999999999999999999;
 
     // Bridge operations
     bytes32 public constant REWARD_OPERATION = 0x0b9821ae606ebc7c79bf3390bdd3dc93e1b4a7cda27aad60646e7b88ff55b001;
@@ -291,138 +120,184 @@ contract LiquidStakingTest is Test {
     // Bridge payload
     bytes public constant BRIDGE_PAYLOAD = "";
 
-    function setUp() public {
-        console.log("=== Starting setUp ===");
 
-        deployer = address(this);
-        agent = address(this);
+    function setUp() public virtual {
+        utils = new Utils();
+        users = utils.createUsers(20);
+        deployer = users[0];
+        vm.label(deployer, "Deployer");
+        agent = users[1];
+        vm.label(deployer, "Agent");
 
-        console.log("Deployer address:", deployer);
+        // Deploying registries contracts
+        serviceRegistry = new ServiceRegistryL2("Service Registry", "SERVICE", "https://localhost/service/");
+        serviceRegistryTokenUtility = new ServiceRegistryTokenUtility(address(serviceRegistry));
+        operatorWhitelist = new OperatorWhitelist(address(serviceRegistry));
+        serviceManagerToken = new ServiceManagerToken(address(serviceRegistry), address(serviceRegistryTokenUtility), address(operatorWhitelist));
+        serviceRegistry.changeManager(address(serviceManagerToken));
+        serviceRegistryTokenUtility.changeManager(address(serviceManagerToken));
 
-        // Deploy ERC20 token (OLAS)
-        console.log("Deploying MockERC20...");
-        olas = new MockERC20();
-        console.log("MockERC20 deployed at:", address(olas));
+        // Deploying multisig contracts and multisig implementation
+        gnosisSafe = new GnosisSafe();
+        gnosisSafeL2 = new GnosisSafeL2();
+        gnosisSafeProxyFactory = new GnosisSafeProxyFactory();
+        safeModuleInitializer = new SafeToL2Setup();
+        fallbackHandler = new DefaultCallbackHandler();
+        multiSend = new MultiSendCallOnly();
+        gnosisSafeProxy = new GnosisSafeProxy(address(gnosisSafe));
 
-        console.log("Minting", INIT_SUPPLY, "tokens to deployer");
+        // Get the multisig proxy bytecode hash
+        bytes32 multisigProxyHash = keccak256(address(gnosisSafeProxy).code);
+
+        gnosisSafeMultisig = new GnosisSafeMultisig(payable(address(gnosisSafe)), address(gnosisSafeProxyFactory));
+        gnosisSafeSameAddressMultisig = new GnosisSafeSameAddressMultisig(multisigProxyHash);
+
+        // Deploying OLAS mock and minting to deployer, operator and a current contract
+        olas = new ERC20Token();
         olas.mint(deployer, INIT_SUPPLY);
-        console.log("Deployer balance:", olas.balanceOf(deployer));
+        olas.mint(address(this), INIT_SUPPLY);
 
-        // Deploy stOLAS
-        console.log("Deploying MockStOLAS...");
-        st = new MockStOLAS(address(olas));
-        console.log("MockStOLAS deployed at:", address(st));
+        ve = new MockVE(address(olas));
+        st = new stOLAS(ERC20(address(olas)));
 
-        // Deploy Lock
-        console.log("Deploying MockLock...");
-        lock = new MockLock(address(olas), address(0));
-        console.log("MockLock deployed at:", address(lock));
+        Lock lockImplementation = new Lock(address(olas), address(ve));
+        bytes memory initPayload = abi.encodeWithSelector(lockImplementation.initialize.selector);
+        Proxy lockProxy = new Proxy(address(lockImplementation), initPayload);
+        lock = Lock(address(lockProxy));
 
-        // Deploy Distributor
-        console.log("Deploying MockDistributor...");
-        distributor = new MockDistributor(address(olas), address(st), payable(address(lock)));
-        console.log("MockDistributor deployed at:", address(distributor));
-
-        // Deploy UnstakeRelayer
-        console.log("Deploying MockUnstakeRelayer...");
-        unstakeRelayer = new MockUnstakeRelayer(address(olas), address(st));
-        console.log("MockUnstakeRelayer deployed at:", address(unstakeRelayer));
-
-        // Deploy Depository
-        console.log("Deploying MockDepository...");
-        depository = new MockDepository(address(olas), address(st));
-        console.log("MockDepository deployed at:", address(depository));
-
-        // Deploy Treasury
-        console.log("Deploying MockTreasury...");
-        treasury = new MockTreasury(address(olas), address(st), address(depository));
-        console.log("MockTreasury deployed at:", address(treasury));
-
-        // Deploy Collector
-        console.log("Deploying MockCollector...");
-        collector = new MockCollector(address(olas));
-        console.log("MockCollector deployed at:", address(collector));
-
-        // Deploy Beacon
-        console.log("Deploying MockBeacon...");
-        beacon = new MockBeacon(address(0));
-        console.log("MockBeacon deployed at:", address(beacon));
-
-        // Deploy StakingManager
-        console.log("Deploying MockStakingManager...");
-        stakingManager =
-            new MockStakingManager(address(olas), address(beacon), address(collector), AGENT_ID, bytes32(0));
-        console.log("MockStakingManager deployed at:", address(stakingManager));
-
-        console.log("=== Starting contract initialization ===");
-
-        // Initialize contracts
-        _initializeContracts();
-
-        console.log("=== setUp completed successfully ===");
-    }
-
-    function _initializeContracts() internal {
-        console.log("Initializing Lock...");
-        // Initialize Lock
-        lock.initialize();
-        console.log("Lock initialized");
-
-        console.log("Initializing Distributor...");
-        // Initialize Distributor
-        distributor.initialize(LOCK_FACTOR);
-        console.log("Distributor initialized");
-
-        console.log("Initializing UnstakeRelayer...");
-        // Initialize UnstakeRelayer
-        unstakeRelayer.initialize();
-        console.log("UnstakeRelayer initialized");
-
-        console.log("Initializing Depository...");
-        // Initialize Depository
-        depository.initialize();
-        console.log("Depository initialized");
-
-        console.log("Initializing Treasury...");
-        // Initialize Treasury
-        treasury.initialize(0);
-        console.log("Treasury initialized");
-
-        console.log("Initializing Collector...");
-        // Initialize Collector
-        collector.initialize();
-        console.log("Collector initialized");
-
-        console.log("Initializing StakingManager...");
-        // Initialize StakingManager
-        stakingManager.initialize(address(0), address(0), address(0));
-        console.log("StakingManager initialized");
-
-        console.log("Setting up stOLAS managers...");
-        // Setup stOLAS managers
-        st.initialize(address(treasury), address(depository), address(distributor), address(unstakeRelayer));
-        console.log("stOLAS managers set");
-
-        console.log("Setting up depository treasury...");
-        // Setup depository treasury
-        depository.changeTreasury(address(treasury));
-        console.log("Depository treasury set");
-
-        console.log("Funding Lock with initial OLAS...");
-        // Fund Lock with initial OLAS
+        // Transfer initial lock
         olas.transfer(address(lock), 1 ether);
-        console.log("Lock funded with 1 ether");
+        // Set governor and create first lock
+        // Governor address is irrelevant for testing
+        lock.setGovernorAndCreateFirstLock(address(this));
 
-        console.log("Setting governor and creating first lock...");
-        lock.setGovernorAndCreateFirstLock(deployer);
-        console.log("Governor set and first lock created");
+        Distributor distributorImplementation = new Distributor(address(olas), address(st), address(lock));
+        initPayload = abi.encodeWithSelector(distributorImplementation.initialize.selector, LOCK_FACTOR);
+        Proxy distributorProxy = new Proxy(address(distributorImplementation), initPayload);
+        distributor = Distributor(address(distributorProxy));
 
-        console.log("Funding StakingManager...");
-        // Fund StakingManager
-        payable(address(stakingManager)).transfer(1 ether);
-        console.log("StakingManager funded with 1 ether");
+        UnstakeRelayer unstakeRelayerImplementation = new UnstakeRelayer(address(olas), address(st));
+        initPayload = abi.encodeWithSelector(unstakeRelayerImplementation.initialize.selector);
+        Proxy unstakeRelayerProxy = new Proxy(address(unstakeRelayerImplementation), initPayload);
+        unstakeRelayer = UnstakeRelayer(address(unstakeRelayerProxy));
 
-        console.log("=== Contract initialization completed ===");
+        Depository depositoryImplementation = new Depository(address(olas), address(st));
+        initPayload = abi.encodeWithSelector(depositoryImplementation.initialize.selector);
+        Proxy depositoryProxy = new Proxy(address(depositoryImplementation), initPayload);
+        depository = Depository(address(depositoryProxy));
+
+        // Change product type to Final
+        depository.changeProductType(ProductType.Final);
+
+        Treasury treasuryImplementation = new Treasury(address(olas), address(st), address(depository));
+        initPayload = abi.encodeWithSelector(treasuryImplementation.initialize.selector, 0);
+        Proxy treasuryProxy = new Proxy(address(treasuryImplementation), initPayload);
+        treasury = Treasury(address(treasuryProxy));
+
+        // Change managers for stOLAS
+        st.initialize(address(treasury), address(depository), address(distributor), address(unstakeRelayer));
+
+        // Change treasury address in depository
+        depository.changeTreasury(address(treasury));
+
+        // Deploy service staking verifier
+        stakingVerifier = new StakingVerifier(address(olas), address(serviceRegistry),
+            address(serviceRegistryTokenUtility), MIN_STAKING_DEPOSIT, TIME_FOR_EMISSIONS, MAX_NUM_SERVICES, APY_LIMIT);
+
+        // Deploy service staking factory
+        stakingFactory = new StakingFactory(address(stakingVerifier));
+
+        Collector collectorImplementation = new Collector(address(olas));
+        initPayload = abi.encodeWithSelector(collectorImplementation.initialize.selector);
+        Proxy collectorProxy = new Proxy(address(collectorImplementation), initPayload);
+        collector = Collector(address(collectorProxy));
+
+        activityModule = new ActivityModule(address(olas), address(collector), address(multiSend));
+        beacon = new Beacon(address(activityModule));
+
+        StakingManager stakingManagerImplementation = new StakingManager(address(olas), address(serviceManagerToken),
+            address(stakingFactory), address(safeModuleInitializer), address(gnosisSafeL2), address(beacon),
+            address(collector), AGENT_ID, DEFAULT_HASH);
+        initPayload = abi.encodeWithSelector(stakingManagerImplementation.initialize.selector, address(gnosisSafeMultisig),
+            address(gnosisSafeSameAddressMultisig), address(fallbackHandler));
+        Proxy stakingManagerProxy = new Proxy(address(stakingManagerImplementation), initPayload);
+        stakingManager = StakingManager(payable(address(stakingManagerProxy)));
+
+        // Fund staking manager with native to support staking creation
+        vm.deal(address(stakingManager), 1 ether);
+
+        bridgeRelayer = new BridgeRelayer(address(olas));
+        gnosisDepositProcessorL1 = new GnosisDepositProcessorL1(address(olas), address(depository), address(bridgeRelayer),
+            address(bridgeRelayer));
+        gnosisStakingProcessorL2 = new GnosisStakingProcessorL2(address(olas), address(stakingManager), address(collector),
+            address(bridgeRelayer), address(bridgeRelayer), address(gnosisDepositProcessorL1), CHAIN_ID);
+
+        // changeStakingProcessorL2 for collector
+        collector.changeStakingProcessorL2(address(gnosisStakingProcessorL2));
+
+        // changeStakingProcessorL2 for stakingManager
+        stakingManager.changeStakingProcessorL2(address(gnosisStakingProcessorL2));
+
+        // Set the gnosisStakingProcessorL2 address in gnosisDepositProcessorL1
+        gnosisDepositProcessorL1.setL2StakingProcessor(address(gnosisStakingProcessorL2));
+
+        // Whitelist deposit processors
+        address[] memory depositProcessors = new address[](1);
+        depositProcessors[0] = address(gnosisDepositProcessorL1);
+        uint256[] memory chainIds = new uint256[](1);
+        chainIds[0] = GNOSIS_CHAIN_ID;
+        depository.setDepositProcessorChainIds(depositProcessors, chainIds);
+
+        // Deploy service staking activity checker
+        moduleActivityChecker = new ModuleActivityChecker(LIVENESS_RATIO);
+
+        // Deploy service staking token locked implementation
+        StakingTokenLocked stakingTokenImplementation = new StakingTokenLocked();
+
+        // Whitelist implementation
+        address[] memory stakingTokenImplementations = new address[](1);
+        stakingTokenImplementations[0] = address(stakingTokenImplementation);
+        bool[] memory boolArr = new bool[](1);
+        boolArr[0] = true;
+        stakingVerifier.setImplementationsStatuses(stakingTokenImplementations, boolArr, true);
+
+        StakingTokenLocked.StakingParams memory stakingParams = StakingTokenLocked.StakingParams(
+            MAX_NUM_SERVICES, REWARDS_PER_SECOND, MIN_STAKING_DEPOSIT, LIVENESS_PERIOD, TIME_FOR_EMISSIONS,
+            address(serviceRegistry), address(serviceRegistryTokenUtility), address(olas), address(stakingManager),
+            address(moduleActivityChecker));
+
+        // Initialization payload and deployment of stakingNativeToken
+        initPayload = abi.encodeWithSelector(stakingTokenImplementation.initialize.selector, stakingParams);
+        address stakingTokenAddress = stakingFactory.createStakingInstance(address(stakingTokenImplementation), initPayload);
+        stakingTokenInstance = StakingTokenLocked(stakingTokenAddress);
+
+        // Whitelist multisig implementations
+        serviceRegistry.changeMultisigPermission(address(gnosisSafeMultisig), true);
+        serviceRegistry.changeMultisigPermission(address(gnosisSafeSameAddressMultisig), true);
+
+        // Fund the staking contract
+        olas.approve(stakingTokenAddress, STAKING_SUPPLY);
+        stakingTokenInstance.deposit(STAKING_SUPPLY);
+
+        // Add model to L1
+        address[] memory stakingTokenAddresses = new address[](1);
+        stakingTokenAddresses[0] = address(stakingTokenAddress);
+        uint256[] memory fullStakeDeposits = new uint256[](1);
+        fullStakeDeposits[0] = FULL_STAKE_DEPOSIT;
+        uint256[] memory maxNumServices = new uint256[](1);
+        maxNumServices[0] = MAX_NUM_SERVICES;
+        depository.createAndActivateStakingModels(chainIds, stakingTokenAddresses, fullStakeDeposits, maxNumServices);
+
+        // Set operation receivers
+        bytes32[] memory operations = new bytes32[](3);
+        operations[0] = REWARD_OPERATION;
+        operations[1] = UNSTAKE_OPERATION;
+        operations[2] = UNSTAKE_RETIRED_OPERATION;
+        address[] memory receivers = new address[](3);
+        receivers[0] = address(distributor);
+        receivers[1] = address(treasury);
+        receivers[2] = address(unstakeRelayer);
+        Collector(collector).setOperationReceivers(operations, receivers);
     }
 
     function testE2ELiquidStakingSimple() public {
@@ -570,21 +445,77 @@ contract LiquidStakingTest is Test {
         uint256 numStakes = 18;
 
         uint256[] memory chainIds = _fillArray(GNOSIS_CHAIN_ID, numStakes);
-        address[] memory stakingInstances = _fillArray(address(0), numStakes);
+        address[] memory stakingInstances = _fillArray(address(stakingTokenInstance), numStakes);
         bytes[] memory bridgePayloads = _fillArray(BRIDGE_PAYLOAD, numStakes);
         uint256[] memory values = _fillArray(0, numStakes);
 
-        for (uint256 i = 0; i < 5; i++) {
-            // Reduced iterations for testing
+        // Iterate over deposits
+        for (uint256 i = 0; i < 40; i++) {
             console.log("Stake-Unstake iteration:", i);
 
+            // Increase stake a bit every iteration
             olasAmount += 1;
-            olas.approve(address(depository), olasAmount * numStakes);
+            uint256 amountToStake = olasAmount * numStakes;
 
-            depository.deposit(olasAmount * numStakes, chainIds, stakingInstances, bridgePayloads, values);
+            // Approve and preview
+            vm.prank(deployer);
+            olas.approve(address(depository), amountToStake);
+            uint256 previewAmount = st.previewDeposit(amountToStake);
+
+            // Track totals before deposit
+            uint256 stTotalAssetsBefore = st.totalAssets();
+            uint256 stBalanceBefore = st.balanceOf(deployer);
+
+            // Deposit
+            vm.prank(deployer);
+            depository.deposit(amountToStake, chainIds, stakingInstances, bridgePayloads, values);
+
+            // Validate totalAssets increased by exact deposited OLAS
+            uint256 stTotalAssetsAfter = st.totalAssets();
+            uint256 stTotalAssetsAfterDiff = stTotalAssetsAfter - stTotalAssetsBefore;
+            assertEq(stTotalAssetsAfterDiff, amountToStake, "totalAssets did not increase by deposited amount");
+
+            // Validate stOLAS minted equals previewDeposit
+            uint256 stBalanceAfter = st.balanceOf(deployer);
+            uint256 stBalanceDiff = stBalanceAfter - stBalanceBefore;
+            assertEq(stBalanceDiff, previewAmount, "minted stOLAS != previewDeposit");
+
+            // Preview redeem of just-minted shares should be ~amountToStake (allow tiny rounding)
+            uint256 redeemPreview = st.previewRedeem(stBalanceDiff);
+            uint256 delta = amountToStake - redeemPreview;
+            require(delta < 10, "previewRedeem deviates too much");
 
             uint256 stBalance = st.balanceOf(deployer);
             console.log("User stOLAS balance now:", stBalance);
+            console.log("OLAS total assets on stOLAS:", stTotalAssetsAfter);
+
+            uint256 veBalance = ve.getVotes(address(lock));
+            console.log("Protocol current veOLAS balance:", veBalance);
+
+            console.log("L2");
+
+            console.log("OLAS rewards available on L2 staking contract:", stakingTokenInstance.availableRewards());
+
+            // Increase the time for the livenessPeriod
+            console.log("Wait for liveness period to pass");
+            skip(LIVENESS_PERIOD);
+
+            // Call the checkpoint
+            console.log("Calling checkpoint by agent or manually");
+            vm.prank(agent);
+            stakingTokenInstance.checkpoint();
+
+            uint256[] memory stakedServiceIds = stakingManager.getStakedServiceIds(address(stakingTokenInstance));
+            console.log("Number of staked services in StakingManager:", stakedServiceIds.length);
+            uint256 numStakedServices = stakingTokenInstance.getNumServiceIds();
+            assertEq(numStakedServices, stakedServiceIds.length);
+
+            // Check sync of staked balances on both chains
+            uint256 stakedBalanceL1 = st.stakedBalance();
+            uint256 stakedBalanceL2 = FULL_STAKE_DEPOSIT * stakedServiceIds.length;
+            uint256 stakeBalanceRemainder = stakingManager.mapStakingProxyBalances(address(stakingTokenInstance));
+            stakedBalanceL2 = stakedBalanceL2 + stakeBalanceRemainder;
+            assertEq(stakedBalanceL1, stakedBalanceL2);
         }
 
         console.log("Test completed successfully");
