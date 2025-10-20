@@ -165,6 +165,7 @@ contract Collector is Implementation {
             revert WrongArrayLength();
         }
 
+        // Traverse all array elements
         for (uint256 i = 0; i < operations.length; ++i) {
             // Check for zero value
             if (operations[i] == 0) {
@@ -176,6 +177,7 @@ contract Collector is Implementation {
                 revert ZeroAddress();
             }
 
+            // Record L1 receiver addresses
             ReceiverBalance storage receiverBalance = mapOperationReceiverBalances[operations[i]];
             receiverBalance.receiver = receivers[i];
         }
@@ -256,7 +258,9 @@ contract Collector is Implementation {
             revert WrongAccount(msg.sender);
         }
 
+        // Get staking proxy unstake balance
         uint256 proxyUnstakeBalance = mapStakingProxyUnstakeReserves[stakingProxy];
+
         // Check for overflow
         if (amount > proxyUnstakeBalance) {
             revert Overflow(amount, proxyUnstakeBalance);
@@ -316,6 +320,7 @@ contract Collector is Implementation {
         if (operation == REWARD) {
             uint256 curProtocolFactor = protocolFactor;
 
+            // Skip if protocol factor is zero
             if (curProtocolFactor > 0) {
                 uint256 protocolAmount = (olasBalance * protocolFactor) / MAX_PROTOCOL_FACTOR;
                 olasBalance -= protocolAmount;

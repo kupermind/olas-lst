@@ -38,6 +38,9 @@ contract UnstakeRelayer is Implementation {
     // Reentrancy lock
     bool transient _locked;
 
+    /// @dev UnstakeRelayer constructor.
+    /// @param _olas OLAS address.
+    /// @param _st stOLAS address.
     constructor(address _olas, address _st) {
         olas = _olas;
         st = _st;

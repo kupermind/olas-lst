@@ -81,6 +81,9 @@ error ZeroValue();
 /// @dev The contract is already initialized.
 error AlreadyInitialized();
 
+/// @dev Caught reentrancy violation.
+error ReentrancyGuard();
+
 /// @title Lock - Smart contract for veOLAS related lock and voting functions
 contract Lock is Implementation {
     event OlasGovernorUpdated(address indexed olasGovernor);
@@ -99,6 +102,9 @@ contract Lock is Implementation {
     address public olasGovernor;
     // OLAS lock time increase value
     uint256 public lockTimeIncrease;
+
+    // Reentrancy lock
+    bool transient _locked;
 
     /// @dev Lock constructor.
     /// @param _olas OLAS address.
@@ -156,6 +162,12 @@ contract Lock is Implementation {
     /// @dev Sets OLAS governor address and creates first veOLAS lock.
     /// @param _olasGovernor OLAS governor address.
     function setGovernorAndCreateFirstLock(address _olasGovernor) external {
+        // Reentrancy guard
+        if (_locked) {
+            revert ReentrancyGuard();
+        }
+        _locked = true;
+
         // Check for ownership
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);
@@ -186,6 +198,12 @@ contract Lock is Implementation {
     /// @param olasAmount OLAS amount.
     /// @return unlockTimeIncreased True, if the unlock time has increased.
     function increaseLock(uint256 olasAmount) external returns (bool unlockTimeIncreased) {
+        // Reentrancy guard
+        if (_locked) {
+            revert ReentrancyGuard();
+        }
+        _locked = true;
+
         // Get OLAS from sender
         IToken(olas).transferFrom(msg.sender, address(this), olasAmount);
 
@@ -207,6 +225,12 @@ contract Lock is Implementation {
     /// @dev Withdraws locked balance.
     /// @param to Address to send funds to.
     function withdraw(address to) external {
+        // Reentrancy guard
+        if (_locked) {
+            revert ReentrancyGuard();
+        }
+        _locked = true;
+
         // Check for ownership
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);
@@ -238,6 +262,12 @@ contract Lock is Implementation {
         bytes[] memory calldatas,
         string memory description
     ) external returns (uint256) {
+        // Reentrancy guard
+        if (_locked) {
+            revert ReentrancyGuard();
+        }
+        _locked = true;
+
         // Check for ownership
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);
@@ -251,6 +281,12 @@ contract Lock is Implementation {
     /// @param support Support value: against, for, abstain.
     /// @return Vote weight.
     function castVote(uint256 proposalId, uint8 support) external returns (uint256) {
+        // Reentrancy guard
+        if (_locked) {
+            revert ReentrancyGuard();
+        }
+        _locked = true;
+
         // Check for ownership
         if (msg.sender != owner) {
             revert OwnerOnly(msg.sender, owner);

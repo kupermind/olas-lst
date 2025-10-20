@@ -301,6 +301,12 @@ contract ActivityModule {
     /// @dev Claims corresponding service rewards.
     /// @return claimed Amount claimed.
     function claim() external returns (uint256 claimed) {
+        // Reentrancy guard
+        if (_locked > 1) {
+            revert ReentrancyGuard();
+        }
+        _locked = 2;
+
         // Claim staking reward
         IStakingManager(stakingManager).claim(stakingProxy, serviceId);
 
@@ -311,16 +317,26 @@ contract ActivityModule {
             // Increase activity for the next staking epoch
             _increaseActivity(DEFAULT_ACTIVITY);
         }
+
+        _locked = 1;
     }
 
     /// @dev Drains multisig failed or unclaimed rewards.
     /// @return balance Amount drained.
     function drain() external returns (uint256 balance) {
+        // Reentrancy guard
+        if (_locked > 1) {
+            revert ReentrancyGuard();
+        }
+        _locked = 2;
+
         if (msg.sender != stakingManager) {
             revert ManagerOnly(msg.sender, stakingManager);
         }
 
         // Drain funds
         balance = _drain();
+
+        _locked = 1;
     }
 }

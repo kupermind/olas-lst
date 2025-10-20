@@ -109,6 +109,7 @@ contract stOLAS is ERC4626 {
     /// @param receiver Receiver account address.
     /// @return shares stOLAS amount.
     function deposit(uint256 assets, address receiver) public override returns (uint256 shares) {
+        // Check for access
         if (msg.sender != depository) {
             revert DepositoryOnly(msg.sender, depository);
         }
@@ -138,6 +139,7 @@ contract stOLAS is ERC4626 {
     /// @param tokenOwner Token owner account address.
     /// @return assets OLAS amount.
     function redeem(uint256 shares, address receiver, address tokenOwner) public override returns (uint256 assets) {
+        // Check for access
         if (msg.sender != treasury) {
             revert TreasuryOnly(msg.sender, treasury);
         }
@@ -220,6 +222,7 @@ contract stOLAS is ERC4626 {
     /// @param topUp Top up amount to be sent or received.
     /// @param direction To stOLAS, if true, and to Depository otherwise.
     function syncStakeBalances(uint256 reserveAmount, uint256 stakeAmount, uint256 topUp, bool direction) external {
+        // Check for access
         if (msg.sender != depository) {
             revert DepositoryOnly(msg.sender, depository);
         }
@@ -264,6 +267,7 @@ contract stOLAS is ERC4626 {
     /// @dev Top-ups vault balance via Distributor.
     /// @param amount OLAS amount.
     function topUpVaultBalance(uint256 amount) external {
+        // Check for access
         if (msg.sender != distributor) {
             revert DistributorOnly(msg.sender, distributor);
         }
@@ -284,6 +288,7 @@ contract stOLAS is ERC4626 {
     /// @dev Top-ups unstake balance from retired models via Depository: increase reserve balance and decrease staked one.
     /// @param amount OLAS amount.
     function topUpRetiredBalance(uint256 amount) external {
+        // Check for access
         if (msg.sender != unstakeRelayer) {
             revert UnstakeRelayerOnly(msg.sender, unstakeRelayer);
         }
