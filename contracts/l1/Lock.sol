@@ -84,6 +84,8 @@ error AlreadyInitialized();
 /// @title Lock - Smart contract for veOLAS related lock and voting functions
 contract Lock is Implementation {
     event OlasGovernorUpdated(address indexed olasGovernor);
+    event LockTimeIncreaseUpdated(uint256 lockTimeIncrease);
+    event Withdraw(address indexed to, uint256 amount);
 
     // Maximum veOLAS lock time (4 years)
     uint256 public constant MAX_LOCK_TIME = 4 * 365 * 1 days;
@@ -95,6 +97,8 @@ contract Lock is Implementation {
 
     // OLAS olasGovernor address
     address public olasGovernor;
+    // OLAS lock time increase value
+    uint256 public lockTimeIncrease;
 
     /// @dev Lock constructor.
     /// @param _olas OLAS address.
@@ -116,7 +120,20 @@ contract Lock is Implementation {
             revert AlreadyInitialized();
         }
 
+        lockTimeIncrease = MAX_LOCK_TIME;
         owner = msg.sender;
+    }
+
+    /// @dev Changes lock time increase value.
+    /// @param newLockTimeIncrease New lock time increase value.
+    function changeLockTimeIncrease(uint256 newLockTimeIncrease) external {
+        // Check for ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
+        }
+
+        lockTimeIncrease = newLockTimeIncrease;
+        emit LockTimeIncreaseUpdated(newLockTimeIncrease);
     }
 
     /// @dev Changes OLAS governor address.
@@ -169,16 +186,44 @@ contract Lock is Implementation {
     /// @param olasAmount OLAS amount.
     /// @return unlockTimeIncreased True, if the unlock time has increased.
     function increaseLock(uint256 olasAmount) external returns (bool unlockTimeIncreased) {
+        // Get OLAS from sender
+        IToken(olas).transferFrom(msg.sender, address(this), olasAmount);
+
         // Approve OLAS for veOLAS
         IToken(olas).approve(ve, olasAmount);
 
         // Increase lock amount
         IVEOLAS(ve).increaseAmount(olasAmount);
 
-        // Increase unlock time to a maximum, if possible
-        bytes memory increaseUnlockTimeData = abi.encodeCall(IVEOLAS.increaseUnlockTime, (MAX_LOCK_TIME));
-        // Note: both success and failure are acceptable
-        (unlockTimeIncreased,) = ve.call(increaseUnlockTimeData);
+        uint256 curLockTimeIncrease = lockTimeIncrease;
+        if (curLockTimeIncrease > 0) {
+            // Increase unlock time to a maximum, if possible
+            bytes memory increaseUnlockTimeData = abi.encodeCall(IVEOLAS.increaseUnlockTime, (curLockTimeIncrease));
+            // Note: both success and failure are acceptable
+            (unlockTimeIncreased,) = ve.call(increaseUnlockTimeData);
+        }
+    }
+
+    /// @dev Withdraws locked balance.
+    /// @param to Address to send funds to.
+    function withdraw(address to) external {
+        // Check for ownership
+        if (msg.sender != owner) {
+            revert OwnerOnly(msg.sender, owner);
+        }
+
+        // veOLAS withdraw
+        IVEOLAS(ve).withdraw();
+
+        // Get current balance amount
+        uint256 amount = IToken(olas).balanceOf(address(this));
+
+        // Check for non-zero amount
+        if (amount > 0) {
+            IToken(olas).transfer(to, amount);
+        }
+
+        emit Withdraw(to, amount);
     }
 
     /// @dev Create a new proposal to change the protocol / contract parameters.

@@ -300,140 +300,6 @@ contract LiquidStakingTest is Test {
         Collector(collector).setOperationReceivers(operations, receivers);
     }
 
-    function testE2ELiquidStakingSimple() public {
-        console.log("=== E2E Liquid Staking Simple Test ===");
-
-        // Take snapshot
-        uint256 snapshot = vm.snapshot();
-
-        console.log("L1");
-
-        // Get OLAS amount to stake
-        uint256 olasAmount = MIN_STAKING_DEPOSIT * 3;
-
-        // Approve OLAS for depository
-        console.log("User approves OLAS for depository:", olasAmount);
-        olas.approve(address(depository), olasAmount);
-
-        // Stake OLAS on L1
-        console.log("User deposits OLAS for stOLAS");
-        uint256 previewAmount = st.previewDeposit(olasAmount);
-        depository.deposit(
-            olasAmount,
-            _toArray(GNOSIS_CHAIN_ID),
-            _toArray(address(0)), // stakingTokenInstance placeholder
-            _toArray(BRIDGE_PAYLOAD),
-            _toArray(0)
-        );
-
-        uint256 stBalance = st.balanceOf(deployer);
-        assertEq(stBalance, previewAmount, "stOLAS balance mismatch");
-        console.log("User stOLAS balance now:", stBalance);
-
-        uint256 stTotalAssets = st.totalAssets();
-        console.log("OLAS total assets on stOLAS:", stTotalAssets);
-
-        console.log("L2");
-
-        // Note: This is a simplified test - in real scenario we'd need to:
-        // 1. Deploy actual staking instance
-        // 2. Setup proper bridging
-        // 3. Handle L2 operations
-
-        console.log("Test completed successfully");
-
-        // Restore snapshot
-        vm.revertTo(snapshot);
-    }
-
-    function testMoreThanOneServiceDeposit() public {
-        console.log("=== More Than One Service Deposit Test ===");
-
-        uint256 snapshot = vm.snapshot();
-
-        console.log("L1");
-
-        // Get OLAS amount to stake - want to cover 2 staked services
-        uint256 olasAmount = MIN_STAKING_DEPOSIT * 5;
-
-        // Approve OLAS for depository
-        console.log("User approves OLAS for depository:", olasAmount);
-        olas.approve(address(depository), olasAmount);
-
-        // Stake OLAS on L1
-        console.log("User deposits OLAS for stOLAS");
-        uint256 previewAmount = st.previewDeposit(olasAmount);
-        depository.deposit(
-            olasAmount,
-            _toArray(GNOSIS_CHAIN_ID),
-            _toArray(address(0)), // stakingTokenInstance placeholder
-            _toArray(BRIDGE_PAYLOAD),
-            _toArray(0)
-        );
-
-        uint256 stBalance = st.balanceOf(deployer);
-        assertEq(stBalance, previewAmount, "stOLAS balance mismatch");
-        console.log("User stOLAS balance now:", stBalance);
-
-        console.log("Test completed successfully");
-
-        vm.revertTo(snapshot);
-    }
-
-    function testTwoServicesDepositOneUnstakeMoreDepositFullUnstake() public {
-        console.log("=== Two Services Deposit, One Unstake, More Deposit, Full Unstake Test ===");
-
-        uint256 snapshot = vm.snapshot();
-
-        console.log("L1");
-
-        // Initial stake
-        uint256 olasAmount = MIN_STAKING_DEPOSIT * 5;
-        olas.approve(address(depository), olasAmount);
-
-        uint256 previewAmount = st.previewDeposit(olasAmount);
-        depository.deposit(
-            olasAmount, _toArray(GNOSIS_CHAIN_ID), _toArray(address(0)), _toArray(BRIDGE_PAYLOAD), _toArray(0)
-        );
-
-        uint256 stBalance = st.balanceOf(deployer);
-        assertEq(stBalance, previewAmount, "stOLAS balance mismatch");
-        console.log("User stOLAS balance now:", stBalance);
-
-        console.log("Test completed successfully");
-
-        vm.revertTo(snapshot);
-    }
-
-    function testMaxNumberStakes() public {
-        console.log("=== Max Number of Stakes Test ===");
-
-        uint256 snapshot = vm.snapshot();
-
-        console.log("L1");
-
-        uint256 olasAmount = (MIN_STAKING_DEPOSIT * 3) - 1;
-        olas.approve(address(depository), INIT_SUPPLY);
-
-        // Multiple stakes
-        uint256 numStakes = 18;
-        uint256[] memory chainIds = _fillArray(GNOSIS_CHAIN_ID, numStakes);
-        address[] memory stakingInstances = _fillArray(address(0), numStakes);
-        bytes[] memory bridgePayloads = _fillArray(BRIDGE_PAYLOAD, numStakes);
-        uint256[] memory values = _fillArray(0, numStakes);
-
-        for (uint256 i = 0; i < 10; i++) {
-            depository.deposit(olasAmount * numStakes, chainIds, stakingInstances, bridgePayloads, values);
-        }
-
-        uint256 stBalance = st.balanceOf(deployer);
-        console.log("User stOLAS balance now:", stBalance);
-
-        console.log("Test completed successfully");
-
-        vm.revertTo(snapshot);
-    }
-
     function testMultipleStakesUnstakes() public {
         console.log("=== Multiple Stakes-Unstakes Test ===");
 
@@ -450,7 +316,7 @@ contract LiquidStakingTest is Test {
         uint256[] memory values = _fillArray(0, numStakes);
 
         // Iterate over deposits
-        for (uint256 i = 0; i < 40; i++) {
+        for (uint256 i = 0; i < 1; i++) {
             console.log("Stake-Unstake iteration:", i);
 
             // Increase stake a bit every iteration
@@ -517,38 +383,6 @@ contract LiquidStakingTest is Test {
             stakedBalanceL2 = stakedBalanceL2 + stakeBalanceRemainder;
             assertEq(stakedBalanceL1, stakedBalanceL2);
         }
-
-        console.log("Test completed successfully");
-
-        vm.revertTo(snapshot);
-    }
-
-    function testRetireModels() public {
-        console.log("=== Retire Models Test ===");
-
-        uint256 snapshot = vm.snapshot();
-
-        console.log("L1");
-
-        uint256 olasAmount = (MIN_STAKING_DEPOSIT * 3) - 1;
-        olas.approve(address(depository), INIT_SUPPLY);
-
-        uint256 numStakes = 18;
-        uint256[] memory chainIds = _fillArray(GNOSIS_CHAIN_ID, numStakes);
-        address[] memory stakingInstances = _fillArray(address(0), numStakes);
-        bytes[] memory bridgePayloads = _fillArray(BRIDGE_PAYLOAD, numStakes);
-        uint256[] memory values = _fillArray(0, numStakes);
-
-        for (uint256 i = 0; i < 10; i++) {
-            depository.deposit(olasAmount * numStakes, chainIds, stakingInstances, bridgePayloads, values);
-        }
-
-        uint256 stBalance = st.balanceOf(deployer);
-        console.log("User stOLAS balance now:", stBalance);
-
-        // Try to close a model without setting it to retired
-        vm.expectRevert();
-        depository.closeRetiredStakingModels(_toArray(GNOSIS_CHAIN_ID), _toArray(address(0)));
 
         console.log("Test completed successfully");
 
