@@ -10,7 +10,8 @@ interface IDepositProcessor {
     /// @param amount Corresponding staking amount.
     /// @param bridgePayload Bridge payload necessary (if required) for a specific bridge relayer.
     /// @param operation Funds operation: stake / unstake.
-    function sendMessage(address target, uint256 amount, bytes memory bridgePayload, bytes32 operation)
+    /// @param sender Sender account.
+    function sendMessage(address target, uint256 amount, bytes memory bridgePayload, bytes32 operation, address sender)
         external
         payable;
 }
@@ -31,14 +32,6 @@ interface IST {
 
     /// @dev stOLAS reserve balance.
     function reserveBalance() external view returns (uint256);
-}
-
-interface ITreasury {
-    /// @dev Processes OLAS amount supplied and mints corresponding amount of stOLAS.
-    /// @param account Account address.
-    /// @param olasAmount OLAS amount.
-    /// @return Amount of stOLAS
-    function processAndMintStToken(address account, uint256 olasAmount) external returns (uint256);
 }
 
 /// @dev Zero value.
@@ -259,7 +252,8 @@ contract Depository is Implementation {
         uint256[] memory amounts,
         bytes[] memory bridgePayloads,
         uint256[] memory values,
-        bytes32 operation
+        bytes32 operation,
+        address sender
     ) private {
         for (uint256 i = 0; i < chainIds.length; ++i) {
             if (amounts[i] == 0) continue;
@@ -280,7 +274,7 @@ contract Depository is Implementation {
 
             // Perform operation on corresponding Staker on L2
             IDepositProcessor(depositProcessor).sendMessage{value: values[i]}(
-                stakingProxies[i], amounts[i], bridgePayloads[i], operation
+                stakingProxies[i], amounts[i], bridgePayloads[i], operation, sender
             );
         }
     }
@@ -613,7 +607,7 @@ contract Depository is Implementation {
         // as this would result in strict inequality: actualRemainder + actualStakeAmount >> stReserveBalance + stakeAmount
 
         // Send funds to staking via relevant deposit processors
-        _operationSendMessage(chainIds, stakingProxies, amounts, bridgePayloads, values, STAKE);
+        _operationSendMessage(chainIds, stakingProxies, amounts, bridgePayloads, values, STAKE, msg.sender);
 
         emit Deposit(msg.sender, stakeAmount, stAmount, chainIds, stakingProxies, amounts);
     }
@@ -627,13 +621,15 @@ contract Depository is Implementation {
     /// @param stakingProxies Set of staking proxies corresponding to each chain Id.
     /// @param bridgePayloads Bridge payloads corresponding to each chain Id.
     /// @param values Value amounts for each bridge interaction, if applicable.
+    /// @param sender Sender account.
     /// @return amounts Corresponding OLAS amounts for each staking proxy.
     function unstake(
         uint256 unstakeAmount,
         uint256[] memory chainIds,
         address[] memory stakingProxies,
         bytes[] memory bridgePayloads,
-        uint256[] memory values
+        uint256[] memory values,
+        address sender
     ) external payable returns (uint256[] memory amounts) {
         // Reentrancy guard
         if (_locked) {
@@ -697,7 +693,7 @@ contract Depository is Implementation {
         }
 
         // Request unstake via relevant deposit processors
-        _operationSendMessage(chainIds, stakingProxies, amounts, bridgePayloads, values, UNSTAKE);
+        _operationSendMessage(chainIds, stakingProxies, amounts, bridgePayloads, values, UNSTAKE, sender);
 
         emit Unstake(msg.sender, chainIds, stakingProxies, amounts);
     }
@@ -768,7 +764,7 @@ contract Depository is Implementation {
         }
 
         // Request unstake for retired models via relevant deposit processors
-        _operationSendMessage(chainIds, stakingProxies, amounts, bridgePayloads, values, UNSTAKE_RETIRED);
+        _operationSendMessage(chainIds, stakingProxies, amounts, bridgePayloads, values, UNSTAKE_RETIRED, msg.sender);
 
         emit Unstake(msg.sender, chainIds, stakingProxies, amounts);
     }

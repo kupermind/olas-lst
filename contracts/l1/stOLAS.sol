@@ -360,4 +360,14 @@ contract stOLAS is ERC4626 {
     function totalAssets() public view override returns (uint256) {
         return totalReserves;
     }
+
+    /// @dev Overrides unused function return value.
+    function maxMint(address) public pure override returns (uint256) {
+        return 0;
+    }
+
+    /// @dev Overrides unused function return value.
+    function maxWithdraw(address) public pure override returns (uint256) {
+        return 0;
+    }
 }

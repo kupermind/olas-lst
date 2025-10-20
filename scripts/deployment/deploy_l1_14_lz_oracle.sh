@@ -36,6 +36,7 @@ stakingImplementationBytecodeHash=$(jq -r '.stakingImplementationBytecodeHash' $
 chainIds=$(jq -r '.chainIds' $globals)
 stakingHelpers=$(jq -r '.stakingHelpers' $globals)
 lzChainIds=$(jq -r '.lzChainIds' $globals)
+depositoryProxyAddress=$(jq -r '.depositoryProxyAddress' $globals)
 
 # Getting L1 API key
 if [ $chainId == 1 ]; then
@@ -54,7 +55,7 @@ fi
 
 contractName="LzOracle"
 contractPath="contracts/l1/bridging/$contractName.sol:$contractName"
-constructorArgs="$endpointAddress $stakingImplementationBytecodeHash $chainIds $stakingHelpers $lzChainIds"
+constructorArgs="$endpointAddress $depositoryProxyAddress $stakingImplementationBytecodeHash $chainIds $stakingHelpers $lzChainIds"
 contractArgs="$contractPath --constructor-args $constructorArgs"
 
 # Get deployer based on the ledger flag
@@ -92,7 +93,7 @@ echo "$(jq '. += {"lzOracleAddress":"'$lzOracleAddress'"}' $globals)" > $globals
 
 # Verify contract
 if [ "$contractVerification" == "true" ]; then
-  contractParams="$lzOracleAddress $contractPath --constructor-args $(cast abi-encode "constructor(address,bytes32,uint256[],address[],uint256[])" $constructorArgs)"
+  contractParams="$lzOracleAddress $contractPath --constructor-args $(cast abi-encode "constructor(address,address,bytes32,uint256[],address[],uint256[])" $constructorArgs)"
   echo "Verification contract params: $contractParams"
 
   echo "${green}Verifying contract on Etherscan...${reset}"
