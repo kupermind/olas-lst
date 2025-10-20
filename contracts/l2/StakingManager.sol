@@ -13,6 +13,12 @@ interface ICollector {
     /// @param amount OLAS amount.
     /// @param operation Operation type.
     function topUpBalance(uint256 amount, bytes32 operation) external;
+
+    /// @dev Re-balances unstake reserve to direct it to requested operation.
+    /// @param stakingProxy Staking proxy address.
+    /// @param amount Amount value.
+    /// @param operation Operation type.
+    function rebalanceFromUnstakeReserve(address stakingProxy, uint256 amount, bytes32 operation) external;
 }
 
 // Activity module interface
@@ -437,10 +443,18 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         if (balance >= amount) {
             balance -= amount;
         } else {
-            // This must never happen except for unlikely cases where L2 staking setup does not correspond L1 numbers
+            // This must never happen except for unlikely cases where L2 staking setup does not correspond L1 numbers,
+            // or when stake failed and now symmetrical unstakes take place
             if (mapStakedServiceIds[stakingProxy].length == 0) {
+                // Get amount - balance difference
+                uint256 amountDiff = amount - balance;
+                // Amount becomes balance
                 amount = balance;
+                // Balance drops to zero since it was not sufficient in first places
                 balance = 0;
+
+                // Request funds re-balance from unstake reserve
+                ICollector(collector).rebalanceFromUnstakeReserve(stakingProxy, amountDiff, operation);
             } else {
                 // Calculate how many unstakes are needed
                 uint256 minStakingDeposit = IStaking(stakingProxy).minStakingDeposit();

@@ -58,6 +58,13 @@ fi
 
 castSendHeader="cast send --rpc-url $networkURL$API_KEY $walletArgs"
 
+echo "${green}Change Staking Manager in CollectorProxy${reset}"
+castArgs="$collectorProxyAddress changeStakingManager(address) $stakingManagerProxyAddress"
+echo $castArgs
+castCmd="$castSendHeader $castArgs"
+result=$($castCmd)
+echo "$result" | grep "status"
+
 echo "${green}Change Staking Processor L2 in CollectorProxy${reset}"
 castArgs="$collectorProxyAddress changeStakingProcessorL2(address) $stakingProcessorL2Address"
 echo $castArgs

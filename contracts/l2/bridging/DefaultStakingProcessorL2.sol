@@ -5,10 +5,10 @@ import {IBridgeErrors} from "../../interfaces/IBridgeErrors.sol";
 
 // Collector interface
 interface ICollector {
-    /// @dev Tops up address(this) with a specified amount according to a selected operation.
+    /// @dev Tops up address(this) with a specified amount as staking proxy unstake reserve.
+    /// @param stakingProxy Staking proxy address.
     /// @param amount OLAS amount.
-    /// @param operation Operation type.
-    function topUpBalance(uint256 amount, bytes32 operation) external;
+    function topUpUnstakeReserve(address stakingProxy, uint256 amount) external;
 }
 
 // StakingManager interface
@@ -319,8 +319,8 @@ abstract contract DefaultStakingProcessorL2 is IBridgeErrors {
                 // Approve OLAS for collector to initiate L1 transfer for corresponding operation by agents
                 IToken(olas).approve(collector, amount);
 
-                // Request top-up by Collector for a specific unstake operation
-                ICollector(collector).topUpBalance(amount, operation);
+                // Request top-up by Collector for staking proxy unstake reserve
+                ICollector(collector).topUpUnstakeReserve(target, amount);
             }
         } else if (operation == UNSTAKE || operation == UNSTAKE_RETIRED) {
             // UNSTAKE* must be finalized

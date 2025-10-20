@@ -280,6 +280,9 @@ describe("Liquid Staking", function () {
             collector.address, bridgeRelayer.address, bridgeRelayer.address, gnosisDepositProcessorL1.address, chainId);
         await gnosisStakingProcessorL2.deployed();
 
+        // changeStakingManager for collector
+        await collector.changeStakingManager(stakingManager.address);
+
         // changeStakingProcessorL2 for collector
         await collector.changeStakingProcessorL2(gnosisStakingProcessorL2.address);
 
@@ -411,9 +414,6 @@ describe("Liquid Staking", function () {
 
             stTotalAssets = await st.totalAssets();
             console.log("OLAS total assets on stOLAS now:", stTotalAssets.toString());
-
-            console.log("User approves stOLAS for treasury:", stBalance.toString());
-            await st.approve(treasury.address, stBalance);
 
             // Divide reward by 10 to definitely cover OLAS that is physically on stOLAS contract
             let stAmount = collectorBalance.div(10);
@@ -576,9 +576,6 @@ describe("Liquid Staking", function () {
             stTotalAssets = await st.totalAssets();
             console.log("OLAS total assets on stOLAS now:", stTotalAssets.toString());
 
-            console.log("User approves stOLAS for treasury:", stBalance.toString());
-            await st.approve(treasury.address, stBalance);
-
             // Divide stOLAS by 2 in order to have unstake executed
             let stAmount = stBalance.div(2);
             // Request withdraw
@@ -733,9 +730,6 @@ describe("Liquid Staking", function () {
             stTotalAssets = await st.totalAssets();
             console.log("OLAS total assets on stOLAS now:", stTotalAssets.toString());
 
-            console.log("User approves stOLAS for treasury:", stBalance.toString());
-            await st.approve(treasury.address, stBalance);
-
             // Divide stOLAS by 2 in order to have unstake executed
             let stAmount = stBalance.div(2);
             // Request withdraw
@@ -852,9 +846,6 @@ describe("Liquid Staking", function () {
 
             stTotalAssets = await st.totalAssets();
             console.log("OLAS total assets on stOLAS now:", stTotalAssets.toString());
-
-            console.log("User approves stOLAS for treasury:", stBalance.toString());
-            await st.approve(treasury.address, stBalance);
 
             console.log("\nL1 - L2 - L1");
 
@@ -1010,9 +1001,6 @@ describe("Liquid Staking", function () {
             stTotalAssets = await st.totalAssets();
             console.log("OLAS total assets on stOLAS now:", stTotalAssets.toString());
             expect(stTotalAssets).to.equal(totalComputedAssets);
-
-            console.log("User approves stOLAS for treasury:", stBalance.toString());
-            await st.approve(treasury.address, stBalance);
 
             // Full stOLAS withdraw
             // Request withdraw
@@ -1230,9 +1218,6 @@ describe("Liquid Staking", function () {
 
                 let stTotalAssets = await st.totalAssets();
                 console.log("OLAS total assets on stOLAS now:", stTotalAssets.toString());
-
-                console.log("User approves stOLAS for treasury:", stBalance.toString());
-                await st.approve(treasury.address, stBalance);
 
                 // Unstake minStakingDeposit * i as stOLAS amount will always be smaller than OLAS amount
                 let stAmount = stBalance.div(10);
