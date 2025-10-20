@@ -234,6 +234,7 @@ contract Depository is Implementation {
             revert WrongStakingModel(stakingModelId);
         }
 
+        // Record staking model status
         mapStakingModels[stakingModelId].status = status;
 
         emit StakingModelStatusSet(chainId, stakingProxy, status);
@@ -254,7 +255,8 @@ contract Depository is Implementation {
         uint256[] memory values,
         bytes32 operation,
         address sender
-    ) private {
+    ) internal {
+        // Traverse all array elements
         for (uint256 i = 0; i < chainIds.length; ++i) {
             if (amounts[i] == 0) continue;
 
@@ -409,6 +411,7 @@ contract Depository is Implementation {
         uint256 stakeLimitPerSlot,
         uint256 numSlots
     ) external {
+        // Check for access
         if (msg.sender != lzOracle) {
             revert UnauthorizedAccount(msg.sender);
         }
@@ -421,6 +424,7 @@ contract Depository is Implementation {
     /// @param chainId Chain Id.
     /// @param stakingProxy Corresponding staking proxy address.
     function LzCloseStakingModel(uint256 chainId, address stakingProxy) external {
+        // Check for access
         if (msg.sender != lzOracle) {
             revert UnauthorizedAccount(msg.sender);
         }

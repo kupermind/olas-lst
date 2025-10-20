@@ -54,6 +54,10 @@ contract Distributor is Implementation {
     // Reentrancy lock
     bool transient _locked;
 
+    /// @dev Distributor constructor.
+    /// @param _olas OLAS address.
+    /// @param _st stOLAS address.
+    /// @param _lock Lock address.
     constructor(address _olas, address _st, address _lock) {
         olas = _olas;
         st = _st;

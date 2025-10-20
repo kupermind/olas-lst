@@ -524,6 +524,12 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
     /// @param serviceId Service Id.
     /// @return reward Staking reward.
     function claim(address stakingProxy, uint256 serviceId) external returns (uint256 reward) {
+        // Reentrancy guard
+        if (_locked > 1) {
+            revert ReentrancyGuard();
+        }
+        _locked = 2;
+
         // Check that msg.sender is a valid Activity Module corresponding to its service Id
         address activityModule = mapServiceIdActivityModules[serviceId];
         if (msg.sender != activityModule) {
@@ -533,6 +539,8 @@ contract StakingManager is Implementation, ERC721TokenReceiver {
         reward = IStaking(stakingProxy).claim(serviceId);
 
         emit Claimed(stakingProxy, serviceId, activityModule, reward);
+
+        _locked = 1;
     }
 
     /// @dev Gets staked service Ids for a specific staking proxy.

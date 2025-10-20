@@ -32,6 +32,8 @@ interface IST {
     /// @return assets OLAS amount.
     function redeem(uint256 shares, address receiver, address owner) external returns (uint256 assets);
 
+    /// @dev Gets stOLAS staked balance.
+    /// @return stOLAS staked balance.
     function stakedBalance() external returns (uint256);
 }
 
