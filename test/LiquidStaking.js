@@ -425,7 +425,7 @@ describe("Liquid Staking", function () {
             let res = await tx.wait();
             // Get withdraw request Id
             //console.log(res.logs);
-            let requestId = ethers.BigNumber.from(res.logs[5].topics[3]);
+            let requestId = ethers.BigNumber.from(res.logs[4].topics[3]);
             let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
             let olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
             expect(olasWithdrawAmount).to.equal(previewAmount);
@@ -434,8 +434,6 @@ describe("Liquid Staking", function () {
 
             // Finalize withdraw
             console.log("User to finalize withdraw request after withdraw cool down period");
-            console.log("Approve 6909 requestId tokens for treasury");
-            await treasury.approve(treasury.address, requestId, await treasury.balanceOf(deployer.address, requestId));
 
             console.log("Finalize withdraw");
             let balanceBefore = await olas.balanceOf(deployer.address);
@@ -456,8 +454,8 @@ describe("Liquid Staking", function () {
             res = await tx.wait();
             // Get withdraw request Id
             //console.log(res.logs);
-            requestId = ethers.BigNumber.from(res.logs[5].topics[3]);
-            data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
+            requestId = ethers.BigNumber.from(res.logs[4].topics[3]);
+            data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[4].data);
             olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
             expect(olasWithdrawAmount).to.equal(previewAmount);
             console.log("Withdraw requestId:", requestId.toString());
@@ -591,8 +589,8 @@ describe("Liquid Staking", function () {
             let res = await tx.wait();
             // Get withdraw request Id
             //console.log(res.logs);
-            let requestId = ethers.BigNumber.from(res.logs[5].topics[3]);
-            let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
+            let requestId = ethers.BigNumber.from(res.logs[4].topics[3]);
+            let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[4].data);
             let olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
             expect(olasWithdrawAmount).to.equal(previewAmount);
             console.log("Withdraw requestId:", requestId.toString());
@@ -600,8 +598,6 @@ describe("Liquid Staking", function () {
 
             // Finalize withdraw
             console.log("User to finalize withdraw request after withdraw cool down period");
-            console.log("Approve 6909 requestId tokens for treasury");
-            await treasury.approve(treasury.address, requestId, await treasury.balanceOf(deployer.address, requestId));
 
             console.log("Finalize withdraw");
             let balanceBefore = await olas.balanceOf(deployer.address);
@@ -622,8 +618,8 @@ describe("Liquid Staking", function () {
             res = await tx.wait();
             // Get withdraw request Id
             //console.log(res.logs);
-            requestId = ethers.BigNumber.from(res.logs[5].topics[3]);
-            data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
+            requestId = ethers.BigNumber.from(res.logs[4].topics[3]);
+            data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[4].data);
             olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
             expect(olasWithdrawAmount).to.equal(previewAmount);
             console.log("Withdraw requestId:", requestId.toString());
@@ -750,8 +746,8 @@ describe("Liquid Staking", function () {
             let res = await tx.wait();
             // Get withdraw request Id
             //console.log(res.logs);
-            let requestId = ethers.BigNumber.from(res.logs[5].topics[3]);
-            let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
+            let requestId = ethers.BigNumber.from(res.logs[4].topics[3]);
+            let data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[4].data);
             let olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
             expect(olasWithdrawAmount).to.equal(previewAmount);
             console.log("Withdraw requestId:", requestId.toString());
@@ -760,8 +756,6 @@ describe("Liquid Staking", function () {
             // Finalize withdraw
             console.log("User to finalize withdraw request after withdraw cool down period");
             const requestBalance = await treasury.balanceOf(deployer.address, requestId);
-            console.log("Approve 6909 requestId tokens for treasury:", requestBalance.toString());
-            await treasury.approve(treasury.address, requestId, requestBalance);
 
             console.log("Finalize withdraw");
             let balanceBefore = await olas.balanceOf(deployer.address);
@@ -883,8 +877,8 @@ describe("Liquid Staking", function () {
             res = await tx.wait();
             // Get withdraw request Id
             //console.log(res.logs);
-            requestId = ethers.BigNumber.from(res.logs[5].topics[3]);
-            data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[5].data);
+            requestId = ethers.BigNumber.from(res.logs[4].topics[3]);
+            data6909 = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], res.logs[4].data);
             olasWithdrawAmount = ethers.BigNumber.from(data6909[1]);
             expect(olasWithdrawAmount).to.equal(previewAmount);
             console.log("Withdraw requestId:", requestId.toString());
@@ -1040,7 +1034,7 @@ describe("Liquid Staking", function () {
                 // Get withdraw request Id
                 //console.log(res.logs);
                 let requestId;
-                let idx = 5;
+                let idx = 4;
                 try {
                     // Try with the 5th event index
                     requestId = ethers.BigNumber.from(res.logs[idx].topics[3]);
@@ -1072,8 +1066,6 @@ describe("Liquid Staking", function () {
                 // Finalize withdraw
                 console.log("User to finalize withdraw request after withdraw cool down period");
                 const requestBalance = await treasury.balanceOf(deployer.address, requestId);
-                console.log("Approve 6909 requestId tokens for treasury:", requestBalance.toString());
-                await treasury.approve(treasury.address, requestId, requestBalance);
 
                 console.log("Finalize withdraw");
                 let balanceBefore = await olas.balanceOf(deployer.address);
@@ -1257,7 +1249,7 @@ describe("Liquid Staking", function () {
                 // Get withdraw request Id
                 //console.log(res.logs);
                 let requestId;
-                let idx = 5;
+                let idx = 4;
                 try {
                     // Try with the 5th event index
                     requestId = ethers.BigNumber.from(res.logs[idx].topics[3]);
@@ -1289,8 +1281,6 @@ describe("Liquid Staking", function () {
                 // Finalize withdraw
                 console.log("User to finalize withdraw request after withdraw cool down period");
                 const requestBalance = await treasury.balanceOf(deployer.address, requestId);
-                console.log("Approve 6909 requestId tokens for treasury:", requestBalance.toString());
-                await treasury.approve(treasury.address, requestId, requestBalance);
 
                 console.log("Finalize withdraw");
                 let balanceBefore = await olas.balanceOf(deployer.address);
@@ -1329,7 +1319,7 @@ describe("Liquid Staking", function () {
                 // Get withdraw request Id
                 //console.log(res.logs);
                 let requestId;
-                let idx = 5;
+                let idx = 4;
                 try {
                     // Try with the 5th event index
                     requestId = ethers.BigNumber.from(res.logs[idx].topics[3]);
@@ -1361,8 +1351,6 @@ describe("Liquid Staking", function () {
                 // Finalize withdraw
                 console.log("User to finalize withdraw request after withdraw cool down period");
                 const requestBalance = await treasury.balanceOf(deployer.address, requestId);
-                console.log("Approve 6909 requestId tokens for treasury:", requestBalance.toString());
-                await treasury.approve(treasury.address, requestId, requestBalance);
 
                 console.log("Finalize withdraw");
                 let balanceBefore = await olas.balanceOf(deployer.address);
