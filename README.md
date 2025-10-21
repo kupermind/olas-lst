@@ -254,6 +254,10 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
+## Important Disclosures
+
+See [Disclosures](doc/disclosures) folder for important disclosure details.
+
 ## Acknowledgements
 stOLAS contracts were inspired and based on the following sources:
 - [Solmate](https://github.com/transmissions11/solmate)
