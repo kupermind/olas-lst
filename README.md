@@ -159,7 +159,7 @@ The test suite covers comprehensive E2E scenarios:
 
 **Exit criteria:**
 - Preflight/alerts in place; correct routing confirmed on staging/mainnet.
-- ≥1 full cycle of request→unstake→bridge→finalize validated end‑to‑end.
+- ≥1 full cycle of request → unstake → bridge → finalize validated end‑to‑end.
 - Dashboards live and reviewed by maintainers.
 
 ### Phase 1 — Core Protocol Stabilization / Mainnet Beta []
