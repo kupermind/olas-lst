@@ -141,8 +141,8 @@ The test suite covers comprehensive E2E scenarios:
 
 ## Security
 
-- **Internal Audits**: Comprehensive internal code review completed
-- **External Audits**: Reviewing options, TBD
+- **Internal Audits**: Comprehensive internal code review [completed](audits/README.md)
+- **External Audits**: v0.1.0 code review is [completed](audits/README.md)
 - **Open Source**: Full transparency with public repository
 - **Bug Bounty**: Program under consideration post-audit
 
@@ -225,6 +225,9 @@ Proposal tx: https://etherscan.io/tx/0x7682f2042e1524a6aa971ec2438846c58282ed485
 Proposal Id: [`59025344683074789922169705239782887646995636661382504070382540682844243682748`](https://etherscan.io/tx/0x7682f2042e1524a6aa971ec2438846c58282ed48546a5a7885caa096b4933178#eventlog)
 
 Proposal State: [Executed](https://etherscan.io/address/0x8e84b5055492901988b831817e4ace5275a3b401#readContract#F21)
+
+## Audits
+Internal and external audits are provided as development matures. All audit reports can be found [here](audits/README.md).
 
 ## Documentation
 

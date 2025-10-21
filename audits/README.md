@@ -11,4 +11,4 @@ An `audit6` with a focus `main` branch [audit6](https://github.com/kupermind/ola
 
 ### External audits
 External audit reports are listed in their historical order:
-- 2025-10-21: v0.1.0 by [CODESPECT]().
+- 2025-10-21: v0.1.0 by [CODESPECT](https://github.com/CODESPECT-security/audit-reports/blob/main/034_CODESPECT_LSTOLAS.pdf).
