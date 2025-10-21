@@ -145,15 +145,16 @@ Ultimately there is a set of active activity module addresses that must be calle
 ### Staking Proxy Checkpoint
 
 For any of `stakingProxy` address, the `checkpoint()` function can be called at any moment. However, note that the `checkpoint()`
-is also called when `stake()`, `claim()` and `ustake()` are called. If applicable, it is advised to monitor the following condition
+is also called when `stake()`, `claim()` and `ustake()` are executed. If applicable, it is advised to monitor the following condition
 prior to calling the `checkpoint()` function:
 ```
-if (block.timestamp - stakingProxy.tsCheckpoint() > stakingProxy.livenessPeriod()) {
+if ((stakingProxy.getNumServiceIds() > 0) && (block.timestamp - stakingProxy.tsCheckpoint() > stakingProxy.livenessPeriod())) {
     send stakingProxy.checkpoint();
 }
 ```
 
-This check is going to skip the `checkpoint()` call if the checkpoint has been already triggered within the `livenessPeriod` time.
+This check is going to skip the `checkpoint()` call if no agents are staked or if the checkpoint has been already
+triggered within the `livenessPeriod` time.
 
 ### Trigger L2 to L1 Tokens Bridging
 

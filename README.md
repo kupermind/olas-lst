@@ -141,8 +141,8 @@ The test suite covers comprehensive E2E scenarios:
 
 ## Security
 
-- **Internal Audits**: Comprehensive internal code review completed
-- **External Audits**: Reviewing options, TBD
+- **Internal Audits**: Comprehensive internal code review [completed](audits/README.md)
+- **External Audits**: v0.1.0 code review is [completed](audits/README.md)
 - **Open Source**: Full transparency with public repository
 - **Bug Bounty**: Program under consideration post-audit
 
@@ -159,7 +159,7 @@ The test suite covers comprehensive E2E scenarios:
 
 **Exit criteria:**
 - Preflight/alerts in place; correct routing confirmed on staging/mainnet.
-- ≥1 full cycle of request→unstake→bridge→finalize validated end‑to‑end.
+- ≥1 full cycle of request → unstake → bridge → finalize validated end‑to‑end.
 - Dashboards live and reviewed by maintainers.
 
 ### Phase 1 — Core Protocol Stabilization / Mainnet Beta []
@@ -226,6 +226,9 @@ Proposal Id: [`59025344683074789922169705239782887646995636661382504070382540682
 
 Proposal State: [Executed](https://etherscan.io/address/0x8e84b5055492901988b831817e4ace5275a3b401#readContract#F21)
 
+## Audits
+Internal and external audits are provided as development matures. All audit reports can be found [here](audits/README.md).
+
 ## Documentation
 
 ```
@@ -253,6 +256,10 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Important Disclosures
+
+See [Disclosures](doc/disclosures) folder for important disclosure details.
 
 ## Acknowledgements
 stOLAS contracts were inspired and based on the following sources:
