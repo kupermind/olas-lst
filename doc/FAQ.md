@@ -95,5 +95,5 @@ instead of on‑chain redemption.
 ### Notes
 - Asset token is assumed to be **standard ERC‑20 OLAS** (no hooks/rebase/fee‑on‑transfer).
 - Upgrade authority is expected to be **multisig → timelock** in production.
-- For integrators: ERC4626 entrypoints are **non‑standard** (`deposit` only via Depository; `redeem` only via Treasury; `mint/withdraw` not meant for external use).
+- For integrators: ERC4626 entry points are **non‑standard** (`deposit` only via Depository; `redeem` only via Treasury; `mint/withdraw` not meant for external use).
 

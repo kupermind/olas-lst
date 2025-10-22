@@ -1,9 +1,9 @@
 # Privacy Policy
 
-**Entity:** Lemon Tree Technologies LTD (BVI) 
-**Project:** stOLAS  
-**Website:** [https://lstolas.xyz](https://lstolas.xyz)  
-**Contact:** info@lstolas.xyz  
+**Entity:** Lemon Tree Technologies LTD (BVI)
+**Project:** stOLAS
+**Website:** [https://lstolas.xyz](https://lstolas.xyz)
+**Contact:** [mailto:info@lstolas.xyz](info@lstolas.xyz)
 
 ---
 
@@ -60,7 +60,7 @@ We do not knowingly collect data from minors.
 
 ## 8. Your Rights
 As a decentralized protocol, users retain full control over their blockchain activity.  
-If you have any questions or concerns about privacy or data handling, please contact us at **info@lstolas.xyz**.
+If you have any questions or concerns about privacy or data handling, please contact us at **[mailto:info@lstolas.xyz](info@lstolas.xyz)**.
 
 ---
 
@@ -71,5 +71,5 @@ We may update this Privacy Policy periodically. The updated version will always 
 
 ## 10. Contact
 For privacy-related inquiries:  
-**Email:** info@lstolas.xyz  
+**Email:** [mailto:info@lstolas.xyz](info@lstolas.xyz)
 **Website:** [https://lstolas.xyz](https://lstolas.xyz)

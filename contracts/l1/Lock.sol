@@ -48,14 +48,6 @@ interface IToken {
 }
 
 interface IVEOLAS {
-    struct LockedBalance {
-        // Token amount. It will never practically be bigger. Initial OLAS cap is 1 bn tokens, or 1e27.
-        // After 10 years, the inflation rate is 2% per year. It would take 1340+ years to reach 2^128 - 1
-        uint128 amount;
-        // Unlock time. It will never practically be bigger
-        uint64 endTime;
-    }
-
     /// @dev Deposits `amount` tokens for `msg.sender` and locks for `unlockTime`.
     /// @param amount Amount to deposit.
     /// @param unlockTime Time when tokens unlock, rounded down to a whole week.
@@ -71,8 +63,6 @@ interface IVEOLAS {
 
     /// @dev Withdraws all tokens for `msg.sender`. Only possible if the lock has expired.
     function withdraw() external;
-
-    function mapLockedBalances(address account) external returns (LockedBalance memory);
 }
 
 /// @dev Zero value.

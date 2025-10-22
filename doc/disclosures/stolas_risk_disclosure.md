@@ -1,9 +1,9 @@
 # Risk Disclosure Statement
 
-**Entity:** Lemon Tree Technologies LTD 
-**Project:** stOLAS  
-**Website:** [https://lstolas.xyz](https://lstolas.xyz)  
-**Contact:** info@lstolas.xyz  
+**Entity:** Lemon Tree Technologies LTD
+**Project:** stOLAS
+**Website:** [https://lstolas.xyz](https://lstolas.xyz)
+**Contact:** [mailto:info@lstolas.xyz](info@lstolas.xyz)
 
 ---
 

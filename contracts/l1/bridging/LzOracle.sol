@@ -298,12 +298,12 @@ contract LzOracle is OAppRead, OAppOptionsType3 {
             READ_CHANNEL,
             payload,
             messageOptions,
-            MessagingFee(msg.value, 0),
+            MessagingFee({ nativeFee: msg.value, lzTokenFee: 0 }),
             payable(msg.sender)
         );
 
         mapUidStakingProxyChainIds[receipt.guid] =
-            AccountChainIdMsgType(stakingProxy, uint32(chainId), READ_TYPE_CREATE);
+            AccountChainIdMsgType({ account: stakingProxy, chainId: uint32(chainId), msgType: READ_TYPE_CREATE });
 
         emit LzCreateAndActivateStakingModelInitiated(receipt.guid, chainId, stakingProxy);
     }

@@ -1,9 +1,9 @@
 # Terms of Use
 
-**Entity:** Lemon Tree Technologies LTD 
-**Project:** stOLAS  
-**Website:** [https://lstolas.xyz](https://lstolas.xyz)  
-**Contact:** info@lstolas.xyz  
+**Entity:** Lemon Tree Technologies LTD
+**Project:** stOLAS
+**Website:** [https://lstolas.xyz](https://lstolas.xyz)
+**Contact:** [mailto:info@lstolas.xyz](info@lstolas.xyz)
 
 ---
 
@@ -75,5 +75,5 @@ These Terms are governed by and construed in accordance with the laws of the **B
 ---
 
 **Contact:**  
-info@lstolas.xyz  
+[mailto:info@lstolas.xyz](info@lstolas.xyz)
 [https://lstolas.xyz](https://lstolas.xyz)

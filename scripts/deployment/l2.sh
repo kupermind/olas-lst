@@ -27,6 +27,7 @@ set -euo pipefail
 ./scripts/deployment/deploy_l2_07_module_activity_checker.sh $1
 
 # Deploy StakingTokenLocked
+# !!! Only on testnet, as on mainnet it must be deployed and voted for already
 ./scripts/deployment/deploy_l2_08_staking_token_locked.sh $1
 
 # Deploy GnosisStakingProcessorL2

@@ -28,10 +28,10 @@
   "stakingTokenLockedAddress": "0xA8e739a8A5D56b9ccF612020204B9C90A1b55099",
   "livenessRatio":"1",
   "maxNumServices":"20",
-  "rewardsPerSecond":"95129375951293",
-  "minStakingDeposit":"1000000000000000000000",
+  "rewardsPerSecond":"47564687975646",
+  "minStakingDeposit":"500000000000000000000",
   "livenessPeriod":"86400",
   "timeForEmissions":"2592000",
-  "stakingManagerProxyAddress": "",
-  "moduleActivityCheckerAddress": ""
+  "stakingManagerProxyAddress": "0xEfF4A1D9faF5c750d5E32754c40Cf163767C63A4",
+  "moduleActivityCheckerAddress": "0xcfA10d192c3999b5CA59aD3c7512c40f1B919e01"
 }
